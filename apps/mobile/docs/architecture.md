@@ -1,11 +1,16 @@
 # Jokko Mobile — Architecture & Design Document
 
-> **Statut** : Design v1 validé par `brainstorming` + `multi-agent-brainstorming` (Skeptic + Constraint Guardian + User Advocate + Arbiter).
-> **Date** : 2026-04-30
+> **Statut** : Design validé (brainstorming + multi-agent review + L0 spikes exécutés). **78 décisions verrouillées**.
+> **Date** : 2026-04-30 (dernière mise à jour §17.3 : 2026-04-30)
 > **Owner** : @doums85 (solo dev)
-> **Disposition Arbiter** : voir §18.
+> **Disposition Arbiter** : APPROVED (voir §18).
 >
-> ⚠️ **Important** : Ce doc a été révisé après la review multi-agents (72 objections soulevées). La §17 contient les **revisions adoptées**, **spikes pré-L1 obligatoires (L0)**, et **objections rejetées avec rationale**. Les sections 1-16 reflètent le design original — **lire la §17 avant d'implémenter**.
+> ⚠️ **Important** : Ce doc a été révisé en 3 passes :
+> 1. **§1-16** : design original single-agent (brainstorming skill)
+> 2. **§17 (Décisions 31-60)** : revisions après review multi-agents (72 objections)
+> 3. **§17.3 (Décisions 61-78)** : findings des spikes L0 exécutés (S1, S2+S3, S5)
+>
+> **Lire la §17 avant d'implémenter.**
 
 ---
 
@@ -644,7 +649,11 @@ Liste finale des spikes qui doivent être validés avec preuve fonctionnelle ava
 
 **Total L0** : ~3-4 semaines avant que L1 commence.
 
-### 17.3 Révisions architecture acceptées (Décisions 31 à 60)
+### 17.3 Révisions architecture acceptées (Décisions 31 à 78)
+
+**Décisions 31-60** : issues directement de la review multi-agents (Skeptic / Guardian / User Advocate / Arbiter, voir §18).
+
+**Décisions 61-78** : issues des **L0 spikes exécutés après l'Arbiter** (S1 Apple SignIn, S2+S3 Privacy/ATT, S5 multi-tenant purge). Chaque décision référence le findings doc du spike correspondant.
 
 | # | Nouvelle décision | Source | Impact |
 |---|---|---|---|
@@ -678,6 +687,29 @@ Liste finale des spikes qui doivent être validés avec preuve fonctionnelle ava
 | 58 | **Reply lock screen v1.0** : copie explicite "Tap pour ouvrir et répondre" (pas inline reply silencieux). NSE planifiée v1.1 avec spike effort | UA #10 | §9.3 |
 | 59 | **Coûts opérationnels chiffrés** : tableau Convex / Apple Dev / EAS / Sentry / PostHog / OAuth Google à 100/1000/10000 users | Guardian #8 | §14 |
 | 60 | **iOS 16+ justifié + comportement device non supporté** : copie d'erreur explicite + lien d'upgrade. Source Apple Developer datée. | Guardian #2 | §1.5 |
+
+#### Décisions issues des L0 spikes
+
+| # | Nouvelle décision | Spike source | Impact |
+|---|---|---|---|
+| 61 | **`packages/convex-client` indispensable dès L1** : sans isolation, l'import de `convex/_generated/api` côté mobile cause un type-check transitif sur tout le backend Convex (incompatible TS lib mobile, ex. `convex/http.ts` `FormData.get`) | S1 §4.2 | L1 |
+| 62 | **Apple `sub` claim** = clé d'identité (pas l'email). Schema Convex à étendre : `users.appleUserId: v.optional(v.string())` indexé. Idem `googleSub` | S1 §4.4 | L2, schema Convex |
+| 63 | **Pin Expo packages manuellement** : `pnpm add` retourne SDK 55 par défaut (`expo-apple-authentication@^55.x` ≠ SDK 54 attendu `~8.x`). Documenter dans `apps/mobile/README.md` | S1 §4.1 | L1 process |
+| 64 | **`fullName` Apple capturé impérativement au premier signup** : Apple ne le re-fournit pas aux signins suivants. Save dans `users` à l'inscription | S1 §4.6 | L2 |
+| 65 | **Privacy Manifest déclaratif via `app.json`** (pas de XML manuel) — Expo SDK 54+ génère le `PrivacyInfo.xcprivacy` au prebuild. Source de vérité = `ios.privacyManifests` | S2 §2.1 | L1 + ongoing |
+| 66 | **Audit SDK obligatoire à chaque `pnpm add`** : vérifier que le SDK fournit son privacy manifest. SDKs sans manifest = refus à l'installation. Liste interdite : AppsFlyer, Branch, Adjust, Singular, Firebase Analytics, Meta SDK | S2 §2.3, §4.3 | Process / lint rule |
+| 67 | **PostHog config `disableIdfa: true`** + `captureDeepLinks: false` + `enableSessionReplay: false` (perf + privacy v1.0) | ADR-0001 | L1 |
+| 68 | **Sentry config `sendDefaultPii: false`** + `beforeSend` scrubber strip emails / phone / message bodies | ADR-0001 | L1 |
+| 69 | **Consent runtime granulaire** : Crash reporting = legitimate interest (default on, opt-out possible). Analytics PostHog = opt-in (default off). Modal au first launch + Settings page | ADR-0001 + Decision #56 | L1 |
+| 70 | **Charles Proxy audit en L12** : valider 0 call vers domaines de tracking publicitaires (doubleclick, facebook, branch.io, adjust, singular) avant submission App Store | S3 §3.3 | L12 |
+| 71 | **`NSPrivacyTracking: false`** verrouillé v1.0. Ré-évaluation requise si acquisition payante mobile devient un canal stratégique (créer ADR-0002 si déclenché) | ADR-0001 §Trigger | Stratégie |
+| 72 | **`switchOrg()` séquence canonique 9 étapes** : confirm queue → snapshot keys → purge cache → reset stores → close Convex → clear secure → set new token → audit. Pas de raccourci | S5 §2 | L1 |
+| 73 | **Re-mount `<ConvexProvider key={orgId}>`** au switch, pour forcer le démontage de toutes les subscriptions React (impossible autrement à fond) | S5 §4.3 | L1 |
+| 74 | **Convention naming MMKV** : `jokko.<orgId>.<scope>.<key>` — purge sélective par préfixe au switch au lieu de `clearAll()` qui détruirait `jokko.global.*` (langue, theme, etc.) | S5 §5.3 | L1 + ADR-0002 |
+| 75 | **Vider `expo-file-system/cache/`** au switchOrg (médias téléchargés en cache disque) — étape supplémentaire à ajouter à la séquence | S5 §4.4 | L1 |
+| 76 | **`detectOrgLeak()` en breadcrumb Sentry** après chaque switch — alerte si leak détecté en prod | S5 §2 + production | L1 + observability |
+| 77 | **Lock mutex sur `switchOrg()`** pour éviter 2 switches concurrents (race condition possible via UI multi-tap rapide) | S5 §4.5 | L1 |
+| 78 | **Maestro E2E `org_switch_isolation_test.yaml`** obligatoire avant beta — scénario draft offline + switch + assertions no-leak | S5 §5.2 + Decision #54 | L12 |
 
 ### 17.4 Planning révisé (avec marge 40% + L0 spikes)
 
@@ -734,11 +766,11 @@ Total v1.0 : ~10-11 mois solo (au lieu de 6-7).
 - ATT prompt si tracking ajouté
 - ADRs complets (5 critiques avant L2, le reste au fil de l'eau)
 
-### 17.7 Decision Log final — version 2 (post-multi-agent)
+### 17.7 Decision Log final — version 3 (post-multi-agent + post-spikes L0)
 
-Total décisions verrouillées : **60** (30 v1 + 30 ajoutées par la review).
+Total décisions verrouillées : **78** (30 v1 + 30 review multi-agent + 18 spikes L0).
 
-L'intégralité des 60 décisions vit dans ce document (Decision Log §3 pour 1-30, §17.3 pour 31-60).
+L'intégralité des 78 décisions vit dans ce document (Decision Log §3 pour 1-30, §17.3 pour 31-78).
 
 ---
 
@@ -790,7 +822,7 @@ Le Primary Designer a traité de manière sérieuse et structurée les 72 object
 ## 19. Validation finale (post-Arbiter)
 
 - ✅ Toutes objections (72) résolues ou explicitement rejetées avec rationale
-- ✅ Decision Log v2 complet (60 décisions verrouillées)
+- ✅ Decision Log v3 complet (78 décisions verrouillées — 30 v1 + 30 review + 18 spikes L0)
 - ✅ L0 spikes listés et chiffrés (S1-S8, ~3-4 sem.)
 - ✅ Disposition Arbiter : **APPROVED**
 - ✅ Planning révisé avec marge 40% (~10-11 mois v1.0, ~16-20 mois parité totale)
