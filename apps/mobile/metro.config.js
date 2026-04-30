@@ -11,11 +11,12 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
-// pnpm monorepo: forcer Metro à utiliser uniquement les nodeModulesPaths
-// configurés ci-dessus. Sinon Metro trouve la copie root node_modules/react-native
-// (real dir) ET le symlink apps/mobile/node_modules/react-native (→ .pnpm/...) →
-// imports internes de react-native cassent (ex. "Cannot resolve InputAccessoryView").
-// Recommandation officielle Expo en monorepo pnpm.
-config.resolver.disableHierarchicalLookup = true;
+// pnpm monorepo: hierarchical lookup DOIT rester actif (false) pour que
+// Metro trouve les deps transitives dans .pnpm/<pkg>@<version>/node_modules/.
+// Exemple : `expo` importe `expo-modules-core`, qui n'est pas hoisté à la
+// racine ni dans apps/mobile/node_modules — il vit dans
+// .pnpm/expo@54.../node_modules/expo-modules-core/ et seul le walk-up le
+// trouve. Désactiver casse "Unable to resolve expo-modules-core from expo".
+config.resolver.disableHierarchicalLookup = false;
 
 module.exports = config;
