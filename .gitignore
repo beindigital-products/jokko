@@ -58,5 +58,9 @@ next-env.d.ts
 certificates
 .env*.local
 
+# Expo
+.expo/
+**/.expo/
+
 # Claude Code runtime
 .claude/
