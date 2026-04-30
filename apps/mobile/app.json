@@ -8,11 +8,15 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.jokko.spike"
+      "bundleIdentifier": "com.jokko.spike",
+      "usesAppleSignIn": true
     },
     "android": {
       "package": "com.jokko.spike"
     },
-    "plugins": []
+    "plugins": [
+      "expo-apple-authentication",
+      "expo-secure-store"
+    ]
   }
 }

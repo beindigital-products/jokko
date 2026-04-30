@@ -98,6 +98,7 @@ import type * as search from "../search.js";
 import type * as seed from "../seed.js";
 import type * as sessions from "../sessions.js";
 import type * as shortcuts from "../shortcuts.js";
+import type * as spike_apple from "../spike_apple.js";
 import type * as stripe from "../stripe.js";
 import type * as stripe_actions from "../stripe_actions.js";
 import type * as syncUser from "../syncUser.js";
@@ -213,6 +214,7 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   sessions: typeof sessions;
   shortcuts: typeof shortcuts;
+  spike_apple: typeof spike_apple;
   stripe: typeof stripe;
   stripe_actions: typeof stripe_actions;
   syncUser: typeof syncUser;

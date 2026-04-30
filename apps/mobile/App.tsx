@@ -6,8 +6,9 @@ import { theme } from "@jokko/tokens";
 import { GlassReply } from "./src/GlassReply";
 import { InboxBreathing } from "./src/InboxBreathing";
 import { ComposeMorph } from "./src/ComposeMorph";
+import { SpikeAppleSignIn } from "./src/SpikeAppleSignIn";
 
-type Screen = "menu" | "glass-reply" | "inbox-breathing" | "compose-morph";
+type Screen = "menu" | "glass-reply" | "inbox-breathing" | "compose-morph" | "spike-apple";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("menu");
@@ -24,6 +25,7 @@ export default function App() {
           {screen === "glass-reply" && <Frame onBack={() => setScreen("menu")} title="Signature #1 · Glass Reply"><GlassReply /></Frame>}
           {screen === "inbox-breathing" && <Frame onBack={() => setScreen("menu")} title="Signature #2 · Inbox Breathing"><InboxBreathing /></Frame>}
           {screen === "compose-morph" && <Frame onBack={() => setScreen("menu")} title="Signature #3 · Compose Morph"><ComposeMorph /></Frame>}
+          {screen === "spike-apple" && <Frame onBack={() => setScreen("menu")} title="Spike S1 · Apple SignIn"><SpikeAppleSignIn /></Frame>}
         </SafeAreaView>
       </KeyboardAvoidingView>
     </GestureHandlerRootView>
@@ -38,6 +40,7 @@ function Menu({ onNavigate }: { onNavigate: (s: Screen) => void }) {
       <MenuButton label="Signature #1 · Glass Reply" hint="long-press bulle → lift + blur + réactions" onPress={() => onNavigate("glass-reply")} />
       <MenuButton label="Signature #2 · Inbox Breathing" hint="nouveau message → row respire" onPress={() => onNavigate("inbox-breathing")} />
       <MenuButton label="Signature #3 · Compose Morph" hint="field qui morph + send qui naît" onPress={() => onNavigate("compose-morph")} />
+      <MenuButton label="Spike S1 · Apple SignIn" hint="Apple natif iOS → Convex JWT verify" onPress={() => onNavigate("spike-apple")} />
     </View>
   );
 }
