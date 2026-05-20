@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
+    buildOrgScopedKey,
     switchOrg,
     detectOrgLeak,
     type KeyValueStorage,
@@ -8,7 +9,9 @@ import {
     type PersistedStore,
 } from "./multitenant";
 
-function makeMemoryKV(initial: Record<string, string> = {}): KeyValueStorage {
+type MemoryKV = KeyValueStorage & { clearAll(): void };
+
+function makeMemoryKV(initial: Record<string, string> = {}): MemoryKV {
     let store = { ...initial };
     return {
         getAllKeys: () => Object.keys(store),
@@ -80,7 +83,7 @@ function makeFakeStore(name: string, initialState: Record<string, unknown>): Per
 }
 
 describe("Spike S5 — switchOrg multi-tenant cache purge", () => {
-    let cache: KeyValueStorage;
+    let cache: MemoryKV;
     let secure: ReturnType<typeof makeMemorySecure>;
     let convex: ReturnType<typeof makeFakeConvexClient>;
     let inboxStore: ReturnType<typeof makeFakeStore>;
@@ -89,11 +92,14 @@ describe("Spike S5 — switchOrg multi-tenant cache purge", () => {
 
     beforeEach(() => {
         cache = makeMemoryKV({
-            "jokko.inbox.org_A": JSON.stringify([
+            [buildOrgScopedKey("org_A", "inbox", "snapshot")]: JSON.stringify([
                 { id: "conv1", orgId: "org_A", lastMessage: "Bonjour" },
             ]),
-            "jokko.draft.conv1.org_A": "Texte tapé en draft",
-            "jokko.prefs.lang": "fr",
+            [buildOrgScopedKey("org_A", "draft", "conv1")]: "Texte tapé en draft",
+            [buildOrgScopedKey("org_B", "inbox", "snapshot")]: JSON.stringify([
+                { id: "conv2", orgId: "org_B", lastMessage: "Bonjour" },
+            ]),
+            "jokko.global.prefs.lang": "fr",
         });
         secure = makeMemorySecure({
             "jokko.session_token": "token_for_org_A",
@@ -128,11 +134,13 @@ describe("Spike S5 — switchOrg multi-tenant cache purge", () => {
         expect(result.success).toBe(true);
         expect(result.reason).toBe("success");
         expect(result.flushedCacheKeys.sort()).toEqual(
-            ["jokko.draft.conv1.org_A", "jokko.inbox.org_A", "jokko.prefs.lang"].sort()
+            ["jokko.org_A.draft.conv1", "jokko.org_A.inbox.snapshot"].sort()
         );
         expect(result.flushedStores).toEqual(["inbox", "composer", "sendQueue"]);
 
-        expect(cache.getAllKeys()).toEqual([]);
+        expect(cache.getAllKeys().sort()).toEqual(
+            ["jokko.global.prefs.lang", "jokko.org_B.inbox.snapshot"].sort()
+        );
 
         expect(inboxStore.persistCleared).toBe(true);
         expect(composerStore.persistCleared).toBe(true);
@@ -165,7 +173,7 @@ describe("Spike S5 — switchOrg multi-tenant cache purge", () => {
         expect(result.reason).toBe("user_cancelled");
         expect(confirmFlush).toHaveBeenCalledTimes(1);
 
-        expect(cache.getAllKeys().length).toBe(3);
+        expect(cache.getAllKeys().length).toBe(4);
         expect(inboxStore.persistCleared).toBe(false);
         expect(convex.state.authToken).toBe("token_for_org_A");
     });
@@ -187,7 +195,9 @@ describe("Spike S5 — switchOrg multi-tenant cache purge", () => {
 
         expect(result.success).toBe(true);
         expect(confirmFlush).toHaveBeenCalledTimes(1);
-        expect(cache.getAllKeys()).toEqual([]);
+        expect(cache.getAllKeys().sort()).toEqual(
+            ["jokko.global.prefs.lang", "jokko.org_B.inbox.snapshot"].sort()
+        );
     });
 
     it("no-op when fromOrgId === toOrgId", async () => {
@@ -202,7 +212,7 @@ describe("Spike S5 — switchOrg multi-tenant cache purge", () => {
 
         expect(result.success).toBe(true);
         expect(result.reason).toBe("no_op");
-        expect(cache.getAllKeys().length).toBe(3);
+        expect(cache.getAllKeys().length).toBe(4);
         expect(inboxStore.persistCleared).toBe(false);
     });
 
@@ -222,18 +232,18 @@ describe("Spike S5 — switchOrg multi-tenant cache purge", () => {
     });
 
     it("detectOrgLeak finds residual org_A data in cache after partial purge", () => {
-        cache.set("jokko.inbox.org_A", JSON.stringify([{ orgId: "org_A" }]));
-        cache.set("jokko.inbox.org_B", JSON.stringify([{ orgId: "org_B" }]));
+        cache.set(buildOrgScopedKey("org_A", "inbox", "snapshot"), JSON.stringify([{ orgId: "org_A" }]));
+        cache.set(buildOrgScopedKey("org_B", "inbox", "snapshot"), JSON.stringify([{ orgId: "org_B" }]));
 
         const result = detectOrgLeak(cache, {}, "org_A");
 
         expect(result.leaked).toBe(true);
-        expect(result.foundIn).toContain("cache:jokko.inbox.org_A");
+        expect(result.foundIn).toContain("cache:jokko.org_A.inbox.snapshot");
     });
 
     it("detectOrgLeak returns false when only target org data remains", () => {
         cache.clearAll();
-        cache.set("jokko.inbox.org_B", JSON.stringify([{ orgId: "org_B" }]));
+        cache.set(buildOrgScopedKey("org_B", "inbox", "snapshot"), JSON.stringify([{ orgId: "org_B" }]));
 
         const result = detectOrgLeak(cache, { "jokko.session_token": "token_B" }, "org_A");
 

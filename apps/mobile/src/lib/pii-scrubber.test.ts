@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { scrubPii, scrubString, type SentryEvent } from "./pii-scrubber";
+import { scrubBreadcrumb, scrubPii, scrubString, type SentryEvent } from "./pii-scrubber";
 
 describe("Spike S6 — PII scrubber", () => {
     describe("scrubString", () => {
@@ -172,6 +172,56 @@ describe("Spike S6 — PII scrubber", () => {
             expect(result.extra?.api_secret).toBe("[REDACTED]");
             expect(result.extra?.auth_token).toBe("[REDACTED]");
             expect(result.extra?.debug_info).toBe("Normal debug text");
+        });
+
+        it("scrubs nested arrays and context objects", () => {
+            const event: SentryEvent = {
+                contexts: {
+                    debug: {
+                        recipients: ["client@example.com", "+33 6 12 34 56 78"],
+                        payloads: [{ text: "Message prive" }],
+                    },
+                },
+                tags: {
+                    phone: "+221 77 123 45 67",
+                    screen: "conversation",
+                },
+            };
+
+            const result = scrubPii(event);
+            const debug = result.contexts?.debug as Record<string, unknown>;
+            expect(debug.recipients).toEqual(["[REDACTED]", "[REDACTED]"]);
+            expect(debug.payloads).toEqual([{ text: "[REDACTED]" }]);
+            expect(result.tags?.phone).toBe("[REDACTED]");
+            expect(result.tags?.screen).toBe("conversation");
+        });
+
+        it("scrubs top-level message and request URL", () => {
+            const event: SentryEvent = {
+                message: "Failed for user@example.com",
+                request: {
+                    url: "https://app.jokko.io/messages?phone=+33612345678",
+                },
+            };
+
+            const result = scrubPii(event);
+            expect(result.message).toBe("Failed for [REDACTED]");
+            expect(result.request?.url).not.toContain("+33612345678");
+        });
+
+        it("scrubs standalone breadcrumbs for Sentry beforeBreadcrumb", () => {
+            const result = scrubBreadcrumb({
+                category: "console",
+                message: "Sending to user@example.com",
+                data: {
+                    content: "Message WhatsApp prive",
+                    recipient: "+221 77 123 45 67",
+                },
+            });
+
+            expect(result?.message).toBe("Sending to [REDACTED]");
+            expect(result?.data?.content).toBe("[REDACTED]");
+            expect(result?.data?.recipient).toBe("[REDACTED]");
         });
 
         it("scrubs message body keys (body, text, content, message_body)", () => {

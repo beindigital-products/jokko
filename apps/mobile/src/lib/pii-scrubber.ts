@@ -35,21 +35,24 @@ export interface SentryEvent {
         url?: string;
         [key: string]: unknown;
     };
-    breadcrumbs?: Array<{
-        message?: string;
-        data?: Record<string, unknown>;
-        category?: string;
-        [key: string]: unknown;
-    }>;
+    breadcrumbs?: SentryBreadcrumb[];
     extra?: Record<string, unknown>;
     tags?: Record<string, string>;
     message?: string | { formatted?: string };
+    contexts?: Record<string, unknown>;
     exception?: {
         values?: Array<{
             value?: string;
             [key: string]: unknown;
         }>;
     };
+}
+
+export interface SentryBreadcrumb {
+    message?: string;
+    data?: Record<string, unknown>;
+    category?: string;
+    [key: string]: unknown;
 }
 
 export function scrubString(input: string): string {
@@ -63,40 +66,64 @@ export function scrubString(input: string): string {
         .replace(WHATSAPP_ID_REGEX, PII_PLACEHOLDER);
 }
 
+function isSensitiveKey(key: string): boolean {
+    const keyLower = key.toLowerCase();
+    return (
+        keyLower.includes("password") ||
+        keyLower.includes("secret") ||
+        keyLower.includes("token") ||
+        keyLower.includes("authorization") ||
+        keyLower.includes("cookie") ||
+        keyLower.includes("apikey") ||
+        keyLower.includes("api_key") ||
+        keyLower === "body" ||
+        keyLower === "text" ||
+        keyLower === "message_body" ||
+        keyLower === "messagebody" ||
+        keyLower === "content"
+    );
+}
+
+function scrubValue(key: string, value: unknown): unknown {
+    if (isSensitiveKey(key)) {
+        return PII_PLACEHOLDER;
+    }
+
+    if (typeof value === "string") {
+        return scrubString(value);
+    }
+
+    if (Array.isArray(value)) {
+        return value.map((item) => scrubValue(key, item));
+    }
+
+    if (value && typeof value === "object") {
+        return scrubRecord(value as Record<string, unknown>);
+    }
+
+    return value;
+}
+
 function scrubRecord(obj: Record<string, unknown>): Record<string, unknown> {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-        const keyLower = key.toLowerCase();
-        if (
-            keyLower.includes("password") ||
-            keyLower.includes("secret") ||
-            keyLower.includes("token") ||
-            keyLower.includes("authorization") ||
-            keyLower.includes("cookie")
-        ) {
-            result[key] = PII_PLACEHOLDER;
-            continue;
-        }
-
-        if (
-            keyLower === "body" ||
-            keyLower === "text" ||
-            keyLower === "message_body" ||
-            keyLower === "content"
-        ) {
-            result[key] = PII_PLACEHOLDER;
-            continue;
-        }
-
-        if (typeof value === "string") {
-            result[key] = scrubString(value);
-        } else if (value && typeof value === "object" && !Array.isArray(value)) {
-            result[key] = scrubRecord(value as Record<string, unknown>);
-        } else {
-            result[key] = value;
-        }
+        result[key] = scrubValue(key, value);
     }
     return result;
+}
+
+export function scrubBreadcrumb(crumb: SentryBreadcrumb | null): SentryBreadcrumb | null {
+    if (!crumb) return crumb;
+
+    if (crumb.message) {
+        crumb.message = scrubString(crumb.message);
+    }
+
+    if (crumb.data && typeof crumb.data === "object") {
+        crumb.data = scrubRecord(crumb.data) as Record<string, unknown>;
+    }
+
+    return crumb;
 }
 
 export function scrubPii(event: SentryEvent): SentryEvent {
@@ -107,6 +134,10 @@ export function scrubPii(event: SentryEvent): SentryEvent {
     }
 
     if (event.request) {
+        if (event.request.url) {
+            event.request.url = scrubString(event.request.url);
+        }
+
         if (typeof event.request.data === "string") {
             event.request.data = PII_PLACEHOLDER;
         } else if (event.request.data && typeof event.request.data === "object") {
@@ -133,17 +164,26 @@ export function scrubPii(event: SentryEvent): SentryEvent {
 
     if (event.breadcrumbs) {
         for (const crumb of event.breadcrumbs) {
-            if (crumb.message) {
-                crumb.message = scrubString(crumb.message);
-            }
-            if (crumb.data && typeof crumb.data === "object") {
-                crumb.data = scrubRecord(crumb.data) as Record<string, unknown>;
-            }
+            scrubBreadcrumb(crumb);
         }
     }
 
     if (event.extra && typeof event.extra === "object") {
         event.extra = scrubRecord(event.extra);
+    }
+
+    if (event.tags && typeof event.tags === "object") {
+        event.tags = scrubRecord(event.tags) as Record<string, string>;
+    }
+
+    if (event.contexts && typeof event.contexts === "object") {
+        event.contexts = scrubRecord(event.contexts);
+    }
+
+    if (typeof event.message === "string") {
+        event.message = scrubString(event.message);
+    } else if (event.message?.formatted) {
+        event.message.formatted = scrubString(event.message.formatted);
     }
 
     if (event.exception?.values) {
