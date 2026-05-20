@@ -138,6 +138,22 @@ export default defineSchema({
         // sans plan sélectionné, toutes les features sont verrouillées.
         hasSelectedPlan: v.optional(v.boolean()),
 
+        // Demo/review workspaces are seeded for App Store and Meta review.
+        // `local_only` lets reviewers send messages without hitting WhatsApp APIs.
+        demo: v.optional(v.object({
+            kind: v.union(
+                v.literal("APP_REVIEW"),
+                v.literal("META_WABA_REVIEW")
+            ),
+            seedVersion: v.string(),
+            seededAt: v.number(),
+            outboundMode: v.union(
+                v.literal("local_only"),
+                v.literal("whatsapp_api")
+            ),
+            notes: v.optional(v.string()),
+        })),
+
         // Stripe Subscription
         stripe: v.optional(v.object({
             customerId: v.string(),
@@ -1559,6 +1575,64 @@ export default defineSchema({
         .index("by_user", ["userId"])
         .index("by_user_read", ["userId", "isRead"])
         .index("by_org", ["organizationId"]),
+
+    devices: defineTable({
+        userId: v.id("users"),
+        organizationId: v.optional(v.id("organizations")),
+        expoPushToken: v.string(),
+        deviceId: v.string(),
+        platform: v.union(
+            v.literal("ios"),
+            v.literal("android"),
+            v.literal("web"),
+            v.literal("unknown")
+        ),
+        appVersion: v.optional(v.string()),
+        nativeBuildVersion: v.optional(v.string()),
+        permissionStatus: v.string(),
+        notificationsEnabled: v.boolean(),
+        lastActiveAt: v.number(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_user", ["userId"])
+        .index("by_user_device", ["userId", "deviceId"])
+        .index("by_token", ["expoPushToken"])
+        .index("by_organization_enabled", ["organizationId", "notificationsEnabled"]),
+
+    pushDeliveryAttempts: defineTable({
+        notificationId: v.id("notifications"),
+        userId: v.id("users"),
+        organizationId: v.id("organizations"),
+        deviceRecordId: v.id("devices"),
+        status: v.union(v.literal("sent"), v.literal("failed")),
+        ticketId: v.optional(v.string()),
+        error: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index("by_notification", ["notificationId"])
+        .index("by_user", ["userId"])
+        .index("by_device", ["deviceRecordId"]),
+
+    notificationPreferences: defineTable({
+        userId: v.id("users"),
+        organizationId: v.optional(v.id("organizations")),
+        newMessages: v.boolean(),
+        assignments: v.boolean(),
+        mentions: v.boolean(),
+        systemAlerts: v.boolean(),
+        mutedConversationIds: v.array(v.id("conversations")),
+        mutedWhatsappChannelIds: v.array(v.id("whatsappChannels")),
+        dndEnabled: v.boolean(),
+        dndStartHour: v.number(),
+        dndEndHour: v.number(),
+        dndWeekendsOnly: v.boolean(),
+        dndTimezone: v.string(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_user", ["userId"])
+        .index("by_user_org", ["userId", "organizationId"]),
     // ============================================
     // Waiting List
     // ============================================
@@ -1938,4 +2012,3 @@ export default defineSchema({
         .index("by_agent", ["agentId"])
         .index("by_channel_status", ["whatsappChannelId", "status"]),
 });
-
