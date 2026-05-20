@@ -1,14 +1,14 @@
 # Jokko Mobile — Architecture & Design Document
 
-> **Statut** : Design validé (brainstorming + multi-agent review + L0 spikes exécutés). **78 décisions verrouillées**.
-> **Date** : 2026-04-30 (dernière mise à jour §17.3 : 2026-04-30)
+> **Statut** : Design validé (brainstorming + multi-agent review + L0 spikes exécutés). **102 décisions verrouillées**.
+> **Date** : 2026-04-30 (dernière mise à jour §17.3 : 2026-05-01)
 > **Owner** : @doums85 (solo dev)
 > **Disposition Arbiter** : APPROVED (voir §18).
 >
 > ⚠️ **Important** : Ce doc a été révisé en 3 passes :
 > 1. **§1-16** : design original single-agent (brainstorming skill)
 > 2. **§17 (Décisions 31-60)** : revisions après review multi-agents (72 objections)
-> 3. **§17.3 (Décisions 61-78)** : findings des spikes L0 exécutés (S1, S2+S3, S5)
+> 3. **§17.3 (Décisions 61-102)** : findings des spikes L0 exécutés (S1, S2+S3, S4, S5, S6, S7, S8)
 >
 > **Lire la §17 avant d'implémenter.**
 
@@ -644,16 +644,16 @@ Liste finale des spikes qui doivent être validés avec preuve fonctionnelle ava
 | **S4** — Demo account fonctionnel (org seed, numéro WhatsApp test, conversations factices) pour App Store + Meta WABA Review | 3 j | Oui — App Review | Guardian #9 |
 | **S5** — Multi-tenant cache purge sequence : test E2E Maestro `switchOrg()` (purge MMKV + Zustand + invalidation Convex + reset listeners) | 3 j | Oui — RGPD / fuite cross-org | Guardian #10 |
 | **S6** — PII scrubbing technique : `Sentry.beforeSend` impl + ESLint custom rule `no-pii-in-logs` + DPA Sentry/PostHog | 2 j | Oui — RGPD | Guardian #12 |
-| **S7** — Voice notes : POC waveform (sample polling `expo-av` ou module natif) sur iPhone faible (SE3) avec mesure FPS p95 | 3 j | Non bloquant — fallback waveform statique acceptable | Skeptic #7, Guardian #14 |
+| **S7** — Voice notes : POC waveform (sample polling `expo-audio` ou module natif) sur iPhone faible (SE3) avec mesure FPS p95 | 3 j | Non bloquant — fallback waveform statique acceptable | Skeptic #7, Guardian #14 |
 | **S8** — Convex websocket battery profile + politique fallback (timeout, banner, status page) | 3 j | Non bloquant — fallback acceptable | Guardian #6 |
 
 **Total L0** : ~3-4 semaines avant que L1 commence.
 
-### 17.3 Révisions architecture acceptées (Décisions 31 à 78)
+### 17.3 Révisions architecture acceptées (Décisions 31 à 102)
 
 **Décisions 31-60** : issues directement de la review multi-agents (Skeptic / Guardian / User Advocate / Arbiter, voir §18).
 
-**Décisions 61-78** : issues des **L0 spikes exécutés après l'Arbiter** (S1 Apple SignIn, S2+S3 Privacy/ATT, S5 multi-tenant purge). Chaque décision référence le findings doc du spike correspondant.
+**Décisions 61-102** : issues des **L0 spikes exécutés après l'Arbiter** (S1 Apple SignIn, S2+S3 Privacy/ATT, S4 demo account, S5 multi-tenant purge, S6 PII scrubbing, S7 voice waveform, S8 Convex websocket fallback). Chaque décision référence le findings doc du spike correspondant.
 
 | # | Nouvelle décision | Source | Impact |
 |---|---|---|---|
@@ -710,6 +710,30 @@ Liste finale des spikes qui doivent être validés avec preuve fonctionnelle ava
 | 76 | **`detectOrgLeak()` en breadcrumb Sentry** après chaque switch — alerte si leak détecté en prod | S5 §2 + production | L1 + observability |
 | 77 | **Lock mutex sur `switchOrg()`** pour éviter 2 switches concurrents (race condition possible via UI multi-tap rapide) | S5 §4.5 | L1 |
 | 78 | **Maestro E2E `org_switch_isolation_test.yaml`** obligatoire avant beta — scénario draft offline + switch + assertions no-leak | S5 §5.2 + Decision #54 | L12 |
+| 79 | **Compte demo App Review seedé via Convex Auth** : action `demo.seedAppReviewDemo` gardée par `DEMO_SEED_TOKEN`, pas de hash password manuel | S4 §2.1 | L12 |
+| 80 | **Org de review marquée dans le schema** : `organizations.demo = { kind, seedVersion, seededAt, outboundMode }` | S4 §2.2 | Schema + L12 |
+| 81 | **Outbound demo local-only par défaut** : `messages.send` / `retry` marquent `SENT` localement et ne planifient aucun appel WhatsApp | S4 §2.3 | App Review safe |
+| 82 | **Seed S4 idempotent et fake-data only** : relance sans duplication, numéros réservés `+1 555 010 xxxx`, aucun PII réel | S4 §2.2 | Compliance |
+| 83 | **Secrets reviewer hors repo** : credentials dans Convex env + App Store Connect / Meta notes uniquement | S4 §3 | Security |
+| 84 | **Checklist L12 demo obligatoire** : reseed avant submission + vérifier login, inbox, conversation, envoi local-only | S4 §4 | Release |
+| 85 | **Scrubber Sentry unique** : `scrubPii` + `scrubBreadcrumb` branchés en `beforeSend` et `beforeBreadcrumb` | S6 §2.1 | L1 |
+| 86 | **Sentry privacy baseline** : `sendDefaultPii: false`, Sentry disabled sans DSN, `tracesSampleRate` default 0.05 | S6 §2.2 | Privacy |
+| 87 | **Corps de messages redacts en entier** : clés `body`, `text`, `content`, `message_body` jamais envoyées en telemetry | S6 §2.1 | RGPD |
+| 88 | **ESLint custom rule active** : `jokko/no-console-pii` bloque les `console.*` avec PII évidente | S6 §2.3 | Dev safety |
+| 89 | **Debug ids autorisés** : `conversationId`, `messageId`, `organizationId`, statuses et counts restent loggables | S6 §2.3 | Debuggability |
+| 90 | **DPA Sentry/PostHog = release gate owner hors repo** : preuves signées stockées en juridique, pas dans Git | S6 §3 | Compliance |
+| 91 | **Voice notes sur `expo-audio`** : SDK 54 utilise `expo-audio` pour recorder + metering, pas `expo-av` | S7 §2.1 | L4b |
+| 92 | **Polling metering 50 ms** : `RecordingPresets.LOW_QUALITY + isMeteringEnabled` alimente la waveform live | S7 §2.1 | L4b |
+| 93 | **Waveform Skia sans PCM brut** : buffer cappe a 48 amplitudes, geometrie stable, aucun stockage frame audio | S7 §2.2 | Perf + privacy |
+| 94 | **Perf gate p95 FPS runtime** : ecran voice expose p95 `requestAnimationFrame`; mesure SE3 requise avant L4b | S7 §2.3 | Perf gate |
+| 95 | **Fallback voice degrade autorise** : si SE3 < 55 fps p95, passer 32 bars, 80 ms poll, puis statique si besoin | S7 §3 | Fallback |
+| 96 | **Permission micro via `expo-audio` plugin** : `NSMicrophoneUsageDescription` dans `app.json`, pas de background recording v1.0 | S7 §2.4 | App Store |
+| 97 | **Politique Convex mobile centralisee** : `convex-connection-policy.ts` pure/testee avant integration React | S8 §2.1 | L1 |
+| 98 | **Timeout 10s = banner `Connexion lente`** : les envois restent en queue locale, non bloques par la websocket | S8 §2.2 | L3/L10 |
+| 99 | **Offline local ≠ service degrade** : deux banners UX distinctes ; status page seulement en degradation service | S8 §2.2 | UX + support |
+| 100 | **Retry websocket borne** : 1s, 2s, 5s, 10s, puis 30s max | S8 §2.3 | Battery + cost |
+| 101 | **Realtime degrade en background/low power/high drain** : mode `throttled` ou `paused`, push prend le relais | S8 §2.4 | Battery |
+| 102 | **Mesure batterie physique gate L6** : si drain > 8%/h, reduire subscriptions/polling avant beta | S8 §2.4 | Perf gate |
 
 ### 17.4 Planning révisé (avec marge 40% + L0 spikes)
 
@@ -768,9 +792,9 @@ Total v1.0 : ~10-11 mois solo (au lieu de 6-7).
 
 ### 17.7 Decision Log final — version 3 (post-multi-agent + post-spikes L0)
 
-Total décisions verrouillées : **78** (30 v1 + 30 review multi-agent + 18 spikes L0).
+Total décisions verrouillées : **102** (30 v1 + 30 review multi-agent + 42 spikes L0).
 
-L'intégralité des 78 décisions vit dans ce document (Decision Log §3 pour 1-30, §17.3 pour 31-78).
+L'intégralité des 102 décisions vit dans ce document (Decision Log §3 pour 1-30, §17.3 pour 31-102).
 
 ---
 
@@ -786,7 +810,7 @@ Le Primary Designer a traité de manière sérieuse et structurée les 72 object
 
 ### 18.3 Forces du design (post-révision)
 
-- **Spikes L0 prioritaires bien ciblés** (S1-S6 bloquants Apple/RGPD/App Store ; S7-S8 fallback acceptable)
+- **Spikes L0 prioritaires bien ciblés** (S1-S6 bloquants Apple/RGPD/App Store ; S7-S8 fallback acceptable et politiques codées)
 - **Honnêteté du planning** : marge 40%, L4 splitté, L12 doublé. 10-11 mois solo crédible
 - **Compliance multi-tenant explicitée** : Decision #54 + #55 + #57 forment un trio cohérent
 - **Server-side enforcement WhatsApp 24h** (Decision #40) : défense en profondeur
@@ -798,7 +822,7 @@ Le Primary Designer a traité de manière sérieuse et structurée les 72 object
 - **Pas de Storybook ni Detox** : maintenance solo justifie ; snapshot tests + Maestro suffisent
 - **Cache 100 MB OOM mesure tardive** (L10) : tolérable car volumes v1.0 modérés
 - **iOS 16+ uniquement** : exclut frange pro, comportement de fallback documenté (#60)
-- **Spike S7 voice notes "non bloquant"** : waveform statique acceptable comme fallback
+- **Spike S7 voice notes "non bloquant"** : POC code livré ; mesure iPhone SE3 reste à capturer, waveform statique acceptable comme fallback
 
 ### 18.5 Risques clés à surveiller pendant l'implémentation
 
@@ -811,6 +835,7 @@ Le Primary Designer a traité de manière sérieuse et structurée les 72 object
 ### 18.6 Recommandations finales
 
 - **Ne pas démarrer L1 avant la fin des 6 spikes bloquants S1-S6** (S7, S8 en parallèle OK).
+- **Dette lint web à corriger avant CI stricte** : `pnpm lint` global échoue côté `apps/web` (503 problèmes relevés le 2026-05-01 : `react/no-unescaped-entities`, `no-explicit-any`, `set-state-in-effect`, unused vars, etc.). `pnpm --filter @jokko/mobile lint` est OK, mais le monorepo doit repasser vert avant d'utiliser `pnpm lint` comme release gate.
 - **Créer les 5 ADRs critiques avant L2** (auth, state, cache, push, monorepo).
 - **Démos hebdomadaires perso** ; absence de démo une semaine = signal rouge burnout.
 - **Spike S5 cache purge à 100% avant beta** : risque CNIL = arrêt entreprise.
@@ -822,7 +847,7 @@ Le Primary Designer a traité de manière sérieuse et structurée les 72 object
 ## 19. Validation finale (post-Arbiter)
 
 - ✅ Toutes objections (72) résolues ou explicitement rejetées avec rationale
-- ✅ Decision Log v3 complet (78 décisions verrouillées — 30 v1 + 30 review + 18 spikes L0)
+- ✅ Decision Log v3 complet (102 décisions verrouillées — 30 v1 + 30 review + 42 spikes L0)
 - ✅ L0 spikes listés et chiffrés (S1-S8, ~3-4 sem.)
 - ✅ Disposition Arbiter : **APPROVED**
 - ✅ Planning révisé avec marge 40% (~10-11 mois v1.0, ~16-20 mois parité totale)
