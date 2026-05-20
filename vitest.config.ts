@@ -8,7 +8,8 @@ export default defineConfig({
         include: [
             'convex/**/*.test.ts',
             'apps/mobile/src/lib/**/*.test.ts',
+            'packages/*/src/**/*.test.ts',
         ],
-        exclude: ['node_modules/**', 'apps/web/**', 'packages/**', 'e2e/**'],
+        exclude: ['node_modules/**', 'apps/web/**', 'e2e/**'],
     },
 })
