@@ -2,6 +2,7 @@
   "expo": {
     "name": "Jokko Spike",
     "slug": "jokko-spike-signatures",
+    "scheme": "jokko",
     "version": "0.0.1",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
@@ -143,7 +144,16 @@
       "package": "com.jokko.spike"
     },
     "plugins": [
+      "expo-router",
+      "expo-notifications",
       "expo-apple-authentication",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Jokko utilise le microphone pour enregistrer et envoyer des notes vocales.",
+          "recordAudioAndroid": true
+        }
+      ],
       "expo-secure-store"
     ]
   }
