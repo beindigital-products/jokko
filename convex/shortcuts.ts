@@ -166,6 +166,28 @@ export const deleteShortcut = mutation({
     },
 });
 
+// Get a single shortcut (org-scoped)
+export const get = query({
+    args: { id: v.id("shortcuts") },
+    handler: async (ctx, args) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return null;
+
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+
+        if (!session?.currentOrganizationId) return null;
+
+        const shortcut = await ctx.db.get(args.id);
+        if (!shortcut || shortcut.organizationId !== session.currentOrganizationId) {
+            return null;
+        }
+        return shortcut;
+    },
+});
+
 // Suggest shortcuts (Prefix search for autocomplete)
 export const suggest = query({
     args: {

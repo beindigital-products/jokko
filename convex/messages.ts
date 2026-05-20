@@ -137,6 +137,16 @@ export const send = mutation({
             updatedAt: Date.now(),
         });
 
+        const org = await ctx.db.get(conversation.organizationId);
+        if (org?.demo?.outboundMode === "local_only") {
+            await ctx.db.patch(messageId, {
+                status: "SENT",
+                externalId: `demo:local:${messageId}`,
+                updatedAt: Date.now(),
+            });
+            return messageId;
+        }
+
         // Trigger WhatsApp Send
         let replyToWhatsAppId: string | undefined;
         if (args.replyToId) {
@@ -204,6 +214,16 @@ export const retry = mutation({
 
         // Reset status
         await ctx.db.patch(args.messageId, { status: "PENDING", updatedAt: Date.now() });
+
+        const org = await ctx.db.get(conversation.organizationId);
+        if (org?.demo?.outboundMode === "local_only") {
+            await ctx.db.patch(args.messageId, {
+                status: "SENT",
+                externalId: message.externalId || `demo:local:${args.messageId}`,
+                updatedAt: Date.now(),
+            });
+            return;
+        }
 
         // Trigger WhatsApp
         const contact = await ctx.db.get(conversation.contactId!);

@@ -447,17 +447,17 @@ export const sendBroadcast = internalAction({
         let targetContacts = contacts;
 
         if (config.type === 'TAGS' && config.tags && config.tags.length > 0) {
-            targetContacts = contacts.filter(c =>
-                c.tags && c.tags.some(t => config.tags!.includes(t))
+            targetContacts = contacts.filter((c: any) =>
+                c.tags && c.tags.some((t: any) => config.tags!.includes(t))
             );
         } else if (config.type === 'COUNTRIES' && config.countries && config.countries.length > 0) {
-            targetContacts = contacts.filter(c =>
-                config.countries!.some(prefix => c.phone.startsWith(prefix))
+            targetContacts = contacts.filter((c: any) =>
+                config.countries!.some((prefix: string) => c.phone.startsWith(prefix))
             );
         }
 
         // 4. Validate & deduct credits before sending (real pricing per country)
-        const { totalCostFCFA } = calculateBroadcastCost(targetContacts.map(c => c.phone));
+        const { totalCostFCFA } = calculateBroadcastCost(targetContacts.map((c: any) => c.phone));
         if (totalCostFCFA > 0) {
             try {
                 await ctx.runMutation(internal.credits.internalDeductCredits, {

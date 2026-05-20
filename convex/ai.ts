@@ -43,7 +43,9 @@ export const generateFlow = action({
         let servicesContext = "";
         if (flowContext?.services && flowContext.services.length > 0) {
             servicesContext = "\n\nAVAILABLE ORGANIZATION SERVICES (Use these if relevant):\n" +
-                flowContext.services.map(s => `- ${s.name}: ${s.description || 'No description'}`).join("\n");
+                flowContext.services
+                    .map((s: { name: string; description?: string }) => `- ${s.name}: ${s.description || 'No description'}`)
+                    .join("\n");
         }
 
         // Check for API key

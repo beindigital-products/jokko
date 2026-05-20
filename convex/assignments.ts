@@ -6,6 +6,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { buildConversationFilter, canViewConversation, VisibilityContext } from "./lib/visibility";
 import { Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
+import { createNotification } from "./notifications";
 
 // Helper to resolve context
 async function getContext(ctx: QueryCtx | MutationCtx): Promise<VisibilityContext> {
@@ -432,15 +433,14 @@ export const autoAssign = mutation({
             });
 
             // Notify Agent
-            await ctx.db.insert("notifications", {
+            await createNotification(ctx, {
                 organizationId,
                 userId: member.userId,
                 type: "ASSIGNMENT",
                 title: "Nouvelle conversation",
                 message: "Une nouvelle conversation vous a été assignée automatiquement.",
                 link: `/dashboard/conversations/${conv._id}`,
-                isRead: false,
-                createdAt: Date.now(),
+                metadata: { conversationId: conv._id },
             });
 
             // Update local member state for next iteration
@@ -549,15 +549,14 @@ export const assign = mutation({
         // Notify Agent (if not assigning to self, or just always notify?)
         // If assignerId === args.memberId, maybe skip?
         if (assignerId !== args.memberId) {
-            await ctx.db.insert("notifications", {
+            await createNotification(ctx, {
                 organizationId,
                 userId: args.memberId,
                 type: "ASSIGNMENT",
                 title: "Conversation assignée",
                 message: "Une conversation vous a été assignée manuellement.",
                 link: `/dashboard/conversations/${args.conversationId}`,
-                isRead: false,
-                createdAt: Date.now(),
+                metadata: { conversationId: args.conversationId },
             });
         }
 
@@ -851,15 +850,14 @@ export const assignToBestAvailable = internalMutation({
         });
 
         // Notify
-        await ctx.db.insert("notifications", {
+        await createNotification(ctx, {
             organizationId,
             userId: selected.userId,
             type: "ASSIGNMENT",
             title: "Nouvelle conversation",
             message: "Une nouvelle conversation vous a été assignée automatiquement.",
             link: `/dashboard/conversations/${conversationId}`,
-            isRead: false,
-            createdAt: Date.now(),
+            metadata: { conversationId },
         });
 
         return { success: true, agentId: selected.userId };
@@ -905,7 +903,7 @@ export const analyzeAndRoute = action({
                 Message: "${messageText}"
                 
                 AGENT LIST:
-                ${JSON.stringify(agents.map(a => ({ id: a.memberId, name: a.name })))}
+                ${JSON.stringify(agents.map((a: any) => ({ id: a.memberId, name: a.name })))}
 
                 POLE LIST:
                 ${JSON.stringify(poles)}
@@ -934,7 +932,7 @@ export const analyzeAndRoute = action({
 
                     if (result.targetAgentId) {
                         // Validate existence
-                        if (agents.find(a => a.memberId === result.targetAgentId)) {
+                        if (agents.find((a: any) => a.memberId === result.targetAgentId)) {
                             specificAgentId = result.targetAgentId;
                             console.log(`[AI Routing] Matched agent ${result.targetAgentId}`);
                         }
