@@ -5,17 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ButtonType } from '@/convex/lib/templateTypes';
 import { Plus, Trash2 } from 'lucide-react';
-
-interface ButtonData {
-    type: ButtonType;
-    text: string;
-    url?: string;
-    phoneNumber?: string;
-}
+import type { TemplateButtonData } from '../types';
 
 interface TemplateButtonsBuilderProps {
-    buttons: ButtonData[];
-    onChange: (buttons: ButtonData[]) => void;
+    buttons: TemplateButtonData[];
+    onChange: (buttons: TemplateButtonData[]) => void;
     allowedTypes: ButtonType[];
     maxButtons: number;
 }
@@ -38,7 +32,11 @@ export const TemplateButtonsBuilder: React.FC<TemplateButtonsBuilderProps> = ({
         onChange(newButtons);
     };
 
-    const handleUpdateButton = (index: number, field: keyof ButtonData, value: any) => {
+    const handleUpdateButton = <Field extends keyof TemplateButtonData>(
+        index: number,
+        field: Field,
+        value: TemplateButtonData[Field],
+    ) => {
         const newButtons = [...buttons];
         newButtons[index] = { ...newButtons[index], [field]: value };
         onChange(newButtons);

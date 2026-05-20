@@ -139,7 +139,7 @@ export default function DashboardLayout({
         return (
             <div className="flex h-screen items-center justify-center flex-col gap-2 bg-gray-50">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="text-sm text-gray-500">Redirection vers l'onboarding...</span>
+                <span className="text-sm text-gray-500">Redirection vers l&apos;onboarding...</span>
             </div>
         );
     }

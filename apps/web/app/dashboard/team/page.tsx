@@ -39,7 +39,6 @@ import {
     MemberList,
     RoleDistributionChart,
     InviteMemberModal,
-    InvitationLinkDialog,
     PendingInvitations,
     TeamLimitBanner,
     MemberListSkeleton,
@@ -47,7 +46,6 @@ import {
     PolesSection,
     PoleModal,
     type Member,
-    type MemberStatus,
     type Invitation,
     type Pole,
 } from '@/components/team'
@@ -312,9 +310,6 @@ export default function TeamPage() {
     const [inviteModalOpen, setInviteModalOpen] = useState(false)
     const [createPoleModalOpen, setCreatePoleModalOpen] = useState(false)
 
-    // Invitation link dialog state (Feature 4)
-    const [invitationLinkData, setInvitationLinkData] = useState<{ token: string; email: string } | null>(null)
-
     // Filter state
     const [searchQuery, setSearchQuery] = useState('')
     const [roleFilter, setRoleFilter] = useState('all')
@@ -334,9 +329,9 @@ export default function TeamPage() {
 
     // Derived data (must be computed before early returns that use them)
     const currentUserRole = (membersData?.currentUserRole as Role) || 'agent'
-    const members = (membersData?.members ?? []) as Member[]
-    const invitations = (invitationsData?.invitations ?? []) as Invitation[]
-    const poles = (polesData?.poles ?? []) as Pole[]
+    const members = useMemo(() => (membersData?.members ?? []) as Member[], [membersData?.members])
+    const invitations = useMemo(() => (invitationsData?.invitations ?? []) as Invitation[], [invitationsData?.invitations])
+    const poles = useMemo(() => (polesData?.poles ?? []) as Pole[], [polesData?.poles])
 
     // Extract unique pole names for filter dropdown
     const uniquePoles = useMemo(() => {

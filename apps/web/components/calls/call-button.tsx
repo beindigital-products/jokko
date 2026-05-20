@@ -21,7 +21,7 @@ interface CallButtonProps {
 }
 
 export function CallButton({ conversationId, contactPhone, contactName }: CallButtonProps) {
-    const { callState, activeCallId, setOutgoingCall, setError, setCallContext, setMicStream } = useCallStore();
+    const { callState, setOutgoingCall, setError, setCallContext, setMicStream } = useCallStore();
     const { initiateCall } = useWebRTCCall();
     const requestOutboundCall = useMutation(api.calls.requestOutboundCall);
 

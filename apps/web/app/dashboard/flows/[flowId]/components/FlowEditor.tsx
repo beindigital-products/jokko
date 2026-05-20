@@ -16,12 +16,12 @@ import {
     Edge,
     Node,
     ReactFlowProvider,
-    Panel,
     useReactFlow,
     BackgroundVariant,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
 import {
     Save,
     ArrowLeft,
@@ -33,11 +33,9 @@ import {
     Plus,
     X,
     LayoutGrid,
-    Search,
     Trash2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -45,10 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
-    Tooltip,
-    TooltipContent,
     TooltipProvider,
-    TooltipTrigger,
 } from "@/components/ui/tooltip";
 
 import { CustomNodeMessage } from '../../components/nodes/CustomNodeMessage';
@@ -67,22 +62,49 @@ interface FlowEditorProps {
     flowId: Id<"flows">;
 }
 
+type FlowOption = {
+    id?: string;
+    title?: string;
+    label?: string;
+};
+
+type FlowNodeData = Record<string, unknown> & {
+    label?: string;
+    content?: string;
+    triggerType?: string;
+    keywords?: string;
+    interactiveType?: string;
+    options?: FlowOption[];
+    actionType?: string;
+    details?: string;
+};
+
+type FlowNode = Node<FlowNodeData>;
+type FlowNodePatch = Partial<FlowNodeData>;
+
+interface PropertiesContentProps {
+    selectedNode: FlowNode | null;
+    updateNodeData: (id: string, data: FlowNodePatch) => void;
+    setNodes: React.Dispatch<React.SetStateAction<FlowNode[]>>;
+    setSelectedNode: React.Dispatch<React.SetStateAction<FlowNode | null>>;
+}
+
 function FlowEditorContent({ flowId }: FlowEditorProps) {
     const router = useRouter();
     const flow = useQuery(api.flows.get, { flowId });
     const updateFlow = useMutation(api.flows.update);
     const { screenToFlowPosition } = useReactFlow();
 
-    const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+    const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
     const [isSaving, setIsSaving] = useState(false);
 
     // Initialize from DB
     useEffect(() => {
         if (flow) {
             try {
-                const loadedNodes = flow.nodes ? JSON.parse(flow.nodes) : [];
+                const loadedNodes = flow.nodes ? JSON.parse(flow.nodes) as FlowNode[] : [];
                 const loadedEdges = flow.edges ? JSON.parse(flow.edges) : [];
                 setNodes(loadedNodes);
                 setEdges(loadedEdges);
@@ -114,7 +136,7 @@ function FlowEditorContent({ flowId }: FlowEditorProps) {
                 y: event.clientY,
             });
 
-            const newNode: Node = {
+            const newNode: FlowNode = {
                 id: `${type}-${Date.now()}`,
                 type,
                 position,
@@ -127,7 +149,7 @@ function FlowEditorContent({ flowId }: FlowEditorProps) {
         [screenToFlowPosition, setNodes]
     );
 
-    const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    const onNodeClick = useCallback((_: React.MouseEvent, node: FlowNode) => {
         setSelectedNode(node);
     }, []);
 
@@ -153,7 +175,7 @@ function FlowEditorContent({ flowId }: FlowEditorProps) {
         }
     };
 
-    const updateNodeData = (id: string, data: any) => {
+    const updateNodeData = (id: string, data: FlowNodePatch) => {
         setNodes((nds) =>
             nds.map((node) => {
                 if (node.id === id) {
@@ -287,7 +309,7 @@ function FlowEditorContent({ flowId }: FlowEditorProps) {
                     <div className="flex items-center justify-center group-hover:justify-start gap-3 text-gray-400 hover:text-gray-600 cursor-pointer transition-colors">
                         <LayoutGrid className="w-5 h-5" />
                         <span className="text-xs font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity overflow-hidden">
-                            Vue d'ensemble
+                            Vue d&apos;ensemble
                         </span>
                     </div>
                 </div>
@@ -382,7 +404,7 @@ function DraggableNode({ type, label, icon, color, desc }: { type: string, label
 }
 
 // Sub-component for Properties Panel Content
-function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelectedNode }: any) {
+function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelectedNode }: PropertiesContentProps) {
     if (!selectedNode) return null;
 
     // MESSAGE NODE CONFIG
@@ -403,7 +425,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                 <Separator />
 
                 <DeleteNodeAction onDelete={() => {
-                    setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id));
+                    setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
                     setSelectedNode(null);
                 }} />
             </div>
@@ -445,10 +467,12 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
 
     // INTERACTIVE NODE CONFIG
     if (selectedNode.type === 'interactive') {
+        const options = selectedNode.data.options || [];
+
         return (
             <div className="space-y-6">
                 <div>
-                    <Label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">Type d'interaction</Label>
+                    <Label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">Type d&apos;interaction</Label>
                     <div className="grid grid-cols-2 gap-2 p-1 bg-gray-100 rounded-lg">
                         <button
                             className={`py-2 px-3 text-xs font-medium rounded-md transition-all ${selectedNode.data.interactiveType === 'list' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
@@ -478,10 +502,10 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
 
                 <div>
                     <Label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">
-                        Options ({((selectedNode.data.options as any[]) || []).length})
+                        Options ({options.length})
                     </Label>
                     <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1 custom-scrollbar">
-                        {((selectedNode.data.options as any[]) || []).map((opt, idx) => (
+                        {options.map((opt, idx) => (
                             <div key={idx} className="flex gap-2 items-center group">
                                 <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shrink-0">
                                     {idx + 1}
@@ -490,7 +514,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                                     className="h-9 w-full text-sm bg-white"
                                     value={opt.label || opt.title}
                                     onChange={(e) => {
-                                        const newOpts = [...((selectedNode.data.options as any[]) || [])];
+                                        const newOpts = [...options];
                                         newOpts[idx] = {
                                             ...newOpts[idx],
                                             label: e.target.value,
@@ -506,7 +530,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                                     variant="ghost"
                                     className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                                     onClick={() => {
-                                        const newOpts = [...((selectedNode.data.options as any[]) || [])];
+                                        const newOpts = [...options];
                                         newOpts.splice(idx, 1);
                                         updateNodeData(selectedNode.id, { options: newOpts });
                                     }}
@@ -521,7 +545,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                         variant="outline"
                         className="w-full mt-3 border-dashed border-gray-300 hover:border-indigo-300 hover:bg-indigo-50 text-gray-500 hover:text-indigo-600 transition-all font-normal"
                         onClick={() => {
-                            const newOpts = [...((selectedNode.data.options as any[]) || [])];
+                            const newOpts = [...options];
                             newOpts.push({ id: `opt_${Date.now()}`, title: '', label: '' });
                             updateNodeData(selectedNode.id, { options: newOpts });
                         }}
@@ -534,7 +558,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                 <Separator />
 
                 <DeleteNodeAction onDelete={() => {
-                    setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id));
+                    setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
                     setSelectedNode(null);
                 }} />
             </div>
@@ -546,7 +570,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
         return (
             <div className="space-y-6">
                 <div>
-                    <Label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">Type d'action</Label>
+                    <Label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">Type d&apos;action</Label>
                     <select
                         className="w-full h-10 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                         value={selectedNode.data.actionType as string || 'tag'}
@@ -573,7 +597,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                 <Separator />
 
                 <DeleteNodeAction onDelete={() => {
-                    setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id));
+                    setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
                     setSelectedNode(null);
                 }} />
             </div>

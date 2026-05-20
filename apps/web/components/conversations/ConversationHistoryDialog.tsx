@@ -101,7 +101,7 @@ export function ConversationHistoryDialog({
                                         return (
                                             <MessageBubble
                                                 key={msg.id}
-                                                // @ts-ignore - types might slightly differ between hook and direct query return
+                                                // @ts-expect-error - types might slightly differ between hook and direct query return
                                                 message={msg}
                                                 isGrouped={!!isGrouped}
                                                 onResend={async () => { }}

@@ -25,7 +25,6 @@ import { useRouter } from 'next/navigation'
 import {
     MoreHorizontal,
     Shield,
-    Trash2,
     Crown,
     MessageSquare,
     User,
@@ -55,14 +54,6 @@ import {
     EmptyDescription,
     EmptyMedia
 } from '@/components/ui/empty'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
-
 import { cn } from '@/lib/utils'
 import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
@@ -325,7 +316,7 @@ export function MemberList({
                 <EmptyHeader>
                     <EmptyTitle>Aucun membre</EmptyTitle>
                     <EmptyDescription>
-                        Il n'y a aucun membre dans cette equipe.
+                        Il n&apos;y a aucun membre dans cette equipe.
                     </EmptyDescription>
                 </EmptyHeader>
             </Empty>
@@ -342,7 +333,6 @@ export function MemberList({
                         canManage={canManage}
                         currentUserRole={currentUserRole}
                         poles={poles}
-                        onEdit={() => setEditingMember(member)}
                         onRemove={() => setRemovingMember(member)}
                     />
                 ))}
@@ -395,7 +385,6 @@ interface MemberCardProps {
     canManage: boolean
     currentUserRole: Role
     poles?: Pole[]
-    onEdit: () => void
     onRemove: () => void
 }
 
@@ -404,7 +393,6 @@ function MemberCard({
     canManage,
     currentUserRole,
     poles = [],
-    onEdit,
     onRemove,
 }: MemberCardProps) {
     const router = useRouter()

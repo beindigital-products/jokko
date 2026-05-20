@@ -1,21 +1,27 @@
 import React from 'react';
-import { cn } from '@/lib/utils';
+import Image from 'next/image';
 import { TemplateTypeConfig } from '@/convex/lib/templateTypes';
+import type {
+    TemplateButtonData,
+    TemplateCarouselEditorCard,
+    TemplateHeaderData,
+    TemplateListSection,
+} from '../types';
 
 interface TemplatePreviewProps {
     data: {
-        header?: { type: string; text?: string; url?: string };
+        header?: TemplateHeaderData;
         body: string;
         footer?: string;
-        buttons?: any[];
-        sections?: any[];
-        cards?: any[];
+        buttons?: TemplateButtonData[];
+        sections?: TemplateListSection[];
+        cards?: TemplateCarouselEditorCard[];
     };
     config: TemplateTypeConfig;
 }
 
 export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }) => {
-    const { header, body, footer, buttons, sections, cards } = data;
+    const { header, body, footer, buttons, cards } = data;
 
     // Helper to replace variables {{1}} with sample data or highlights
     const formatBody = (text: string) => {
@@ -28,7 +34,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }
         });
     };
 
-    const renderHeader = (h: any) => {
+    const renderHeader = (h?: TemplateHeaderData) => {
         if (!h || h.type === 'NONE') return null;
         return (
             <div className="mb-2">
@@ -36,7 +42,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }
                     <div className="font-bold text-sm text-gray-900">{h.text}</div>
                 )}
                 {h.type === 'IMAGE' && (
-                    <div className="h-32 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs overflow-hidden">
+                    <div className="relative h-32 bg-gray-200 rounded flex items-center justify-center text-gray-400 text-xs overflow-hidden">
                         {h.url ? (
                             h.url.includes('{{') ? (
                                 <div className="flex flex-col items-center justify-center p-2 text-center">
@@ -46,7 +52,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }
                                     <span className="text-[10px] mt-1 opacity-70 truncate max-w-[200px]">{h.url}</span>
                                 </div>
                             ) : (
-                                <img src={h.url} alt="Header" className="w-full h-full object-cover" />
+                                <Image src={h.url} alt="Header" fill sizes="320px" unoptimized className="object-cover" />
                             )
                         ) : (
                             <span>IMAGE</span>
@@ -111,11 +117,11 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }
                 {/* CAROUSEL VIEW */}
                 {config.type === 'CAROUSEL' ? (
                     <div className="flex gap-2 overflow-x-auto pb-4 snap-x">
-                        {(cards && cards.length > 0 ? cards : [{ body: '' }]).map((card: any, idx: number) => (
+                        {(cards && cards.length > 0 ? cards : [{ body: '', buttons: [] }]).map((card, idx) => (
                             <div key={idx} className="min-w-[80%] max-w-[80%] flex flex-col snap-center">
                                 <div className="bg-white rounded-lg p-3 shadow-sm relative">
                                     {card.headerUrl && (
-                                        <div className="h-32 bg-gray-200 rounded mb-2 overflow-hidden flex items-center justify-center bg-gray-100">
+                                        <div className="relative h-32 bg-gray-200 rounded mb-2 overflow-hidden flex items-center justify-center bg-gray-100">
                                             {card.headerUrl.includes('{{') ? (
                                                 <div className="flex flex-col items-center justify-center p-2 text-center">
                                                     <span className="font-mono text-[10px] bg-yellow-100 text-yellow-800 px-1 rounded border border-yellow-200">
@@ -123,7 +129,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }
                                                     </span>
                                                 </div>
                                             ) : (
-                                                <img src={card.headerUrl} className="w-full h-full object-cover" alt="Card Header" />
+                                                <Image src={card.headerUrl} className="object-cover" fill sizes="260px" unoptimized alt="Card Header" />
                                             )}
                                         </div>
                                     )}
@@ -139,7 +145,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }
 
                                 {card.buttons && card.buttons.length > 0 && (
                                     <div className="mt-1 space-y-1">
-                                        {card.buttons.map((btn: any, i: number) => (
+                                        {card.buttons.map((btn, i) => (
                                             <div key={i} className="bg-white rounded text-center py-2 text-[#00A5F4] text-sm shadow-sm font-medium">
                                                 {btn.text || 'Bouton'}
                                             </div>
@@ -189,7 +195,7 @@ export const TemplatePreview: React.FC<TemplatePreviewProps> = ({ data, config }
                         {/* STANDARD BUTTONS */}
                         {config.type !== 'LIST' && buttons && buttons.length > 0 && (
                             <div className="mt-1 space-y-1 max-w-[90%]">
-                                {buttons.map((btn: any, i: number) => (
+                                {buttons.map((btn, i) => (
                                     <div key={i} className="bg-white rounded text-center py-2 text-[#00A5F4] text-sm shadow-sm font-medium cursor-pointer hover:bg-gray-50">
                                         {btn.type === 'PHONE_NUMBER' && '📞 '}
                                         {btn.type === 'URL' && '🔗 '}

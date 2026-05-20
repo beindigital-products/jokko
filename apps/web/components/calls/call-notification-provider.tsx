@@ -70,6 +70,11 @@ export function CallNotificationProvider() {
         trackedCallStatusRef.current = trackedCallStatus;
     }, [trackedCallStatus]);
 
+    const getTerminationReason = (call: object): string | undefined => {
+        if (!('terminationReason' in call)) return undefined;
+        return typeof call.terminationReason === 'string' ? call.terminationReason : undefined;
+    };
+
     // Detect new incoming calls
     useEffect(() => {
         if (!activeCall) {
@@ -220,8 +225,9 @@ export function CallNotificationProvider() {
             (callState === 'dialing' || callState === 'connecting') &&
             initiatingCallIdRef.current !== myOutboundCall._id
         ) {
-            console.warn('[call-flow] Provider: PERMISSION_GRANTED while dialing/connecting (no in-flight), surfacing error', (myOutboundCall as any).terminationReason);
-            setError(mapCallError((myOutboundCall as any).terminationReason));
+            const terminationReason = getTerminationReason(myOutboundCall);
+            console.warn('[call-flow] Provider: PERMISSION_GRANTED while dialing/connecting (no in-flight), surfacing error', terminationReason);
+            setError(mapCallError(terminationReason));
         }
     }, [myOutboundCall, callState, activeCallId, setCallState, setError, initiateCall]);
 

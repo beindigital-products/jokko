@@ -7,14 +7,14 @@ import {
     DialogTitle,
     DialogDescription,
 } from '@/components/ui/dialog';
-import { ContactForm } from './ContactForm';
+import { ContactForm, type ContactFormInitialData, type ContactFormSubmitData } from './ContactForm';
 
 interface ContactFormDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     mode: 'create' | 'edit';
-    initialData?: any;
-    onSubmit: (data: any) => Promise<void>;
+    initialData?: ContactFormInitialData;
+    onSubmit: (data: ContactFormSubmitData) => Promise<void>;
     isLoading?: boolean;
 }
 

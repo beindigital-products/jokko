@@ -1,18 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Bell, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function NotificationBanner() {
-    const [permission, setPermission] = useState<NotificationPermission>('granted'); // Default to granted to hide initial flash
-    const [isVisible, setIsVisible] = useState(true);
-
-    useEffect(() => {
+    const [permission, setPermission] = useState<NotificationPermission>(() => {
         if (typeof window !== 'undefined' && 'Notification' in window) {
-            setPermission(Notification.permission);
+            return Notification.permission;
         }
-    }, []);
+        return 'granted';
+    });
+    const [isVisible, setIsVisible] = useState(true);
 
     const enableNotifications = () => {
         Notification.requestPermission().then((p) => {

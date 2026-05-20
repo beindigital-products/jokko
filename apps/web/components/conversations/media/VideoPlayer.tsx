@@ -13,9 +13,10 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Play, Pause, X, Maximize2, Video as VideoIcon, ArrowLeft, Download } from 'lucide-react'
+import { Play, X, Video as VideoIcon, ArrowLeft, Download } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useIsClient } from '@/hooks/useIsClient'
 
 interface VideoPlayerProps {
     src: string | null
@@ -26,25 +27,18 @@ interface VideoPlayerProps {
 
 export function VideoPlayer({
     src,
-    thumbnailSrc,
     caption,
     isOutbound = false,
 }: VideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null)
     const fullscreenVideoRef = useRef<HTMLVideoElement>(null)
-    const [isPlaying, setIsPlaying] = useState(false)
     const [showFullscreen, setShowFullscreen] = useState(false)
-    const [isMounted, setIsMounted] = useState(false)
+    const isMounted = useIsClient()
     // Blob URLs load instantly, so don't show loading state for them
     const isBlobUrl = src?.startsWith('blob:') || false
     const [isLoading, setIsLoading] = useState(!isBlobUrl)
     const [hasError, setHasError] = useState(false)
     const [duration, setDuration] = useState<number | null>(null)
-
-    // Pour le portail - s'assurer qu'on est côté client
-    useEffect(() => {
-        setIsMounted(true)
-    }, [])
 
     // Bloquer le scroll du body quand le fullscreen est ouvert
     useEffect(() => {
@@ -73,17 +67,6 @@ export function VideoPlayer({
         const mins = Math.floor(seconds / 60)
         const secs = Math.floor(seconds % 60)
         return `${mins}:${secs.toString().padStart(2, '0')}`
-    }
-
-    const handlePlayPause = () => {
-        if (!videoRef.current) return
-
-        if (isPlaying) {
-            videoRef.current.pause()
-        } else {
-            videoRef.current.play()
-        }
-        setIsPlaying(!isPlaying)
     }
 
     const handleVideoClick = () => {

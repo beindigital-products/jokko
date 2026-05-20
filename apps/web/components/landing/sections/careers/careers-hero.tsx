@@ -54,7 +54,7 @@ export function CareersHero() {
                     Nous sommes une équipe de 14 personnes entre Paris et Dakar, en
                     hypercroissance, bien financée. Nous cherchons des profils rares
                     qui veulent façonner un produit utilisé tous les jours par des
-                    milliers d'équipes.
+                    milliers d&apos;équipes.
                 </motion.p>
 
                 <motion.div

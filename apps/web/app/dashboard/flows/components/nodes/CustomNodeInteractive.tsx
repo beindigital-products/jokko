@@ -2,8 +2,18 @@
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { MousePointerClick, List } from 'lucide-react';
 
+interface InteractiveOption {
+    label?: string;
+    title?: string;
+}
+
+function isInteractiveOption(value: unknown): value is InteractiveOption {
+    return typeof value === 'object' && value !== null;
+}
+
 export function CustomNodeInteractive({ data, isConnectable }: NodeProps) {
     const isList = data.interactiveType === 'list';
+    const options = Array.isArray(data.options) ? data.options.filter(isInteractiveOption) : [];
 
     return (
         <div className="group relative px-4 py-3 shadow-lg hover:shadow-xl transition-all duration-300 rounded-2xl bg-white border border-violet-100 min-w-[280px]">
@@ -22,9 +32,9 @@ export function CustomNodeInteractive({ data, isConnectable }: NodeProps) {
             </div>
 
             {/* Show choices preview */}
-            {data.options && Array.isArray(data.options) && (data.options as any[]).length > 0 ? (
+            {options.length > 0 ? (
                 <div className="mt-2 space-y-1.5 bg-gray-50/50 p-2 rounded-lg border border-gray-100">
-                    {(data.options as any[]).slice(0, 3).map((opt: any, i: number) => (
+                    {options.slice(0, 3).map((opt, i) => (
                         <div key={i} className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-violet-300"></div>
                             <span className="text-xs text-gray-600 font-medium truncate flex-1">
@@ -32,8 +42,8 @@ export function CustomNodeInteractive({ data, isConnectable }: NodeProps) {
                             </span>
                         </div>
                     ))}
-                    {(data.options as any[]).length > 3 && (
-                        <div className="text-[10px] text-gray-400 pl-3.5 font-medium">+{(data.options as any[]).length - 3} autres...</div>
+                    {options.length > 3 && (
+                        <div className="text-[10px] text-gray-400 pl-3.5 font-medium">+{options.length - 3} autres...</div>
                     )}
                 </div>
             ) : null}

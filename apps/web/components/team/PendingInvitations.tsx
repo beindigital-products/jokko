@@ -126,7 +126,7 @@ export function PendingInvitations({
                 <EmptyHeader>
                     <EmptyTitle>Aucune invitation</EmptyTitle>
                     <EmptyDescription>
-                        Il n'y a aucune invitation en attente.
+                        Il n&apos;y a aucune invitation en attente.
                     </EmptyDescription>
                 </EmptyHeader>
             </Empty>
@@ -210,7 +210,7 @@ export function PendingInvitations({
                                         disabled={cancelingId === invitation.id}
                                     >
                                         <XCircle className="mr-2 h-4 w-4" />
-                                        Annuler l'invitation
+                                        Annuler l&apos;invitation
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
@@ -222,9 +222,9 @@ export function PendingInvitations({
             <AlertDialog open={!!invitationToCancel} onOpenChange={(open) => !open && setInvitationToCancel(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Annuler l'invitation ?</AlertDialogTitle>
+                        <AlertDialogTitle>Annuler l&apos;invitation ?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            Cette action est irréversible. L'utilisateur ne pourra plus utiliser le lien d'invitation pour rejoindre l'équipe.
+                            Cette action est irréversible. L&apos;utilisateur ne pourra plus utiliser le lien d&apos;invitation pour rejoindre l&apos;équipe.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

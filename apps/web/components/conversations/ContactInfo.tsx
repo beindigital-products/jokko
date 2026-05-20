@@ -31,6 +31,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -46,14 +47,11 @@ import {
     Eye,
     Trash,
     Send,
-    Image as ImageIcon,
     Video,
     FileText,
-    Link as LinkIcon,
-    Download
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
@@ -80,11 +78,46 @@ import {
 // MEDIA GALLERY COMPONENTS
 // ============================================
 
-function MediaThumbnail({ item }: { item: any }) {
+interface MediaItem {
+    _id: string;
+    type: string;
+    mediaUrl?: string;
+    fileName?: string;
+}
+
+interface ContactNote {
+    authorId?: Id<"users">;
+    authorName?: string;
+    createdAt: number;
+    content: string;
+}
+
+function getTagName(tag: unknown): string {
+    if (typeof tag === 'string') return tag;
+    if (typeof tag === 'object' && tag !== null && 'name' in tag && typeof tag.name === 'string') {
+        return tag.name;
+    }
+    return '';
+}
+
+function isContactNote(note: unknown): note is ContactNote {
+    return typeof note === 'object' && note !== null && 'createdAt' in note && 'content' in note && typeof note.content === 'string';
+}
+
+function MediaThumbnail({ item }: { item: MediaItem }) {
+    if (!item.mediaUrl) return null;
+
     if (item.type === 'IMAGE') {
         return (
             <a href={item.mediaUrl} target="_blank" rel="noopener noreferrer" className="relative aspect-square bg-gray-100 rounded-md overflow-hidden group block border hover:border-blue-500 transition-colors">
-                <img src={item.mediaUrl} alt="Media" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                <Image
+                    src={item.mediaUrl}
+                    alt="Media"
+                    fill
+                    sizes="96px"
+                    unoptimized
+                    className="object-cover group-hover:scale-105 transition-transform"
+                />
             </a>
         )
     }
@@ -118,7 +151,7 @@ function MediaGallery({ conversationId }: { conversationId: string }) {
     const videos = media.filter(m => m.type === 'VIDEO');
     const documents = media.filter(m => m.type === 'DOCUMENT' || m.type === 'AUDIO');
 
-    const renderGrid = (items: any[]) => {
+    const renderGrid = (items: MediaItem[]) => {
         if (items.length === 0) return <p className="text-xs text-gray-400 py-4 text-center">Aucun element.</p>;
         return (
             <div className="grid grid-cols-3 gap-2 max-h-60 overflow-y-auto p-1">
@@ -200,7 +233,6 @@ function InfoRow({
 // ============================================
 
 function HistoryList({
-    contactId,
     conversationId,
     onView,
     onDelete,
@@ -348,12 +380,12 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
         try {
             await updateContact({
                 id: contact.id,
-                tags: contact.tags.map((t: any) => typeof t === 'string' ? t : t.name),
+                tags: contact.tags.map(getTagName).filter(Boolean),
                 addNote: newNoteContent.trim()
             });
             setNewNoteContent('');
             toast.success("Note ajoutée");
-        } catch (err) {
+        } catch {
             toast.error("Erreur lors de l'ajout de la note");
         }
     };
@@ -364,7 +396,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
         try {
             await clearAllNotes({ contactId: contact.id });
             toast.success("Toutes les notes ont été effacées");
-        } catch (err) {
+        } catch {
             toast.error("Erreur lors de la suppression des notes");
         } finally {
             setIsClearingNotes(false);
@@ -382,7 +414,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
             setEditingNoteTimestamp(null);
             setEditNoteContent('');
             toast.success("Note modifiée");
-        } catch (err) {
+        } catch {
             toast.error("Erreur lors de la modification");
         }
     };
@@ -399,7 +431,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
                 noteTimestamp: noteToDeleteTimestamp
             });
             toast.success("Note supprimée");
-        } catch (err) {
+        } catch {
             toast.error("Erreur lors de la suppression");
         } finally {
             setNoteToDeleteTimestamp(null);
@@ -408,7 +440,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
 
     const handleAddTag = async (tag: string) => {
         if (!contact || !tag.trim()) return;
-        const tagNames = contact.tags.map((t: any) => typeof t === 'string' ? t : t.name);
+        const tagNames = contact.tags.map(getTagName).filter(Boolean);
         if (tagNames.includes(tag.trim())) return;
 
         await updateContact({
@@ -420,7 +452,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
 
     const handleRemoveTag = async (tagToRemove: string) => {
         if (!contact) return;
-        const tagNames = contact.tags.map((t: any) => typeof t === 'string' ? t : t.name);
+        const tagNames = contact.tags.map(getTagName).filter(Boolean);
         await updateContact({
             id: contact.id,
             tags: tagNames.filter((t: string) => t !== tagToRemove)
@@ -434,7 +466,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
         try {
             await removeConversation({ id: id as Id<"conversations"> });
             toast.success("Ticket supprime");
-        } catch (error) {
+        } catch {
             toast.error("Erreur lors de la suppression");
         } finally {
             setIsDeletingId(null);
@@ -457,7 +489,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
                 excludeIds: [conversationId as Id<"conversations">] // Keep current
             });
             toast.success("Historique efface");
-        } catch (error) {
+        } catch {
             toast.error("Erreur lors de la suppression de l'historique");
         } finally {
             setIsClearingHistory(false);
@@ -505,7 +537,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
         : contact.phone.slice(-2)
 
     // Notes casting (safe due to backend update)
-    const notesList: any[] = Array.isArray(contact.notes) ? contact.notes : [];
+    const notesList: ContactNote[] = Array.isArray(contact.notes) ? contact.notes.filter(isContactNote) : [];
 
     return (
         <div className="flex flex-col h-full">
@@ -579,7 +611,7 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
                                     </AlertDialogTrigger>
                                     <AlertDialogContent>
                                         <AlertDialogHeader>
-                                            <AlertDialogTitle>Effacer tout l'historique ?</AlertDialogTitle>
+                                            <AlertDialogTitle>Effacer tout l&apos;historique ?</AlertDialogTitle>
                                             <AlertDialogDescription>
                                                 Cette action est irreversible. Tous les tickets terminés pour ce contact seront supprimés définitivement.
                                             </AlertDialogDescription>
@@ -610,8 +642,8 @@ export function ContactInfo({ conversationId, onClose }: ContactInfoProps) {
                     <div>
                         <h4 className="text-sm font-medium text-gray-900 mb-3">Tags</h4>
                         <div className="flex flex-wrap gap-2">
-                            {contact.tags.map((tag: any) => {
-                                const tagName = typeof tag === 'string' ? tag : tag.name
+                            {contact.tags.map((tag) => {
+                                const tagName = getTagName(tag)
                                 return (
                                     <Badge
                                         key={tagName}

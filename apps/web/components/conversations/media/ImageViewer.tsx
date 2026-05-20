@@ -17,6 +17,7 @@ import Image from 'next/image'
 import { X, Download, ZoomIn, ImageIcon, ArrowLeft } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { useIsClient } from '@/hooks/useIsClient'
 
 interface ImageViewerProps {
     src: string | null
@@ -34,17 +35,12 @@ export function ImageViewer({
     isOutbound = false,
 }: ImageViewerProps) {
     const [isOpen, setIsOpen] = useState(false)
-    const [isMounted, setIsMounted] = useState(false)
+    const isMounted = useIsClient()
     const displaySrc = src || thumbnailSrc
     // Blob URLs load instantly, so don't show loading state for them
     const isBlobUrl = displaySrc?.startsWith('blob:') || false
     const [isLoading, setIsLoading] = useState(!isBlobUrl)
     const [hasError, setHasError] = useState(false)
-
-    // Pour le portail - s'assurer qu'on est côté client
-    useEffect(() => {
-        setIsMounted(true)
-    }, [])
 
     // Bloquer le scroll du body quand le lightbox est ouvert
     useEffect(() => {

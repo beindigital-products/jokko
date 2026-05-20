@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import type { Id } from '@/convex/_generated/dataModel';
 import { useRouter } from 'next/navigation';
-import { Plus, MoreVertical, Play, Pause, Trash2, Edit, Workflow, Bot, ChevronLeft, AlertCircle, Sparkles } from 'lucide-react';
+import { Plus, MoreVertical, Play, Pause, Trash2, Edit, Workflow, ChevronLeft, AlertCircle, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { SearchInput } from '@/components/ui/search-input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -16,7 +16,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import {
@@ -36,7 +35,6 @@ export function FlowsPageClient() {
     const { allowed: planAllowed, isLoading: planLoading } = usePlanFeature('flows');
 
     const flows = useQuery(api.flows.list);
-    const createFlow = useMutation(api.flows.create);
     const deleteFlow = useMutation(api.flows.deleteFlow);
     const updateFlow = useMutation(api.flows.update);
     const [search, setSearch] = useState('');
@@ -64,7 +62,7 @@ export function FlowsPageClient() {
                     <AlertCircle className="h-4 w-4" />
                     <AlertTitle>Accès refusé</AlertTitle>
                     <AlertDescription>
-                        Vous n'avez pas les autorisations nécessaires pour accéder à cette page.
+                        Vous n&apos;avez pas les autorisations nécessaires pour accéder à cette page.
                     </AlertDescription>
                 </Alert>
             </div>
@@ -90,13 +88,13 @@ export function FlowsPageClient() {
         f.name.toLowerCase().includes(search.toLowerCase())
     ) || [];
 
-    const handleDelete = async (id: any) => {
+    const handleDelete = async (id: Id<"flows">) => {
         if (confirm('Êtes-vous sûr de vouloir supprimer ce flux ?')) {
             await deleteFlow({ flowId: id });
         }
     };
 
-    const toggleStatus = async (id: any, currentStatus: boolean) => {
+    const toggleStatus = async (id: Id<"flows">, currentStatus: boolean) => {
         await updateFlow({ flowId: id, isActive: !currentStatus });
     }
 
@@ -153,13 +151,13 @@ export function FlowsPageClient() {
                             </EmptyMedia>
                             <EmptyTitle className="text-xl font-bold text-gray-900">Aucun flux trouvé</EmptyTitle>
                             <EmptyDescription className="text-gray-500 max-w-sm mx-auto mt-2">
-                                Commencez par créer votre premier flux d'automatisation pour répondre automatiquement à vos clients.
+                                Commencez par créer votre premier flux d&apos;automatisation pour répondre automatiquement à vos clients.
                             </EmptyDescription>
                         </EmptyHeader>
                         <EmptyContent className="mt-6">
                             <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-xl" onClick={() => router.push('/dashboard/flows/new')}>
                                 <Sparkles className="w-4 h-4" />
-                                Créer avec l'IA
+                                Créer avec l&apos;IA
                             </Button>
                         </EmptyContent>
                     </Empty>

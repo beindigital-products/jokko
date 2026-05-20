@@ -455,7 +455,7 @@ export default function AnalyticsPage() {
     const handleExport = () => {
         if (!agents || agents.length === 0) return;
 
-        const csvData = agents.map((agent: any) => ({
+        const csvData = agents.map((agent) => ({
             Nom: agent.name,
             "R\u00f4le": roleLabels[agent.role] || agent.role,
             "Messages envoy\u00e9s": agent.messagesCount,
@@ -803,7 +803,7 @@ export default function AnalyticsPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {agents.map((agent: any) => (
+                                {agents.map((agent) => (
                                     <TableRow
                                         key={agent.id}
                                         className="border-gray-50 hover:bg-gray-50/50 transition-colors"

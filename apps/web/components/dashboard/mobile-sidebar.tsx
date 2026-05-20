@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -26,6 +26,7 @@ import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 
 import { cn } from '@/lib/utils'
+import { useIsClient } from '@/hooks/useIsClient'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -76,12 +77,8 @@ export function MobileSidebar({
     const router = useRouter()
     const [isOpen, setIsOpen] = useState(false)
     const { signOut } = useAuthActions()
-    const [isMounted, setIsMounted] = useState(false)
+    const isMounted = useIsClient()
     const role = useQuery(api.users.currentUserRole)
-
-    useEffect(() => {
-        setIsMounted(true)
-    }, [])
 
     const restrictedForAgents = ['Attribution', 'Modèles', 'Campagnes', 'Analytics', 'Automatisation', 'Team']
 

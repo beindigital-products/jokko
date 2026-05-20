@@ -44,8 +44,9 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
         try {
             const { accessToken: token } = await fbLogin();
             handleFetchNumbers(token);
-        } catch (err: any) {
-            setErrorMessage(err.message || "Connexion annulée ou non autorisée.");
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "Connexion annulée ou non autorisée.";
+            setErrorMessage(message);
         }
     };
 
@@ -64,7 +65,7 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
                 setErrorMessage("Aucun numéro WhatsApp trouvé sur ce compte.");
                 setStatus('ERROR');
             }
-        } catch (error: any) {
+        } catch (error) {
             console.error("Fetch failed", error);
             setErrorMessage("Impossible de récupérer vos numéros. Vérifiez vos permissions.");
             setStatus('ERROR');

@@ -15,7 +15,6 @@ import { toast } from 'sonner';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '@/components/ui/empty';
 import { SearchInput } from '@/components/ui/search-input';
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 
 export const ShortcutList = () => {
@@ -83,9 +82,10 @@ export const ShortcutList = () => {
             }
             setIsDialogOpen(false);
             resetForm();
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            toast.error(error.message || "Une erreur est survenue");
+            const message = error instanceof Error ? error.message : "Une erreur est survenue";
+            toast.error(message);
         } finally {
             setIsSubmitting(false);
         }
@@ -108,7 +108,7 @@ export const ShortcutList = () => {
         try {
             await deleteShortcut({ id });
             toast.success('Raccourci supprime');
-        } catch (error) {
+        } catch {
             toast.error("Erreur lors de la suppression");
         }
     };

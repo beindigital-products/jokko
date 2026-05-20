@@ -15,11 +15,11 @@ import { TemplateButtonsBuilder } from './builders/TemplateButtonsBuilder';
 import { TemplateListBuilder } from './builders/TemplateListBuilder';
 import { TemplateCarouselBuilder } from './builders/TemplateCarouselBuilder';
 import { useTemplateBuilder } from '@/hooks/useTemplateBuilder';
-import { cn } from '@/lib/utils';
+import type { ExistingTemplateData, TemplateHeaderData } from './types';
 
 interface TemplateBuilderProps {
     type: TemplateType;
-    initialData?: any;
+    initialData?: ExistingTemplateData | null;
     onSuccess: () => void;
     onCancel: () => void;
 }
@@ -38,7 +38,15 @@ export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({
         config
     });
 
-    const isReadOnly = ['PENDING', 'APPROVED'].includes(initialData?.status);
+    const isReadOnly = initialData?.status === 'PENDING' || initialData?.status === 'APPROVED';
+
+    const updateHeader = (patch: Partial<TemplateHeaderData>) => {
+        handleChange('header', {
+            type: formData.header?.type || 'NONE',
+            ...formData.header,
+            ...patch,
+        });
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -183,7 +191,7 @@ export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({
                                     <Label className="text-xs font-medium text-gray-700">En-tete (Header)</Label>
                                     <Select
                                         value={formData.header?.type || 'NONE'}
-                                        onValueChange={v => handleChange('header', { ...formData.header, type: v })}
+                                        onValueChange={v => updateHeader({ type: v })}
                                         disabled={isReadOnly}
                                     >
                                         <SelectTrigger className="h-9">
@@ -199,7 +207,7 @@ export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({
                                     {formData.header?.type === 'TEXT' && (
                                         <Input
                                             value={formData.header?.text || ''}
-                                            onChange={e => handleChange('header', { ...formData.header, text: e.target.value })}
+                                            onChange={e => updateHeader({ text: e.target.value })}
                                             placeholder="Texte de l'en-tete"
                                             maxLength={60}
                                             className="h-9"
@@ -215,14 +223,14 @@ export const TemplateBuilder: React.FC<TemplateBuilderProps> = ({
                                                     variant="ghost"
                                                     size="sm"
                                                     className="h-5 px-2 text-[10px] text-green-700 hover:text-green-800 hover:bg-green-50"
-                                                    onClick={() => handleChange('header', { ...formData.header, url: (formData.header?.url || '') + '{{1}}' })}
+                                                    onClick={() => updateHeader({ url: (formData.header?.url || '') + '{{1}}' })}
                                                 >
                                                     + Variable
                                                 </Button>
                                             </div>
                                             <Input
                                                 value={formData.header?.url || ''}
-                                                onChange={e => handleChange('header', { ...formData.header, url: e.target.value })}
+                                                onChange={e => updateHeader({ url: e.target.value })}
                                                 placeholder="https://example.com/image-{{1}}.jpg"
                                                 className="h-9"
                                             />

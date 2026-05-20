@@ -42,7 +42,7 @@ export function useConversations() {
     const conversationsData = useQuery(api.conversations.list,
         currentOrg ? {
             organizationId: currentOrg._id as Id<"organizations">,
-            filter: filter as any, // Cast to match backend union if needed or ensure backend supports all
+            filter,
             search: search || undefined
         } : "skip"
     );
@@ -50,7 +50,7 @@ export function useConversations() {
     const conversations: ConversationSummary[] = useMemo(() => {
         if (!conversationsData) return [];
 
-        return conversationsData.map((c: any) => ({
+        return conversationsData.map((c) => ({
             id: c._id,
             contact: {
                 id: c.contact?._id || "unknown",
@@ -59,14 +59,14 @@ export function useConversations() {
                 avatarUrl: c.contact?.profilePicture || null,
                 isBlocked: c.contact?.isBlocked,
             },
-            lastMessageText: c.preview,
+            lastMessageText: c.preview ?? null,
             lastMessageAt: c.lastMessageAt,
             lastMessageType: "TEXT",
             unreadCount: c.unreadCount,
             assignedTo: c.assignedTo ? {
                 id: c.assignedTo._id,
-                name: c.assignedTo.user.name,
-                email: c.assignedTo.user.email,
+                name: c.assignedTo.user.name ?? null,
+                email: c.assignedTo.user.email ?? "",
                 avatar: c.assignedTo.user.image || null
             } : undefined,
             tags: c.tags || [],
@@ -81,7 +81,7 @@ export function useConversations() {
 
     const unreadCount = useMemo(() => {
         if (!conversationsData) return 0;
-        return conversationsData.reduce((acc: number, c: any) => acc + (c.unreadCount || 0), 0);
+        return conversationsData.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
     }, [conversationsData]);
 
     const resolveMutation = useMutation(api.conversations.resolve);

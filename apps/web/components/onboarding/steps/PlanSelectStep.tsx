@@ -31,9 +31,10 @@ const PLAN_CONFIG = {
 } as const;
 
 type PlanKey = keyof typeof PLAN_CONFIG;
+type SelectablePlanKey = PlanKey | 'FREE';
 
 export function PlanSelectStep({ onComplete }: PlanSelectStepProps) {
-    const [selectedPlan, setSelectedPlan] = useState<string>('BUSINESS');
+    const [selectedPlan, setSelectedPlan] = useState<PlanKey>('BUSINESS');
     const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -55,16 +56,16 @@ export function PlanSelectStep({ onComplete }: PlanSelectStepProps) {
                     `${formatLimit(p.maxAgents)} agent${p.maxAgents > 1 ? 's' : ''}`,
                     `${formatLimit(p.maxWhatsappChannels)} canal${p.maxWhatsappChannels > 1 ? 'aux' : ''} WhatsApp`,
                     `${formatLimit(p.maxConversationsPerMonth)} conversations/mois`,
-                    ...p.features.filter((f: any) => f.included).slice(0, 2).map((f: any) => f.label),
+                    ...p.features.filter((f) => f.included).slice(0, 2).map((f) => f.label),
                 ],
                 ...config,
             };
         });
 
-    const handleSelectPlan = async (planKey: string) => {
+    const handleSelectPlan = async (planKey: SelectablePlanKey) => {
         setIsLoading(true);
         try {
-            await updateOrgPlan({ plan: planKey as any });
+            await updateOrgPlan({ plan: planKey });
             if (planKey !== 'FREE') {
                 sessionStorage.setItem('jokko_billing_interval', billingInterval);
             }

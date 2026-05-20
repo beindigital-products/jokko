@@ -35,9 +35,10 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { PhoneInput } from './PhoneInput';
 import { detectCountry } from '@/lib/contacts/validation';
 import { useCrmLink } from '@/hooks/use-crm-link';
+import type { ComponentProps, ReactNode } from 'react';
 
 // Helper to wrap input with icon
-function InputWithIcon({ leftIcon, className, ...props }: any) {
+function InputWithIcon({ leftIcon, className, ...props }: ComponentProps<typeof Input> & { leftIcon?: ReactNode }) {
     return (
         <div className="relative">
             {leftIcon && (
@@ -68,11 +69,43 @@ const formSchema = z.object({
     // reference form handles tags in state `const [tags, setTags]`.
 });
 
+export type ContactFormValues = z.infer<typeof formSchema>;
+
+export interface ContactNote {
+    authorName?: string;
+    createdAt: number;
+    content: string;
+}
+
+type NullableString = string | null | undefined;
+
+export interface ContactFormInitialData {
+    id?: string;
+    phone?: NullableString;
+    name?: NullableString;
+    firstName?: NullableString;
+    lastName?: NullableString;
+    email?: NullableString;
+    company?: NullableString;
+    jobTitle?: NullableString;
+    address?: NullableString;
+    city?: NullableString;
+    country?: NullableString;
+    tags?: string[] | string | null;
+    notes?: string | ContactNote[] | null;
+}
+
+export type ContactFormSubmitData = Omit<ContactFormValues, 'notes'> & {
+    tags: string[];
+    notes?: string;
+    addNote?: string;
+};
+
 interface ContactFormProps {
-    initialData?: any;
+    initialData?: ContactFormInitialData;
     mode: 'create' | 'edit';
     tags: string[]; // Available tags for autocomplete? Reference form only shows tags in badges.
-    onSubmit: (data: any) => Promise<void>;
+    onSubmit: (data: ContactFormSubmitData) => Promise<void>;
     isLoading?: boolean;
     onCancel?: () => void;
 }
@@ -80,7 +113,6 @@ interface ContactFormProps {
 export function ContactForm({
     initialData,
     mode,
-    tags: availableTags, // Not used in reference snippet for selection?
     onSubmit,
     isLoading,
     onCancel
@@ -98,7 +130,7 @@ export function ContactForm({
     const [tagInput, setTagInput] = useState('');
 
     // Handle initial notes
-    const existingNotes = Array.isArray(initialData?.notes) ? initialData.notes : [];
+    const existingNotes: ContactNote[] = Array.isArray(initialData?.notes) ? initialData.notes : [];
     const initialNoteValue = typeof initialData?.notes === 'string' ? initialData.notes : '';
 
     // Logic to split the name if firstName and lastName are missing but name exists.
@@ -126,7 +158,7 @@ export function ContactForm({
         notes: mode === 'create' ? initialNoteValue : '', // Empty for edit mode (add new note)
     };
 
-    const form = useForm<z.infer<typeof formSchema>>({
+    const form = useForm<ContactFormValues>({
         resolver: zodResolver(formSchema),
         defaultValues,
     });
@@ -146,18 +178,20 @@ export function ContactForm({
         setTags(tags.filter(t => t !== tag));
     }
 
-    const handleSubmit = async (values: z.infer<typeof formSchema>) => {
-        const payload: any = {
+    const handleSubmit = async (values: ContactFormValues) => {
+        const payload: ContactFormSubmitData = {
             ...values,
             tags
         };
 
         if (mode === 'edit') {
             // For edit mode, 'notes' field in form is actually for adding a new note
-            if (values.notes) {
-                payload.addNote = values.notes;
-            }
-            delete payload.notes; // Prevent overwriting entire notes history
+            const { notes, ...withoutNotes } = payload;
+            await onSubmit({
+                ...withoutNotes,
+                ...(notes ? { addNote: notes } : {}),
+            });
+            return;
         }
 
         await onSubmit(payload);
@@ -259,7 +293,7 @@ export function ContactForm({
                         <FormField
                             control={form.control}
                             name="email"
-                            render={({ field, fieldState }) => (
+                            render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>Email</FormLabel>
                                     <FormControl>
@@ -406,7 +440,7 @@ export function ContactForm({
                             {/* Existing Notes Display */}
                             {existingNotes.length > 0 && (
                                 <div className="space-y-2 mb-2 max-h-40 overflow-y-auto bg-gray-50 p-2 rounded border">
-                                    {existingNotes.map((note: any, i: number) => (
+                                    {existingNotes.map((note, i) => (
                                         <div key={i} className="text-xs border-b border-gray-100 last:border-0 pb-1 mb-1">
                                             <div className="flex justify-between text-gray-400">
                                                 <span>{note.authorName || 'Agent'}</span>

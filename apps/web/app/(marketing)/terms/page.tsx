@@ -17,13 +17,13 @@ export default function TermsPage() {
                     className="inline-flex items-center text-sm text-gray-600 hover:text-green-600 mb-8 transition-colors"
                 >
                     <ArrowLeft className="w-4 h-4 mr-2" />
-                    Retour à l'accueil
+                    Retour à l&apos;accueil
                 </Link>
 
                 <div className="bg-white shadow-xl rounded-2xl border border-gray-100 overflow-hidden">
                     {/* Header Banner */}
                     <div className="bg-slate-900 px-8 py-10 text-white">
-                        <h1 className="text-3xl md:text-4xl font-bold mb-4">Conditions d'Utilisation</h1>
+                        <h1 className="text-3xl md:text-4xl font-bold mb-4">Conditions d&apos;Utilisation</h1>
                         <p className="text-slate-300 text-lg">
                             Dernière mise à jour : {new Date().toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
                         </p>
@@ -37,8 +37,8 @@ export default function TermsPage() {
                                 1. Acceptation des conditions
                             </h2>
                             <p className="mb-4">
-                                En accédant à la plateforme Jokko ("Service"), vous acceptez d'être lié par les présentes Conditions d'Utilisation ("Conditions").
-                                Si vous n'acceptez pas ces termes, veuillez ne pas utiliser notre Service.
+                                En accédant à la plateforme Jokko (&quot;Service&quot;), vous acceptez d&apos;être lié par les présentes Conditions d&apos;Utilisation (&quot;Conditions&quot;).
+                                Si vous n&apos;acceptez pas ces termes, veuillez ne pas utiliser notre Service.
                             </p>
                         </section>
 
@@ -47,7 +47,7 @@ export default function TermsPage() {
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">2. Description du Service</h2>
                             <p className="mb-4">
                                 Jokko fournit une plateforme de messagerie multi-canaux pour entreprises, permettant la gestion des communications via WhatsApp Business API,
-                                l'automatisation des réponses et l'analyse des données. Le Service inclut :
+                                l&apos;automatisation des réponses et l&apos;analyse des données. Le Service inclut :
                             </p>
                             <ul className="list-disc ml-6 space-y-2">
                                 <li>Interface de gestion de conversations.</li>
@@ -73,7 +73,7 @@ export default function TermsPage() {
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">4. Usage Acceptable et Politique WhatsApp</h2>
                             <p className="mb-4">
                                 Vous vous engagez à respecter les conditions de service de WhatsApp Business et la Politique de Commerce de WhatsApp.
-                                Il est strictement interdit d'utiliser le Service pour :
+                                Il est strictement interdit d&apos;utiliser le Service pour :
                             </p>
                             <ul className="list-disc ml-6 space-y-2">
                                 <li>Envoyer des messages non sollicités (SPAM).</li>
@@ -105,7 +105,7 @@ export default function TermsPage() {
                             <h2 className="text-2xl font-bold text-gray-900 mb-4">7. Limitation de Responsabilité</h2>
                             <p className="mb-4">
                                 Jokko ne pourra être tenu responsable des dommages indirects, pertes de données ou interruptions de service,
-                                notamment ceux liés à des dysfonctionnements de l'API WhatsApp ou de services tiers (Meta).
+                                notamment ceux liés à des dysfonctionnements de l&apos;API WhatsApp ou de services tiers (Meta).
                             </p>
                         </section>
 

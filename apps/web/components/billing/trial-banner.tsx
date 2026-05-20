@@ -45,7 +45,7 @@ export function TrialBanner({ variant = "page", className }: TrialBannerProps) {
                     </div>
                     <p className={cn("opacity-80", variant === "sidebar" ? "text-[11px]" : "text-sm")}>
                         Toutes les fonctionnalités sont déverrouillées. Choisissez un plan avant la fin
-                        de l'essai pour éviter le verrouillage.
+                        de l&apos;essai pour éviter le verrouillage.
                     </p>
                     <Button asChild size="sm" variant="outline" className="mt-2 h-7 border-amber-300 bg-white/60 text-amber-900 hover:bg-white dark:bg-amber-900/40 dark:text-amber-100">
                         <Link href="/dashboard/billing">Choisir un plan</Link>
@@ -68,9 +68,9 @@ export function TrialBanner({ variant = "page", className }: TrialBannerProps) {
         >
             <Lock className={cn("mt-0.5 shrink-0", variant === "sidebar" ? "h-4 w-4" : "h-5 w-5")} />
             <div className="flex-1">
-                <div className="font-semibold">Période d'essai terminée</div>
+                <div className="font-semibold">Période d&apos;essai terminée</div>
                 <p className={cn("opacity-80", variant === "sidebar" ? "text-[11px]" : "text-sm")}>
-                    Toutes les fonctionnalités sont verrouillées tant qu'aucun plan n'est sélectionné.
+                    Toutes les fonctionnalités sont verrouillées tant qu&apos;aucun plan n&apos;est sélectionné.
                 </p>
                 <Button asChild size="sm" className="mt-2 h-7">
                     <Link href="/dashboard/billing">Choisir un plan</Link>

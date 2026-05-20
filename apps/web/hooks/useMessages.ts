@@ -30,7 +30,35 @@ export interface Message {
     longitude?: number
     locationName?: string
     locationAddress?: string
-    interactive?: any
+    interactive?: InteractiveMessageContent
+}
+
+export interface InteractiveMessageContent {
+    header?: {
+        type?: string
+        text?: string
+    }
+    body?: {
+        text?: string
+    }
+    footer?: {
+        text?: string
+    }
+    action?: {
+        buttons?: {
+            reply?: {
+                title?: string
+            }
+        }[]
+        button?: string
+        sections?: {
+            title?: string
+            rows?: {
+                title?: string
+                description?: string
+            }[]
+        }[]
+    }
 }
 
 interface UseMessagesProps {
@@ -64,7 +92,7 @@ export function useMessages({ conversationId, organizationId }: UseMessagesProps
         // Usually chat UIs render newest at bottom.
         // If list returns newest first, we should reverse to get chronological order.
 
-        return results.map((msg: any) => ({
+        return results.map((msg) => ({
             id: msg._id,
             content: msg.content || null,
             type: msg.type as Message['type'],
@@ -89,7 +117,7 @@ export function useMessages({ conversationId, organizationId }: UseMessagesProps
             longitude: msg.longitude,
             locationName: msg.locationName,
             locationAddress: msg.locationAddress,
-            interactive: msg.interactive,
+            interactive: msg.interactive as InteractiveMessageContent | undefined,
         })).reverse();
     }, [results]);
 

@@ -41,7 +41,6 @@ import {
     Mail,
     MessageCircle,
     Send,
-    FileQuestion,
     LifeBuoy,
     AlertCircle,
     HelpCircle,
@@ -95,8 +94,8 @@ const FAQ_ITEMS = [
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Jokko propose trois rôles avec des permissions différentes :</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Propriétaire :</strong> Accès total — gestion de l'organisation, facturation, suppression de membres, paramètres WhatsApp.</li>
-                    <li><strong>Administrateur :</strong> Gestion des membres, conversations, templates, campagnes et automatisations. Ne peut pas supprimer l'organisation ni gérer la facturation.</li>
+                    <li><strong>Propriétaire :</strong> Accès total — gestion de l&apos;organisation, facturation, suppression de membres, paramètres WhatsApp.</li>
+                    <li><strong>Administrateur :</strong> Gestion des membres, conversations, templates, campagnes et automatisations. Ne peut pas supprimer l&apos;organisation ni gérer la facturation.</li>
                     <li><strong>Agent :</strong> Gère uniquement ses conversations assignées, peut consulter les contacts et envoyer des messages.</li>
                 </ul>
             </div>
@@ -108,8 +107,8 @@ const FAQ_ITEMS = [
         question: "Comment inviter des membres dans mon équipe ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>Allez dans <strong>Équipe</strong> depuis le menu latéral, puis cliquez sur <strong>Inviter un membre</strong>. Entrez l'adresse email du membre et choisissez son rôle (Admin ou Agent).</p>
-                <p>Le membre recevra un email d'invitation avec un lien pour rejoindre votre organisation. Vous pouvez suivre les invitations en attente dans l'onglet <strong>Invitations</strong>.</p>
+                <p>Allez dans <strong>Équipe</strong> depuis le menu latéral, puis cliquez sur <strong>Inviter un membre</strong>. Entrez l&apos;adresse email du membre et choisissez son rôle (Admin ou Agent).</p>
+                <p>Le membre recevra un email d&apos;invitation avec un lien pour rejoindre votre organisation. Vous pouvez suivre les invitations en attente dans l&apos;onglet <strong>Invitations</strong>.</p>
             </div>
         ),
         category: "getting-started",
@@ -138,8 +137,8 @@ const FAQ_ITEMS = [
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Vous pouvez assigner une conversation de deux manières :</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Manuellement :</strong> Ouvrez la conversation, puis utilisez le menu d'assignation en haut pour sélectionner un agent dans la liste.</li>
-                    <li><strong>Automatiquement :</strong> Activez l'attribution automatique dans <strong>Paramètres → Organisation → Attribution automatique</strong>. Les nouvelles conversations seront distribuées aux agents disponibles en rotation.</li>
+                    <li><strong>Manuellement :</strong> Ouvrez la conversation, puis utilisez le menu d&apos;assignation en haut pour sélectionner un agent dans la liste.</li>
+                    <li><strong>Automatiquement :</strong> Activez l&apos;attribution automatique dans <strong>Paramètres → Organisation → Attribution automatique</strong>. Les nouvelles conversations seront distribuées aux agents disponibles en rotation.</li>
                 </ul>
             </div>
         ),
@@ -150,7 +149,7 @@ const FAQ_ITEMS = [
         question: "Qu'est-ce que la fenêtre de 24 heures ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>Lorsqu'un client vous envoie un message, une session de 24 heures s'ouvre. Pendant cette période, vous pouvez envoyer des messages libres (texte, média) sans restriction.</p>
+                <p>Lorsqu&apos;un client vous envoie un message, une session de 24 heures s&apos;ouvre. Pendant cette période, vous pouvez envoyer des messages libres (texte, média) sans restriction.</p>
                 <p>Une fois les 24 heures écoulées, vous devez utiliser un <strong>Modèle de Message (Template)</strong> approuvé par Meta pour relancer la conversation.</p>
             </div>
         ),
@@ -161,14 +160,14 @@ const FAQ_ITEMS = [
         question: "Puis-je envoyer des images ou des fichiers dans les conversations ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>Oui, Jokko supporte l'envoi et la réception de différents types de médias :</p>
+                <p>Oui, Jokko supporte l&apos;envoi et la réception de différents types de médias :</p>
                 <ul className="list-disc pl-5 space-y-1">
                     <li>Images (JPG, PNG, GIF)</li>
                     <li>Documents (PDF, Word, Excel)</li>
                     <li>Messages de localisation</li>
                     <li>Messages transférés</li>
                 </ul>
-                <p>Utilisez le bouton d'attachement dans la zone de saisie pour joindre un fichier.</p>
+                <p>Utilisez le bouton d&apos;attachement dans la zone de saisie pour joindre un fichier.</p>
             </div>
         ),
         category: "conversations",
@@ -181,7 +180,7 @@ const FAQ_ITEMS = [
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Allez dans <strong>Contacts</strong> depuis le menu latéral et cliquez sur <strong>Ajouter un contact</strong>. Renseignez le nom et le numéro de téléphone au format international (ex: +221 77 123 45 67).</p>
-                <p>Les contacts sont également créés automatiquement lorsqu'un nouveau client vous envoie un message sur WhatsApp.</p>
+                <p>Les contacts sont également créés automatiquement lorsqu&apos;un nouveau client vous envoie un message sur WhatsApp.</p>
             </div>
         ),
         category: "contacts",
@@ -209,9 +208,9 @@ const FAQ_ITEMS = [
                     <li>Cliquez sur <strong>Nouvelle campagne</strong>.</li>
                     <li>Sélectionnez un modèle de message approuvé par Meta.</li>
                     <li>Choisissez les destinataires (contacts individuels ou groupes).</li>
-                    <li>Planifiez l'envoi ou envoyez immédiatement.</li>
+                    <li>Planifiez l&apos;envoi ou envoyez immédiatement.</li>
                 </ol>
-                <p>Les campagnes consomment des crédits marketing. Vérifiez votre solde dans <strong>Facturation</strong> avant l'envoi.</p>
+                <p>Les campagnes consomment des crédits marketing. Vérifiez votre solde dans <strong>Facturation</strong> avant l&apos;envoi.</p>
                 <div className="mt-2 text-xs text-amber-700 bg-amber-50 p-2.5 rounded-lg border border-amber-100">
                     Seuls les Propriétaires et Administrateurs peuvent créer des campagnes.
                 </div>
@@ -226,8 +225,8 @@ const FAQ_ITEMS = [
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Jokko utilise deux systèmes de paiement distincts :</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Abonnement mensuel/annuel :</strong> Donne accès aux fonctionnalités de la plateforme (nombre d'agents, de numéros WhatsApp, conversations/mois).</li>
-                    <li><strong>Crédits marketing (pay-as-you-go) :</strong> Consommés uniquement lors de l'envoi de campagnes de diffusion. Rechargez votre solde à tout moment depuis la page Facturation.</li>
+                    <li><strong>Abonnement mensuel/annuel :</strong> Donne accès aux fonctionnalités de la plateforme (nombre d&apos;agents, de numéros WhatsApp, conversations/mois).</li>
+                    <li><strong>Crédits marketing (pay-as-you-go) :</strong> Consommés uniquement lors de l&apos;envoi de campagnes de diffusion. Rechargez votre solde à tout moment depuis la page Facturation.</li>
                 </ul>
                 <p>Les conversations individuelles avec les clients ne consomment pas de crédits marketing.</p>
             </div>
@@ -244,7 +243,7 @@ const FAQ_ITEMS = [
                 <p>Jokko propose deux types de modèles :</p>
                 <ul className="list-disc pl-5 space-y-1">
                     <li><strong>Modèles WhatsApp :</strong> Templates officiels soumis à Meta pour approbation. Nécessaires pour initier une conversation ou envoyer des campagnes. Supportent les variables dynamiques.</li>
-                    <li><strong>Réponses rapides :</strong> Raccourcis internes à Jokko, utilisables uniquement dans les conversations ouvertes. Pas besoin d'approbation Meta. Idéal pour les messages fréquents (salutations, informations standard).</li>
+                    <li><strong>Réponses rapides :</strong> Raccourcis internes à Jokko, utilisables uniquement dans les conversations ouvertes. Pas besoin d&apos;approbation Meta. Idéal pour les messages fréquents (salutations, informations standard).</li>
                 </ul>
             </div>
         ),
@@ -255,8 +254,8 @@ const FAQ_ITEMS = [
         question: "Combien de temps prend l'approbation d'un modèle par Meta ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>L'approbation d'un modèle WhatsApp par Meta prend généralement entre quelques secondes et 24 heures. Dans de rares cas, cela peut prendre jusqu'à 48 heures.</p>
-                <p className="font-medium">Pour accélérer l'approbation :</p>
+                <p>L&apos;approbation d&apos;un modèle WhatsApp par Meta prend généralement entre quelques secondes et 24 heures. Dans de rares cas, cela peut prendre jusqu&apos;à 48 heures.</p>
+                <p className="font-medium">Pour accélérer l&apos;approbation :</p>
                 <ul className="list-disc pl-5 space-y-1">
                     <li>Évitez les termes promotionnels agressifs.</li>
                     <li>Respectez les catégories (marketing, utilitaire, authentification).</li>
@@ -274,18 +273,18 @@ const FAQ_ITEMS = [
         question: "Comment créer un chatbot automatique ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>Jokko dispose d'un constructeur de flux visuel :</p>
+                <p>Jokko dispose d&apos;un constructeur de flux visuel :</p>
                 <ol className="list-decimal pl-5 space-y-1">
                     <li>Allez dans <strong>Automatisations</strong> depuis le menu latéral.</li>
                     <li>Cliquez sur <strong>Nouveau flux</strong>.</li>
-                    <li>Utilisez l'éditeur glisser-déposer pour construire votre flux :</li>
+                    <li>Utilisez l&apos;éditeur glisser-déposer pour construire votre flux :</li>
                 </ol>
                 <ul className="list-disc pl-5 mt-1 space-y-1">
                     <li><strong>Déclencheur :</strong> Message reçu, mot-clé détecté.</li>
                     <li><strong>Message :</strong> Envoyer un texte ou un menu interactif.</li>
                     <li><strong>Action :</strong> Assigner la conversation, mettre à jour le contact, appeler un webhook.</li>
                 </ul>
-                <p className="mt-1">Testez votre flux avec l'interface de chat intégrée avant de le publier.</p>
+                <p className="mt-1">Testez votre flux avec l&apos;interface de chat intégrée avant de le publier.</p>
             </div>
         ),
         category: "automation",
@@ -297,10 +296,10 @@ const FAQ_ITEMS = [
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Quand la réponse automatique est activée dans <strong>Paramètres → Organisation</strong>, un message est envoyé automatiquement aux clients dans deux cas :</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>En dehors des horaires d'ouverture définis.</li>
-                    <li>Quand aucun agent n'est en ligne pour répondre.</li>
+                    <li>En dehors des horaires d&apos;ouverture définis.</li>
+                    <li>Quand aucun agent n&apos;est en ligne pour répondre.</li>
                 </ul>
-                <p>Vous pouvez personnaliser le message de réponse automatique et configurer les horaires d'ouverture jour par jour.</p>
+                <p>Vous pouvez personnaliser le message de réponse automatique et configurer les horaires d&apos;ouverture jour par jour.</p>
             </div>
         ),
         category: "automation",
@@ -310,12 +309,12 @@ const FAQ_ITEMS = [
         question: "Comment fonctionne l'attribution automatique des conversations ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>L'attribution automatique distribue les nouvelles conversations aux agents disponibles en <strong>rotation (round-robin)</strong>. Configurable dans <strong>Paramètres → Organisation → Attribution automatique</strong> :</p>
+                <p>L&apos;attribution automatique distribue les nouvelles conversations aux agents disponibles en <strong>rotation (round-robin)</strong>. Configurable dans <strong>Paramètres → Organisation → Attribution automatique</strong> :</p>
                 <ul className="list-disc pl-5 space-y-1">
                     <li><strong>Max conversations par agent :</strong> Limite le nombre de conversations simultanées.</li>
-                    <li><strong>Exclure les agents hors ligne :</strong> N'attribue pas de conversations aux agents déconnectés.</li>
+                    <li><strong>Exclure les agents hors ligne :</strong> N&apos;attribue pas de conversations aux agents déconnectés.</li>
                 </ul>
-                <p>Si un client demande un agent spécifique ou un service précis, le système d'IA le détecte et redirige automatiquement vers la bonne personne.</p>
+                <p>Si un client demande un agent spécifique ou un service précis, le système d&apos;IA le détecte et redirige automatiquement vers la bonne personne.</p>
             </div>
         ),
         category: "automation",
@@ -327,7 +326,7 @@ const FAQ_ITEMS = [
         question: "Qu'est-ce qu'un pôle (département) et comment l'utiliser ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>Les pôles permettent d'organiser votre équipe par service (Commercial, Support, SAV, etc.). Pour créer un pôle :</p>
+                <p>Les pôles permettent d&apos;organiser votre équipe par service (Commercial, Support, SAV, etc.). Pour créer un pôle :</p>
                 <ol className="list-decimal pl-5 space-y-1">
                     <li>Allez dans <strong>Équipe → Pôles</strong>.</li>
                     <li>Cliquez sur <strong>Créer un pôle</strong>.</li>
@@ -365,7 +364,7 @@ const FAQ_ITEMS = [
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Allez dans <strong>Facturation</strong> depuis le menu latéral. Vous verrez les plans disponibles avec leurs fonctionnalités. Cliquez sur <strong>Choisir ce plan</strong> pour passer à un plan supérieur.</p>
                 <p>Le changement est effectif immédiatement. Si vous passez à un plan inférieur, le changement prendra effet à la fin de votre période de facturation en cours.</p>
-                <p>Tous les plans payants incluent un <strong>essai gratuit de 7 jours</strong>. Vous bénéficiez également d'une <strong>réduction de 20%</strong> sur la facturation annuelle.</p>
+                <p>Tous les plans payants incluent un <strong>essai gratuit de 7 jours</strong>. Vous bénéficiez également d&apos;une <strong>réduction de 20%</strong> sur la facturation annuelle.</p>
             </div>
         ),
         category: "billing",
@@ -376,7 +375,7 @@ const FAQ_ITEMS = [
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Depuis la page <strong>Facturation</strong>, vous trouverez votre solde de crédits marketing en haut. Cliquez sur <strong>Recharger</strong> pour ajouter des crédits.</p>
-                <p>Le paiement est sécurisé via Stripe. Les crédits sont ajoutés instantanément à votre compte et n'expirent pas.</p>
+                <p>Le paiement est sécurisé via Stripe. Les crédits sont ajoutés instantanément à votre compte et n&apos;expirent pas.</p>
             </div>
         ),
         category: "billing",
@@ -386,7 +385,7 @@ const FAQ_ITEMS = [
         question: "Où puis-je voir l'historique de mes transactions ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>L'historique complet de vos transactions (rechargements, consommations, abonnements) est disponible dans la section <strong>Transactions récentes</strong> de la page Facturation.</p>
+                <p>L&apos;historique complet de vos transactions (rechargements, consommations, abonnements) est disponible dans la section <strong>Transactions récentes</strong> de la page Facturation.</p>
                 <p>Chaque transaction indique la date, le type (recharge, abonnement, consommation), et le montant.</p>
             </div>
         ),
@@ -399,10 +398,10 @@ const FAQ_ITEMS = [
         question: "Quels types de contenus sont interdits par Meta ?",
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
-                <p>Meta interdit strictement l'utilisation de WhatsApp Business pour :</p>
+                <p>Meta interdit strictement l&apos;utilisation de WhatsApp Business pour :</p>
                 <ul className="list-disc pl-5 mt-1 space-y-1">
                     <li>Les produits illégaux ou réglementés (alcool, tabac, drogues, armes).</li>
-                    <li>Les jeux d'argent en ligne.</li>
+                    <li>Les jeux d&apos;argent en ligne.</li>
                     <li>Le contenu adulte ou nuisible.</li>
                     <li>La discrimination ou le harcèlement.</li>
                     <li>Les services financiers prédateurs.</li>
@@ -420,7 +419,7 @@ const FAQ_ITEMS = [
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>WhatsApp attribue une note de qualité (Vert, Jaune, Rouge) à votre numéro basée sur les signalements et blocages des utilisateurs.</p>
-                <p>Si votre qualité passe au Rouge, votre capacité d'envoi peut être restreinte.</p>
+                <p>Si votre qualité passe au Rouge, votre capacité d&apos;envoi peut être restreinte.</p>
                 <p className="font-medium">Conseils pour maintenir une bonne qualité :</p>
                 <ul className="list-disc pl-5 space-y-1">
                     <li>Ne spammez pas les utilisateurs.</li>
@@ -437,7 +436,7 @@ const FAQ_ITEMS = [
         answer: (
             <div className="text-gray-600 space-y-2 text-sm">
                 <p>Le badge vert est réservé aux entreprises notables et authentiques. Meta applique des critères stricts incluant la notoriété de la marque (articles de presse, présence web significative).</p>
-                <p>Vous pouvez faire la demande via Meta Business Suite, mais l'approbation n'est pas garantie même pour les entreprises légitimes.</p>
+                <p>Vous pouvez faire la demande via Meta Business Suite, mais l&apos;approbation n&apos;est pas garantie même pour les entreprises légitimes.</p>
             </div>
         ),
         category: "whatsapp",
@@ -453,7 +452,7 @@ const FAQ_ITEMS = [
                     <li><strong>Business :</strong> 3 numéros</li>
                     <li><strong>Pro / Enterprise :</strong> Illimité</li>
                 </ul>
-                <p>Chaque numéro peut être assigné à une équipe spécifique et défini comme canal par défaut pour l'envoi des messages sortants.</p>
+                <p>Chaque numéro peut être assigné à une équipe spécifique et défini comme canal par défaut pour l&apos;envoi des messages sortants.</p>
             </div>
         ),
         category: "whatsapp",
@@ -855,7 +854,7 @@ export default function HelpPage() {
                                 </div>
                                 <div>
                                     <CardTitle className="text-sm sm:text-base font-semibold text-gray-900">
-                                        Besoin d'aide supplémentaire ?
+                                        Besoin d&apos;aide supplémentaire ?
                                     </CardTitle>
                                     <p className="text-[11px] text-gray-400 mt-0.5">
                                         Notre équipe est disponible pour vous accompagner

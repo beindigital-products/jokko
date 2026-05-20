@@ -23,7 +23,8 @@
 
 'use client'
 
-import { useState, useRef, useCallback, useEffect, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react'
 import {
@@ -36,7 +37,6 @@ import {
     Loader2,
     Mic,
     Camera,
-    Square,
     Trash2,
     Reply,
     Zap, // Icon for shortcuts
@@ -44,7 +44,7 @@ import {
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
-// @ts-ignore
+// @ts-expect-error mic-recorder-to-mp3 does not ship TypeScript declarations.
 import MicRecorder from 'mic-recorder-to-mp3'
 
 import { Button } from '@/components/ui/button'
@@ -82,7 +82,26 @@ interface Attachment {
     file?: File
     storageId?: string
     preview?: string
-    type: 'image' | 'video' | 'document'
+    type: 'image' | 'video' | 'document' | 'audio'
+}
+
+interface Mp3Recorder {
+    start: () => Promise<void>
+    stop: () => {
+        getMp3: () => Promise<[BlobPart[], Blob]>
+    }
+}
+
+type MicRecorderConstructor = new (options: { bitRate: number }) => Mp3Recorder
+
+const TypedMicRecorder = MicRecorder as MicRecorderConstructor
+
+function toAttachmentType(type: string): Attachment['type'] {
+    const normalized = type.toLowerCase()
+    if (normalized === 'image' || normalized === 'video' || normalized === 'audio' || normalized === 'document') {
+        return normalized
+    }
+    return 'document'
 }
 
 // File size limits (videos will be compressed on server)
@@ -92,6 +111,8 @@ const MAX_FILE_SIZES = {
     audio: 16 * 1024 * 1024,     // 16 MB
     document: 100 * 1024 * 1024, // 100 MB
 }
+
+const RECORDING_WAVEFORM_HEIGHTS = [10, 18, 12, 24, 16, 28, 14, 22, 11, 26, 19, 13, 25, 17, 29, 15, 21, 12, 23, 16]
 
 function formatFileSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`
@@ -125,7 +146,7 @@ export function MessageInput({
     // Audio recording state
     const [isRecording, setIsRecording] = useState(false)
     const [recordingDuration, setRecordingDuration] = useState(0)
-    const recorderRef = useRef<any>(null)
+    const recorderRef = useRef<Mp3Recorder | null>(null)
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
     const { sendMessage, sendMedia, isSending } = useSendMessage(conversationId)
@@ -201,7 +222,7 @@ export function MessageInput({
                     if (url) {
                         setAttachment({
                             storageId: shortcut.mediaStorageId,
-                            type: shortcut.type.toLowerCase() as any,
+                            type: toAttachmentType(shortcut.type),
                             preview: url,
                             // file is undefined
                         })
@@ -244,13 +265,13 @@ export function MessageInput({
     }
 
     // Auto-resize textarea
-    const adjustHeight = useCallback(() => {
+    const adjustHeight = () => {
         const textarea = textareaRef.current
         if (textarea) {
             textarea.style.height = 'auto'
             textarea.style.height = `${Math.min(textarea.scrollHeight, 150)}px`
         }
-    }, [])
+    }
 
     // Handle file selection
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -319,7 +340,7 @@ export function MessageInput({
     // Start audio recording
     const startRecording = async () => {
         try {
-            const recorder = new MicRecorder({ bitRate: 128 })
+            const recorder = new TypedMicRecorder({ bitRate: 128 })
             await recorder.start()
             recorderRef.current = recorder
 
@@ -343,7 +364,7 @@ export function MessageInput({
         recorderRef.current
             .stop()
             .getMp3()
-            .then(([buffer, blob]: [any, Blob]) => {
+            .then(([buffer]) => {
                 const audioFile = new File(buffer, `audio_${Date.now()}.mp3`, {
                     type: 'audio/mpeg',
                 })
@@ -355,7 +376,7 @@ export function MessageInput({
 
                 cleanupRecording()
             })
-            .catch((e: any) => {
+            .catch((e: unknown) => {
                 console.error('[MessageInput] Failed to get MP3:', e)
                 cleanupRecording()
             })
@@ -507,7 +528,7 @@ export function MessageInput({
                                     key={i}
                                     className="w-[3px] bg-green-500 rounded-full"
                                     animate={{
-                                        height: [4, Math.random() * 20 + 8, 4],
+                                        height: [4, RECORDING_WAVEFORM_HEIGHTS[i], 4],
                                     }}
                                     transition={{
                                         repeat: Infinity,
@@ -664,9 +685,12 @@ export function MessageInput({
                                         muted
                                     />
                                 ) : (
-                                    <img
+                                    <Image
                                         src={attachment.preview}
                                         alt="Preview"
+                                        width={64}
+                                        height={64}
+                                        unoptimized
                                         className="h-16 w-16 rounded-lg object-cover"
                                     />
                                 )

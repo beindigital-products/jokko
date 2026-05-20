@@ -11,11 +11,10 @@ import { api } from "@/convex/_generated/api";
 import { Loader2, ArrowLeft, AlertCircle, FileText, Zap } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Id } from '@/convex/_generated/dataModel';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ShortcutList } from '@/components/templates/ShortcutList';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 
 type ViewState = 'LIST' | 'SELECT_TYPE' | 'CREATE' | 'EDIT';
 

@@ -28,7 +28,6 @@
 
 import { useEffect, useRef, useCallback, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
 import { formatDistanceToNow, format, isToday, isYesterday, isSameDay } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import {
@@ -37,7 +36,6 @@ import {
     Info,
     Archive,
     Ban,
-    Trash2,
     CheckCircle,
     Unlock,
     Clock,
@@ -516,13 +514,6 @@ export function ConversationView({
 
     // Get current member from conversations hook
     const { currentMember } = useConversations()
-
-    // Reset states when changing conversation
-    useEffect(() => {
-        setReplyToMessage(null)
-        setForwardMessage(null)
-        setShowForwardModal(false)
-    }, [conversationId])
 
     // Handle forward
     const handleForward = useCallback((message: Message) => {

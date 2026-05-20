@@ -16,6 +16,8 @@ import { usePresence } from "@/hooks/use-presence";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { StatusIndicator } from "./status-indicator";
 
+type PresenceMember = ReturnType<typeof usePresence>["online"][number];
+
 export function PresenceList({ organizationId }: { organizationId: Id<"organizations"> }) {
     const { online, busy, away, offline } = usePresence(organizationId);
 
@@ -69,7 +71,7 @@ export function PresenceList({ organizationId }: { organizationId: Id<"organizat
 }
 
 // Helper component for individual member row
-function MemberRow({ member }: { member: any }) {
+function MemberRow({ member }: { member: PresenceMember }) {
     // member structure comes from usePresence -> listWithPresence
     // it has { user: { name, email, image }, status, statusMessage, activeConversations, maxConversations }
 

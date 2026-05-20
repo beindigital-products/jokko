@@ -34,6 +34,7 @@ export default function NewBroadcastPage() {
     const availableCountries = useQuery(api.contacts.getAvailableCountryCodes) || [];
 
     const { channels } = useChannels();
+    type Channel = (typeof channels)[number];
     const hasMultipleChannels = channels.length > 1;
 
     const [name, setName] = useState('');
@@ -385,8 +386,8 @@ export default function NewBroadcastPage() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {channels
-                                            .filter((ch: any) => ch.status === 'active')
-                                            .map((ch: any) => (
+                                            .filter((ch: Channel) => ch.status === 'active')
+                                            .map((ch) => (
                                                 <SelectItem key={ch._id} value={ch._id}>
                                                     <div className="flex items-center gap-2">
                                                         <div className="h-2 w-2 rounded-full bg-green-500" />

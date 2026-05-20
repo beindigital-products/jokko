@@ -64,22 +64,49 @@ interface FlowEditorProps {
     flowId: Id<"flows">;
 }
 
+type FlowOption = {
+    id?: string;
+    title?: string;
+    label?: string;
+};
+
+type FlowNodeData = Record<string, unknown> & {
+    label?: string;
+    content?: string;
+    triggerType?: string;
+    keywords?: string;
+    interactiveType?: string;
+    options?: FlowOption[];
+    actionType?: string;
+    details?: string;
+};
+
+type FlowNode = Node<FlowNodeData>;
+type FlowNodePatch = Partial<FlowNodeData>;
+
+interface PropertiesContentProps {
+    selectedNode: FlowNode | null;
+    updateNodeData: (id: string, data: FlowNodePatch) => void;
+    setNodes: React.Dispatch<React.SetStateAction<FlowNode[]>>;
+    setSelectedNode: React.Dispatch<React.SetStateAction<FlowNode | null>>;
+}
+
 function FlowEditorContent({ flowId }: FlowEditorProps) {
     const router = useRouter();
     const flow = useQuery(api.flows.get, { flowId });
     const updateFlow = useMutation(api.flows.update);
     const { screenToFlowPosition } = useReactFlow();
 
-    const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+    const [nodes, setNodes, onNodesChange] = useNodesState<FlowNode>([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
-    const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+    const [selectedNode, setSelectedNode] = useState<FlowNode | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isToggling, setIsToggling] = useState(false);
 
     useEffect(() => {
         if (flow) {
             try {
-                const loadedNodes = flow.nodes ? JSON.parse(flow.nodes) : [];
+                const loadedNodes = flow.nodes ? JSON.parse(flow.nodes) as FlowNode[] : [];
                 const loadedEdges = flow.edges ? JSON.parse(flow.edges) : [];
                 setNodes(loadedNodes);
                 setEdges(loadedEdges);
@@ -110,7 +137,7 @@ function FlowEditorContent({ flowId }: FlowEditorProps) {
                 y: event.clientY,
             });
 
-            const newNode: Node = {
+            const newNode: FlowNode = {
                 id: `${type}-${Date.now()}`,
                 type,
                 position,
@@ -123,7 +150,7 @@ function FlowEditorContent({ flowId }: FlowEditorProps) {
         [screenToFlowPosition, setNodes]
     );
 
-    const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
+    const onNodeClick = useCallback((_: React.MouseEvent, node: FlowNode) => {
         setSelectedNode(node);
     }, []);
 
@@ -165,7 +192,7 @@ function FlowEditorContent({ flowId }: FlowEditorProps) {
         }
     };
 
-    const updateNodeData = (id: string, data: any) => {
+    const updateNodeData = (id: string, data: FlowNodePatch) => {
         setNodes((nds) =>
             nds.map((node) => {
                 if (node.id === id) {
@@ -365,7 +392,7 @@ function DraggableNode({ type, label, icon, color, desc }: { type: string, label
     );
 }
 
-function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelectedNode }: any) {
+function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelectedNode }: PropertiesContentProps) {
     if (!selectedNode) return null;
 
     if (selectedNode.type === 'message') {
@@ -382,7 +409,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                     <p className="text-[10px] text-gray-400 mt-1 text-right">Markdown supporté</p>
                 </div>
                 <Separator />
-                <DeleteNodeAction onDelete={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} />
+                <DeleteNodeAction onDelete={() => { setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id)); setSelectedNode(null); }} />
             </div>
         );
     }
@@ -419,6 +446,8 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
     }
 
     if (selectedNode.type === 'interactive') {
+        const options = selectedNode.data.options || [];
+
         return (
             <div className="space-y-6">
                 <div>
@@ -450,17 +479,17 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                 </div>
                 <div>
                     <Label className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-2 block">
-                        Options ({((selectedNode.data.options as any[]) || []).length})
+                        Options ({options.length})
                     </Label>
                     <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
-                        {((selectedNode.data.options as any[]) || []).map((opt: any, idx: number) => (
+                        {options.map((opt, idx) => (
                             <div key={idx} className="flex gap-2 items-center group">
                                 <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shrink-0">{idx + 1}</div>
                                 <Input
                                     className="h-9 w-full text-sm bg-white"
                                     value={opt.label || opt.title}
                                     onChange={(e) => {
-                                        const newOpts = [...((selectedNode.data.options as any[]) || [])];
+                                        const newOpts = [...options];
                                         newOpts[idx] = { ...newOpts[idx], label: e.target.value, title: e.target.value, id: e.target.value.toLowerCase().replace(/\s/g, '_') };
                                         updateNodeData(selectedNode.id, { options: newOpts });
                                     }}
@@ -470,7 +499,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                                     size="icon" variant="ghost"
                                     className="h-8 w-8 text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-opacity"
                                     onClick={() => {
-                                        const newOpts = [...((selectedNode.data.options as any[]) || [])];
+                                        const newOpts = [...options];
                                         newOpts.splice(idx, 1);
                                         updateNodeData(selectedNode.id, { options: newOpts });
                                     }}
@@ -484,7 +513,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                         size="sm" variant="outline"
                         className="w-full mt-3 border-dashed border-gray-300 hover:border-green-300 hover:bg-green-50 text-gray-500 hover:text-green-600 transition-all font-normal"
                         onClick={() => {
-                            const newOpts = [...((selectedNode.data.options as any[]) || [])];
+                            const newOpts = [...options];
                             newOpts.push({ id: `opt_${Date.now()}`, title: '', label: '' });
                             updateNodeData(selectedNode.id, { options: newOpts });
                         }}
@@ -494,7 +523,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                     </Button>
                 </div>
                 <Separator />
-                <DeleteNodeAction onDelete={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} />
+                <DeleteNodeAction onDelete={() => { setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id)); setSelectedNode(null); }} />
             </div>
         );
     }
@@ -526,7 +555,7 @@ function PropertiesContent({ selectedNode, updateNodeData, setNodes, setSelected
                     </div>
                 )}
                 <Separator />
-                <DeleteNodeAction onDelete={() => { setNodes((nds: any) => nds.filter((n: any) => n.id !== selectedNode.id)); setSelectedNode(null); }} />
+                <DeleteNodeAction onDelete={() => { setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id)); setSelectedNode(null); }} />
             </div>
         );
     }

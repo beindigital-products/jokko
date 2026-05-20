@@ -272,10 +272,13 @@ export default function AssignmentsClient() {
     const bulkAssignMutation = useMutation(api.assignments.bulkAssign)
     const settings = useQuery(api.assignments.getAssignmentSettings)
 
+    type QueueConversation = NonNullable<typeof conversationsData>[number]
+    type Agent = NonNullable<typeof agentsData>[number]
+
     // #32 - Unique departments
     const departments = useMemo(() => {
         if (!agentsData) return []
-        const depts = new Set(agentsData.map((a: any) => a.department))
+        const depts = new Set(agentsData.map((a: Agent) => a.department))
         return Array.from(depts).filter(Boolean) as string[]
     }, [agentsData])
 
@@ -287,7 +290,7 @@ export default function AssignmentsClient() {
         // Search filter (#30)
         if (search.trim()) {
             const q = search.toLowerCase()
-            list = list.filter((c: any) =>
+            list = list.filter((c: QueueConversation) =>
                 (c.business || '').toLowerCase().includes(q) ||
                 (c.phone || '').toLowerCase().includes(q) ||
                 (c.message || '').toLowerCase().includes(q)
@@ -296,12 +299,12 @@ export default function AssignmentsClient() {
 
         // Agent filter (#35)
         if (selectedAgent) {
-            list = list.filter((c: any) => c.assignedTo === selectedAgent)
+            list = list.filter((c: QueueConversation) => c.assignedTo === selectedAgent)
         }
 
         // Department filter (#32)
         if (selectedDept) {
-            list = list.filter((c: any) => c.departmentId === selectedDept)
+            list = list.filter((c: QueueConversation) => c.departmentId === selectedDept)
         }
 
         return list
@@ -348,7 +351,7 @@ export default function AssignmentsClient() {
 
     const hasOnlyOneMember = agentsData && agentsData.length <= 1
 
-    const agentsByDept = (agentsData || []).reduce((acc: Record<string, any[]>, agent: any) => {
+    const agentsByDept = (agentsData || []).reduce((acc: Record<string, Agent[]>, agent: Agent) => {
         const dept = agent.department || "General"
         if (!acc[dept]) acc[dept] = []
         acc[dept].push(agent)
@@ -356,8 +359,8 @@ export default function AssignmentsClient() {
     }, {})
 
     // #34 - Team workload calculation
-    const totalLoad = (agentsData || []).reduce((sum: number, a: any) => sum + a.load, 0)
-    const totalCapacity = (agentsData || []).reduce((sum: number, a: any) => sum + a.maxLoad, 0)
+    const totalLoad = (agentsData || []).reduce((sum: number, a: Agent) => sum + a.load, 0)
+    const totalCapacity = (agentsData || []).reduce((sum: number, a: Agent) => sum + a.maxLoad, 0)
     const workloadPercent = totalCapacity > 0 ? Math.round((totalLoad / totalCapacity) * 100) : 0
 
     const stats = [
@@ -399,13 +402,13 @@ export default function AssignmentsClient() {
         },
     ]
 
-    const unassignedConversations = filteredConversations.filter((c: any) => !c.assignedTo)
-    const assignedConversations = filteredConversations.filter((c: any) => c.assignedTo)
+    const unassignedConversations = filteredConversations.filter((c: QueueConversation) => !c.assignedTo)
+    const assignedConversations = filteredConversations.filter((c: QueueConversation) => c.assignedTo)
 
     // Active filter indicators
     const hasActiveFilters = !!search || !!selectedAgent || !!selectedDept
 
-    const ConversationList = ({ conversations, isAssigned }: { conversations: any[], isAssigned: boolean }) => (
+    const renderConversationList = (conversations: QueueConversation[], isAssigned: boolean) => (
         <div className="divide-y divide-gray-100 max-h-[500px] overflow-y-auto">
             {conversations.length === 0 && (
                 <div className="p-8 flex items-center justify-center">
@@ -426,7 +429,7 @@ export default function AssignmentsClient() {
                     </Empty>
                 </div>
             )}
-            {conversations.map((conv: any) => {
+            {conversations.map((conv) => {
                 const waitTime = !isAssigned && conv.lastMessageAt ? formatWaitTime(conv.lastMessageAt) : null
 
                 return (
@@ -559,15 +562,15 @@ export default function AssignmentsClient() {
                                             </Button>
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end" className="w-[240px] max-h-[300px] overflow-y-auto">
-                                            {Object.entries(agentsByDept).map(([dept, agents]: [string, any], index) => {
-                                                const validAgents = agents.filter((a: any) => a.memberId !== conv.assignedTo)
+                                            {Object.entries(agentsByDept).map(([dept, agents], index) => {
+                                                const validAgents = agents.filter((a) => a.memberId !== conv.assignedTo)
                                                 if (validAgents.length === 0) return null
 
                                                 return (
                                                     <div key={dept}>
                                                         {index > 0 && <DropdownMenuSeparator />}
                                                         <DropdownMenuLabel className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{dept}</DropdownMenuLabel>
-                                                        {validAgents.map((agent: any) => (
+                                                        {validAgents.map((agent) => (
                                                             <DropdownMenuItem
                                                                 key={agent.id}
                                                                 className="cursor-pointer"
@@ -789,7 +792,7 @@ export default function AssignmentsClient() {
                                 {selectedAgent && (
                                     <div className="flex items-center gap-2 mb-2 px-1">
                                         <Badge variant="secondary" className="text-xs gap-1 bg-green-50 text-green-700">
-                                            Filtre: {agentsData?.find((a: any) => a.memberId === selectedAgent)?.fullName}
+                                            Filtre: {agentsData?.find((a) => a.memberId === selectedAgent)?.fullName}
                                             <button onClick={() => setSelectedAgent(null)}>
                                                 <X className="h-3 w-3" />
                                             </button>
@@ -812,11 +815,11 @@ export default function AssignmentsClient() {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-[240px]">
-                                                    {Object.entries(agentsByDept).map(([dept, agents]: [string, any], index) => (
+                                                    {Object.entries(agentsByDept).map(([dept, agents], index) => (
                                                         <div key={dept}>
                                                             {index > 0 && <DropdownMenuSeparator />}
                                                             <DropdownMenuLabel className="text-[10px] uppercase text-gray-500">{dept}</DropdownMenuLabel>
-                                                            {(agents as any[]).map((agent: any) => (
+                                                            {agents.map((agent) => (
                                                                 <DropdownMenuItem
                                                                     key={agent.id}
                                                                     className="cursor-pointer"
@@ -847,10 +850,10 @@ export default function AssignmentsClient() {
                                     </TabsList>
 
                                     <TabsContent value="unassigned" className="mt-3">
-                                        <ConversationList conversations={unassignedConversations} isAssigned={false} />
+                                        {renderConversationList(unassignedConversations, false)}
                                     </TabsContent>
                                     <TabsContent value="assigned" className="mt-3">
-                                        <ConversationList conversations={assignedConversations} isAssigned={true} />
+                                        {renderConversationList(assignedConversations, true)}
                                     </TabsContent>
                                 </Tabs>
                             </CardHeader>
@@ -881,7 +884,7 @@ export default function AssignmentsClient() {
                                     </div>
                                 )}
                                 <div className="space-y-1 mt-1">
-                                    {agentsData?.map((agent: any) => (
+                                    {agentsData?.map((agent) => (
                                         <div
                                             key={agent.id}
                                             className={cn(

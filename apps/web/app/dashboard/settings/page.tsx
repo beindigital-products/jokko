@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from "react";
-import { useQuery, useMutation, useAction } from "convex/react";
+import { useState, useRef } from "react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { ButtonGroup } from "@/components/ui/button-group";
 import {
@@ -12,13 +12,9 @@ import {
     Mail,
     Upload,
     Loader2,
-    Save,
     Trash2,
     Briefcase,
     MessageSquare,
-    AlertCircle,
-    Phone,
-    Hash,
     Check,
     Palette,
     Building2,
@@ -31,15 +27,13 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ChannelsSettings } from '@/components/settings/ChannelsSettings';
-import { useCurrentOrg } from "@/hooks/use-current-org";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PhoneInput } from "@/components/contacts/PhoneInput";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -610,7 +604,16 @@ const DAYS = [
     { key: "sunday", label: "Dimanche" },
 ];
 
-const DEFAULT_BUSINESS_HOURS: Record<string, { enabled: boolean; open: string; close: string }> = {
+type BusinessHour = { enabled: boolean; open: string; close: string };
+type StoredBusinessHours = {
+    schedule?: { day?: string; enabled?: boolean; start?: string; end?: string }[];
+} & Record<string, unknown>;
+
+function isBusinessHour(value: unknown): value is BusinessHour {
+    return typeof value === "object" && value !== null;
+}
+
+const DEFAULT_BUSINESS_HOURS: Record<string, BusinessHour> = {
     monday: { enabled: true, open: "08:00", close: "18:00" },
     tuesday: { enabled: true, open: "08:00", close: "18:00" },
     wednesday: { enabled: true, open: "08:00", close: "18:00" },
@@ -677,7 +680,7 @@ function OrganizationSettingsTab() {
     // Initialize business hours
     if (orgSettings?.settings && !hoursInitialized) {
         if (orgSettings.settings.businessHours) {
-            const bh = orgSettings.settings.businessHours as any;
+            const bh = orgSettings.settings.businessHours as StoredBusinessHours;
             if (bh?.schedule) {
                 // New format: convert schedule array to Record
                 const converted = { ...DEFAULT_BUSINESS_HOURS };
@@ -693,7 +696,17 @@ function OrganizationSettingsTab() {
                 setBusinessHours(converted);
             } else {
                 // Legacy format: direct Record
-                setBusinessHours({ ...DEFAULT_BUSINESS_HOURS, ...bh });
+                const converted = { ...DEFAULT_BUSINESS_HOURS };
+                for (const day of Object.keys(DEFAULT_BUSINESS_HOURS)) {
+                    const value = bh[day];
+                    if (isBusinessHour(value)) {
+                        converted[day] = {
+                            ...converted[day],
+                            ...value,
+                        };
+                    }
+                }
+                setBusinessHours(converted);
             }
         }
         setHoursInitialized(true);
@@ -772,7 +785,7 @@ function OrganizationSettingsTab() {
         }
     };
 
-    const updateDayHours = (day: string, field: string, value: any) => {
+    const updateDayHours = <Field extends keyof BusinessHour>(day: string, field: Field, value: BusinessHour[Field]) => {
         setBusinessHours(prev => ({
             ...prev,
             [day]: { ...prev[day], [field]: value },
@@ -804,7 +817,7 @@ function OrganizationSettingsTab() {
                         </div>
                         <div>
                             <CardTitle className="text-sm sm:text-base font-semibold text-gray-900">
-                                Profil de l'organisation
+                                Profil de l&apos;organisation
                             </CardTitle>
                             <p className="text-[11px] text-gray-400 mt-0.5">
                                 Informations générales de votre entreprise
@@ -815,7 +828,7 @@ function OrganizationSettingsTab() {
                 <CardContent className="space-y-5 pt-4">
                     <div className="grid gap-5 md:grid-cols-2">
                         <div className="space-y-1.5">
-                            <Label htmlFor="org-name" className="text-xs font-medium text-gray-500">Nom de l'organisation</Label>
+                            <Label htmlFor="org-name" className="text-xs font-medium text-gray-500">Nom de l&apos;organisation</Label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-200 bg-gray-50 text-gray-400">
                                     <Building2 className="h-3.5 w-3.5" />
@@ -830,7 +843,7 @@ function OrganizationSettingsTab() {
                             </div>
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="org-sector" className="text-xs font-medium text-gray-500">Secteur d'activité</Label>
+                            <Label htmlFor="org-sector" className="text-xs font-medium text-gray-500">Secteur d&apos;activité</Label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-200 bg-gray-50 text-gray-400">
                                     <Briefcase className="h-3.5 w-3.5" />
@@ -926,7 +939,7 @@ function OrganizationSettingsTab() {
                                     Réponse automatique
                                 </CardTitle>
                                 <p className="text-[11px] text-gray-400 mt-0.5">
-                                    Message envoyé automatiquement quand aucun agent n'est disponible
+                                    Message envoyé automatiquement quand aucun agent n&apos;est disponible
                                 </p>
                             </div>
                         </div>
@@ -951,7 +964,7 @@ function OrganizationSettingsTab() {
                                 className="text-sm resize-none"
                             />
                             <p className="text-[11px] text-gray-400">
-                                Ce message sera envoyé aux clients en dehors des horaires d'ouverture ou quand aucun agent n'est en ligne.
+                                Ce message sera envoyé aux clients en dehors des horaires d&apos;ouverture ou quand aucun agent n&apos;est en ligne.
                             </p>
                         </div>
                     </CardContent>
@@ -978,7 +991,7 @@ function OrganizationSettingsTab() {
                         </div>
                         <div>
                             <CardTitle className="text-sm sm:text-base font-semibold text-gray-900">
-                                Horaires d'ouverture
+                                Horaires d&apos;ouverture
                             </CardTitle>
                             <p className="text-[11px] text-gray-400 mt-0.5">
                                 Définissez les heures de disponibilité de votre équipe
@@ -1083,7 +1096,7 @@ function OrganizationSettingsTab() {
                                     className="h-9 w-24 text-sm"
                                 />
                                 <p className="text-[11px] text-gray-400">
-                                    Limite le nombre de conversations actives qu'un agent peut gérer en parallèle.
+                                    Limite le nombre de conversations actives qu&apos;un agent peut gérer en parallèle.
                                 </p>
                             </div>
                         </div>
@@ -1119,4 +1132,3 @@ function OrganizationSettingsTab() {
         </>
     );
 }
-

@@ -11,7 +11,7 @@ import {
     MessageSquareText, Headphones, ShoppingBag, BarChart3, RefreshCw, Wrench,
     MessageCircle, Hash, Radio,
     MousePointerClick, List, X,
-    UserPlus, Tag, XCircle, Minus,
+    UserPlus, Tag, XCircle,
     Plus, Loader2, Trash2, Pencil,
     StickyNote, Bell, Clock, CheckCircle2,
     type LucideIcon,
@@ -144,7 +144,7 @@ export function GuidedFlowBuilder({ flowId }: GuidedFlowBuilderProps) {
     );
 
     const {
-        currentStep, answers, generatedNodes, generatedEdges, flowName, editingFlowId,
+        currentStep, answers, generatedNodes, generatedEdges, flowName,
         setAnswer, nextStep, prevStep, generateFlow, setFlowName, reset,
         hydrateFromFlow, addStep, updateStep, removeStep,
     } = useGuidedFlowStore();
@@ -593,15 +593,12 @@ function StepCard({
     onRemove: () => void;
 }) {
     const colors = STEP_COLORS[step.type];
-    const icon = getStepIcon(step);
-    const Icon = icon;
-
     return (
         <div className="flex gap-3">
             {/* Timeline connector */}
             <div className="flex flex-col items-center">
                 <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center shrink-0", colors.bg)}>
-                    <Icon className="h-4 w-4 text-white" />
+                    {renderStepIcon(step, "h-4 w-4 text-white")}
                 </div>
                 {!isLast && <div className="w-0.5 flex-1 bg-gray-200 my-1 min-h-[16px]" />}
             </div>
@@ -853,10 +850,10 @@ function getStepTypeLabel(step: FlowStep): string {
     return '';
 }
 
-function getStepIcon(step: FlowStep): LucideIcon {
-    if (step.type === 'message') return MessageSquareText;
+function renderStepIcon(step: FlowStep, className: string) {
+    if (step.type === 'message') return <MessageSquareText className={className} />;
     if (step.type === 'interactive') {
-        return step.interactiveType === 'buttons' ? MousePointerClick : List;
+        return step.interactiveType === 'buttons' ? <MousePointerClick className={className} /> : <List className={className} />;
     }
     if (step.type === 'action') {
         const icons: Record<string, LucideIcon> = {
@@ -868,9 +865,10 @@ function getStepIcon(step: FlowStep): LucideIcon {
             wait: Clock,
             resolve: CheckCircle2,
         };
-        return icons[step.actionType || ''] || Sparkles;
+        const Icon = icons[step.actionType || ''] || Sparkles;
+        return <Icon className={className} />;
     }
-    return Sparkles;
+    return <Sparkles className={className} />;
 }
 
 function SummaryRow({ label, value }: { label: string; value: string }) {

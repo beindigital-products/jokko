@@ -37,6 +37,22 @@ interface ImportWizardProps {
     onCancel?: () => void;
 }
 
+type CsvRow = Record<string, string | undefined>;
+
+interface ParsedContact {
+    phone: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    company?: string;
+    tags: string[];
+}
+
+function getCell(row: CsvRow, ...keys: string[]): string | undefined {
+    return keys.map((key) => row[key]).find((value): value is string => Boolean(value));
+}
+
 const STEPS: { id: ImportStep; title: string }[] = [
     { id: 'upload', title: 'Fichier' },
     { id: 'mapping', title: 'Mapping' },
@@ -95,7 +111,7 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
     const [currentStep, setCurrentStep] = useState<ImportStep>('upload');
     const [isLoading, setIsLoading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
-    const [parsedContacts, setParsedContacts] = useState<any[]>([]);
+    const [parsedContacts, setParsedContacts] = useState<ParsedContact[]>([]);
     const [importStats, setImportStats] = useState<ImportResult | null>(null);
     const [showGuide, setShowGuide] = useState(false);
 
@@ -112,31 +128,31 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
         if (!file) return;
         setIsLoading(true);
 
-        Papa.parse(file, {
+        Papa.parse<CsvRow>(file, {
             header: true,
-            complete: (results: any) => {
+            complete: (results) => {
                 // Simplified mapping: map keys directly if they match, or guess
-                const mapped = results.data.map((row: any) => {
+                const mapped: ParsedContact[] = results.data.map((row): ParsedContact | null => {
                     // Basic normalization
-                    const phone = row['phone'] || row['Phone'] || row['Mobile'] || row['Téléphone'];
+                    const phone = getCell(row, 'phone', 'Phone', 'Mobile', 'Téléphone');
                     if (!phone) return null; // Skip without phone
 
                     return {
                         phone: String(phone),
-                        name: row['name'] || row['Name'] || row['Nom'] || (row['First Name'] ? `${row['First Name']} ${row['Last Name']}` : undefined),
-                        firstName: row['firstName'] || row['First Name'] || row['Prénom'],
-                        lastName: row['lastName'] || row['Last Name'] || row['Nom'],
-                        email: row['email'] || row['Email'] || row['E-mail'],
-                        company: row['company'] || row['Company'] || row['Entreprise'],
+                        name: getCell(row, 'name', 'Name', 'Nom') || (row['First Name'] ? `${row['First Name']} ${row['Last Name'] || ''}`.trim() : undefined),
+                        firstName: getCell(row, 'firstName', 'First Name', 'Prénom'),
+                        lastName: getCell(row, 'lastName', 'Last Name', 'Nom'),
+                        email: getCell(row, 'email', 'Email', 'E-mail'),
+                        company: getCell(row, 'company', 'Company', 'Entreprise'),
                         tags: row['tags'] ? String(row['tags']).split(',').map(t => t.trim()) : []
                     };
-                }).filter(Boolean);
+                }).filter((contact): contact is ParsedContact => contact !== null);
 
                 setParsedContacts(mapped);
                 setIsLoading(false);
                 setCurrentStep('mapping'); // Skip custom mapping UI for now, assume auto-map
             },
-            error: (err: any) => {
+            error: (err) => {
                 console.error("Parse error", err);
                 setIsLoading(false);
                 alert("Erreur lors de la lecture du fichier");
@@ -166,9 +182,10 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
                 skipped: 0,
                 errors: result.errors || []
             });
-        } catch (err: any) {
+        } catch (err) {
             console.error("Import failed", err);
-            alert("Erreur lors de l'import: " + err.message);
+            const message = err instanceof Error ? err.message : "Erreur inconnue";
+            alert("Erreur lors de l'import: " + message);
         } finally {
             setIsLoading(false);
         }
@@ -233,7 +250,7 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
                 <p className="font-medium text-foreground">{parsedContacts.length} contacts détectés</p>
             </div>
             <p className="max-w-md mx-auto">
-                Les colonnes ont été automatiquement associées. Cliquez sur continuer pour vérifier l'aperçu.
+                Les colonnes ont été automatiquement associées. Cliquez sur continuer pour vérifier l&apos;aperçu.
             </p>
         </div>
     );
@@ -242,7 +259,7 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
         <div className="py-12 text-center text-muted-foreground">
             <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-yellow-500" />
             <p className="font-medium text-foreground">Prêt à importer {parsedContacts.length} contacts</p>
-            <p className="text-sm">Veuillez confirmer l'importation</p>
+            <p className="text-sm">Veuillez confirmer l&apos;importation</p>
 
             <div className="mt-4 max-h-40 overflow-y-auto border rounded-md text-left p-2 text-xs bg-muted/20">
                 {parsedContacts.slice(0, 5).map((c, i) => (

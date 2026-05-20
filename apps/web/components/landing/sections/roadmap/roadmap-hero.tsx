@@ -35,7 +35,7 @@ export function RoadmapHero() {
                 </motion.p>
 
                 <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl">
-                    <SplitText>Ce qu'on construit,</SplitText>
+                    <SplitText>Ce qu&apos;on construit,</SplitText>
                     <br />
                     <span className="bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] bg-clip-text text-transparent">
                         <SplitText delay={0.2}>sans filtre.</SplitText>

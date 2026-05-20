@@ -24,8 +24,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { StatusIndicator } from "./status-indicator";
 
-type Status = "ONLINE" | "BUSY" | "AWAY" | "OFFLINE";
-
 const statusConfig = {
     ONLINE: { label: "En ligne" },
     BUSY: { label: "Occupé" },

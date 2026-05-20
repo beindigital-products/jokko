@@ -4,19 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { TemplateButtonsBuilder } from './TemplateButtonsBuilder';
-
-interface CarouselCard {
-    title?: string;
-    headerUrl?: string;
-    body: string;
-    buttons: any[];
-}
+import type { TemplateCarouselEditorCard } from '../types';
 
 interface TemplateCarouselBuilderProps {
-    cards: CarouselCard[];
-    onChange: (cards: CarouselCard[]) => void;
+    cards: TemplateCarouselEditorCard[];
+    onChange: (cards: TemplateCarouselEditorCard[]) => void;
 }
 
 export const TemplateCarouselBuilder: React.FC<TemplateCarouselBuilderProps> = ({
@@ -35,7 +29,11 @@ export const TemplateCarouselBuilder: React.FC<TemplateCarouselBuilderProps> = (
         onChange(newCards);
     };
 
-    const handleUpdateCard = (index: number, field: keyof CarouselCard, value: any) => {
+    const handleUpdateCard = <Field extends keyof TemplateCarouselEditorCard>(
+        index: number,
+        field: Field,
+        value: TemplateCarouselEditorCard[Field],
+    ) => {
         const newCards = [...cards];
         newCards[index] = { ...newCards[index], [field]: value };
         onChange(newCards);

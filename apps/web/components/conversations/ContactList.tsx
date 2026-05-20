@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
-import { Search, UserX, Archive, Inbox, User, Phone, MessageSquare, X, Mail, Users, Clock, UserPlus, CheckCheck, Pin, ArrowUpDown, SortAsc, CheckSquare } from 'lucide-react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { Search, UserX, Archive, Inbox, User, Phone, MessageSquare, X, Mail, Users, Clock, UserPlus, CheckCheck, Pin, ArrowUpDown, CheckSquare } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select'
 import { useConversations, type ConversationFilter, type ConversationSummary } from '@/hooks/useConversations'
 import { useChannels } from '@/hooks/useChannels'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
@@ -66,6 +66,10 @@ function computeBackendFilter(primary: PrimaryScope, secondary: SecondaryFilter)
     return 'all'
 }
 
+function isTagObject(tag: unknown): tag is { name?: string; color?: string } {
+    return typeof tag === 'object' && tag !== null
+}
+
 // ============================================
 // SECTION DIVIDER
 // ============================================
@@ -102,6 +106,7 @@ function ContactListItem({
     onAssignToMe,
     onTogglePin,
     isTyping = false,
+    now,
 }: {
     conversation: ConversationSummary
     isSelected: boolean
@@ -112,6 +117,7 @@ function ContactListItem({
     onAssignToMe?: (id: string) => void
     onTogglePin?: (id: string) => void
     isTyping?: boolean
+    now: number
 }) {
     const { contact, lastMessageText, lastMessageAt, unreadCount, lastMessageType, assignedTo } = conversation
 
@@ -210,7 +216,7 @@ function ContactListItem({
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: '150ms' }} />
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                             </span>
-                            En train d'écrire...
+                            En train d&apos;écrire...
                         </span>
                     ) : (
                         <p className={cn(
@@ -224,7 +230,7 @@ function ContactListItem({
                         {/* Response time indicator */}
                         {unreadCount > 0 && conversation.lastMessageDirection === 'INBOUND' && lastMessageAt && (
                             (() => {
-                                const waitMs = Date.now() - lastMessageAt
+                                const waitMs = now - lastMessageAt
                                 const waitHours = Math.floor(waitMs / 3_600_000)
                                 const waitMin = Math.floor((waitMs % 3_600_000) / 60_000)
                                 if (waitMin < 5) return null
@@ -261,11 +267,11 @@ function ContactListItem({
                                 <TooltipTrigger asChild>
                                     <span
                                         className="inline-block w-2 h-2 rounded-full"
-                                        style={{ backgroundColor: typeof tag === 'object' && (tag as any).color ? (tag as any).color : '#9ca3af' }}
+                                        style={{ backgroundColor: isTagObject(tag) && tag.color ? tag.color : '#9ca3af' }}
                                     />
                                 </TooltipTrigger>
                                 <TooltipContent>
-                                    <span className="text-xs">{typeof tag === 'object' ? (tag as any).name : tag}</span>
+                                    <span className="text-xs">{isTagObject(tag) ? tag.name : tag}</span>
                                 </TooltipContent>
                             </Tooltip>
                         ))}
@@ -308,7 +314,7 @@ function ContactListItem({
                                 <UserPlus className="h-4 w-4" />
                             </span>
                         </TooltipTrigger>
-                        <TooltipContent>S'assigner</TooltipContent>
+                        <TooltipContent>S&apos;assigner</TooltipContent>
                     </Tooltip>
                 )}
                 {onTogglePin && (
@@ -395,6 +401,12 @@ export function ContactList({ selectedId, onSelect }: ContactListProps) {
     const [sortBy, setSortBy] = useState<SortOption>('recent')
     const [bulkMode, setBulkMode] = useState(false)
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+    const [now, setNow] = useState(() => Date.now())
+
+    useEffect(() => {
+        const timer = setInterval(() => setNow(Date.now()), 60_000)
+        return () => clearInterval(timer)
+    }, [])
 
     const {
         conversations,
@@ -577,6 +589,7 @@ export function ContactList({ selectedId, onSelect }: ContactListProps) {
                                 onMarkAsRead={bulkMode ? undefined : markAsRead}
                                 onAssignToMe={bulkMode ? undefined : assignToMe}
                                 onTogglePin={bulkMode ? undefined : togglePin}
+                                now={now}
                             />
                         </div>
                     </HoverCardTrigger>
@@ -735,7 +748,7 @@ export function ContactList({ selectedId, onSelect }: ContactListProps) {
                         <SelectContent align="end">
                             <SelectItem value="recent">Plus récentes</SelectItem>
                             <SelectItem value="oldest">Plus anciennes</SelectItem>
-                            <SelectItem value="unread">Non lus d'abord</SelectItem>
+                            <SelectItem value="unread">Non lus d&apos;abord</SelectItem>
                             <SelectItem value="name">Par nom</SelectItem>
                         </SelectContent>
                     </Select>

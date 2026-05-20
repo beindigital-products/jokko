@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { useAction, useQuery } from "convex/react"
 import { api } from "@/convex/_generated/api"
+import type { Id } from "@/convex/_generated/dataModel"
 
 import {
     Dialog,
@@ -49,7 +50,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
-import { Progress } from '@/components/ui/progress'
 
 import { type Role, ROLE_DEFINITIONS, getAssignableRoles } from '@/lib/team/roles'
 
@@ -166,7 +166,7 @@ export function InviteMemberModal({
                 email: values.email,
                 name: values.name, // Send the name to backend
                 role: values.role.toUpperCase(),
-                poleId: values.poleId as any, // Cast ID
+                poleId: values.poleId ? values.poleId as Id<"poles"> : undefined,
                 // OrganizationId is inferred on backend or we could pass it if needed
             })
 
@@ -334,7 +334,7 @@ export function InviteMemberModal({
                                                                     Aucun pole
                                                                 </p>
                                                                 <p className="text-sm text-gray-500">
-                                                                    L'agent n'est affecte a aucun pole specifique
+                                                                    L&apos;agent n&apos;est affecte a aucun pole specifique
                                                                 </p>
                                                             </div>
                                                             {!field.value && (
@@ -423,7 +423,7 @@ export function InviteMemberModal({
                                     className="bg-green-600 hover:bg-green-700"
                                 >
                                     {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Envoyer l'invitation
+                                    Envoyer l&apos;invitation
                                 </Button>
                             </ButtonGroup>
                         </DialogFooter>

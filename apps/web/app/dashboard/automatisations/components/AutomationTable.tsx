@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import { Id } from '@/convex/_generated/dataModel';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import {
-    Plus, MoreHorizontal, Trash2, Edit, Play, Pause,
+    Plus, MoreHorizontal, Trash2, Play, Pause,
     Workflow, Sparkles, GitBranch
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
@@ -74,19 +74,11 @@ export function AutomationTable({ flows, searchTerm, onSearchChange }: Automatio
     const PAGE_SIZE = 20;
 
     const totalPages = Math.ceil(flows.length / PAGE_SIZE);
+    const visiblePage = totalPages > 0 ? Math.min(currentPage, totalPages) : 1;
     const paginatedFlows = useMemo(() => {
-        const start = (currentPage - 1) * PAGE_SIZE;
+        const start = (visiblePage - 1) * PAGE_SIZE;
         return flows.slice(start, start + PAGE_SIZE);
-    }, [flows, currentPage]);
-
-    // Reset to page 1 when search changes the list
-    const prevFlowsLength = React.useRef(flows.length);
-    if (flows.length !== prevFlowsLength.current) {
-        prevFlowsLength.current = flows.length;
-        if (currentPage > Math.ceil(flows.length / PAGE_SIZE)) {
-            setCurrentPage(1);
-        }
-    }
+    }, [flows, visiblePage]);
 
     const handleDelete = async (id: string) => {
         try {
@@ -352,12 +344,12 @@ export function AutomationTable({ flows, searchTerm, onSearchChange }: Automatio
                     <div className="flex items-center justify-between mt-4">
                         <p className="text-[11px] text-gray-400 font-medium">
                             {flows.length > PAGE_SIZE
-                                ? `${(currentPage - 1) * PAGE_SIZE + 1}–${Math.min(currentPage * PAGE_SIZE, flows.length)} sur ${flows.length}`
+                                ? `${(visiblePage - 1) * PAGE_SIZE + 1}–${Math.min(visiblePage * PAGE_SIZE, flows.length)} sur ${flows.length}`
                                 : `${flows.length} résultat${flows.length > 1 ? 's' : ''}`
                             }
                         </p>
                         <Pagination
-                            currentPage={currentPage}
+                            currentPage={visiblePage}
                             totalPages={totalPages}
                             onPageChange={setCurrentPage}
                         />

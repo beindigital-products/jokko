@@ -27,7 +27,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -65,12 +65,7 @@ export function ConversationLayout({
     const [showList, setShowList] = useState(true)
     const [showInfo, setShowInfo] = useState(false)
 
-    // Sur mobile, gerer la vue
-    useEffect(() => {
-        if (isMobile && conversationId) {
-            setShowList(false)
-        }
-    }, [isMobile, conversationId])
+    const shouldShowList = isMobile && conversationId ? false : showList
 
     // Subscribe aux events temps reel
     useRealtime(organizationId)
@@ -184,7 +179,7 @@ export function ConversationLayout({
         <div className="flex h-full overflow-hidden bg-gray-50/30">
             {/* Contact List */}
             <AnimatePresence mode="wait">
-                {(!isMobile || showList) && (
+                {(!isMobile || shouldShowList) && (
                     <motion.aside
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
@@ -205,7 +200,7 @@ export function ConversationLayout({
 
             {/* Conversation View */}
             <AnimatePresence mode="wait">
-                {(!isMobile || !showList) && (
+                {(!isMobile || !shouldShowList) && (
                     <motion.main
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -218,6 +213,7 @@ export function ConversationLayout({
                     >
                         {conversationId ? (
                             <ConversationView
+                                key={conversationId}
                                 conversationId={conversationId}
                                 onBack={isMobile ? handleBack : undefined}
                                 onToggleInfo={toggleInfo}

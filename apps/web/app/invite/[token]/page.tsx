@@ -140,7 +140,7 @@ export default function AcceptInvitationPage() {
                             {isAccepted && !success ? "Invitation déjà acceptée" : "Compte créé !"}
                         </h2>
                         <p className="text-green-700">
-                            Bienvenue dans l'équipe <strong>{orgName}</strong>.
+                            Bienvenue dans l&apos;équipe <strong>{orgName}</strong>.
                             <br />
                             Redirection vers le tableau de bord...
                         </p>
@@ -161,12 +161,12 @@ export default function AcceptInvitationPage() {
                         </div>
                         <CardTitle className="text-xl text-red-600">Invitation Invalide</CardTitle>
                         <CardDescription>
-                            Ce lien d'invitation n'est pas valide ou n'existe pas.
+                            Ce lien d&apos;invitation n&apos;est pas valide ou n&apos;existe pas.
                         </CardDescription>
                     </CardHeader>
                     <CardFooter className="justify-center">
                         <Button variant="outline" onClick={() => router.push("/")}>
-                            Retour à l'accueil
+                            Retour à l&apos;accueil
                         </Button>
                     </CardFooter>
                 </Card>
@@ -184,12 +184,12 @@ export default function AcceptInvitationPage() {
                         </div>
                         <CardTitle className="text-xl text-amber-600">Invitation Expirée</CardTitle>
                         <CardDescription>
-                            Ce lien d'invitation a expiré. Veuillez demander une nouvelle invitation à votre administrateur.
+                            Ce lien d&apos;invitation a expiré. Veuillez demander une nouvelle invitation à votre administrateur.
                         </CardDescription>
                     </CardHeader>
                     <CardFooter className="justify-center">
                         <Button variant="outline" onClick={() => router.push("/")}>
-                            Retour à l'accueil
+                            Retour à l&apos;accueil
                         </Button>
                     </CardFooter>
                 </Card>
@@ -212,7 +212,7 @@ export default function AcceptInvitationPage() {
                 <div className="text-center space-y-2">
                     <h1 className="text-3xl font-bold tracking-tight text-gray-900">Bienvenue sur Jokko</h1>
                     <p className="text-gray-500">
-                        Acceptez l'invitation pour rejoindre votre équipe.
+                        Acceptez l&apos;invitation pour rejoindre votre équipe.
                     </p>
                 </div>
 
@@ -246,7 +246,7 @@ export default function AcceptInvitationPage() {
                                     className="bg-gray-50 font-medium text-gray-900"
                                 />
                                 <p className="text-xs text-muted-foreground">
-                                    L'invitation est liée à cet email unique.
+                                    L&apos;invitation est liée à cet email unique.
                                 </p>
                             </div>
 
@@ -335,7 +335,7 @@ export default function AcceptInvitationPage() {
                         </form>
                     </CardContent>
                     <CardFooter className="bg-gray-50/50 rounded-b-xl text-center text-xs text-gray-500 py-4 justify-center">
-                        En créant un compte, vous acceptez nos conditions d'utilisation.
+                        En créant un compte, vous acceptez nos conditions d&apos;utilisation.
                     </CardFooter>
                 </Card>
             </div>

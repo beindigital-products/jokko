@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 
 interface ListRow {
     id: string;
@@ -111,7 +111,7 @@ export const TemplateListBuilder: React.FC<TemplateListBuilderProps> = ({
                                         />
                                     </div>
                                     <div className="col-span-4 space-y-1">
-                                        <Label className="text-[10px] text-muted-foreground">Titre de l'option</Label>
+                                        <Label className="text-[10px] text-muted-foreground">Titre de l&apos;option</Label>
                                         <Input
                                             value={row.title}
                                             onChange={(e) => handleUpdateRow(sIndex, rIndex, 'title', e.target.value)}

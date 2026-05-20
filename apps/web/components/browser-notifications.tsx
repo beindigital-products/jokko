@@ -3,7 +3,6 @@
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useEffect, useRef, useState } from "react";
-import { Id } from "@/convex/_generated/dataModel";
 import { toast } from "sonner";
 
 export function BrowserNotifications() {
@@ -12,16 +11,9 @@ export function BrowserNotifications() {
 
     // Track the ID of the most recent notification we've seen to avoid re-notifying
     const lastSeenIdRef = useRef<string | null>(null);
-    const [permission, setPermission] = useState<NotificationPermission>('default');
-
-    // Check permission on mount
-    useEffect(() => {
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-            setPermission(Notification.permission);
-        }
-    }, []);
-
-
+    const [permission, setPermission] = useState<NotificationPermission>(() =>
+        typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+    );
 
     // Monitor for new notifications
     useEffect(() => {

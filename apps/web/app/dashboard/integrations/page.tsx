@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -666,7 +666,7 @@ export default function IntegrationsPage() {
                                     </Button>
                                     {isBlockedByOtherActive && activeProviderLabel && (
                                         <p className="text-[11px] text-gray-500 text-center leading-snug">
-                                            Déconnectez {activeProviderLabel} d'abord
+                                            Déconnectez {activeProviderLabel} d&apos;abord
                                             pour changer de CRM
                                         </p>
                                     )}

@@ -62,6 +62,10 @@ function formatRelativeTime(timestamp: number | undefined): string {
     return `Il y a ${days}j`
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback
+}
+
 export function ChannelsSettings() {
     const { currentOrg } = useCurrentOrg()
     const {
@@ -70,6 +74,8 @@ export function ChannelsSettings() {
     } = useChannels()
     const polesData = useQuery(api.poles.list, currentOrg ? { organizationId: currentOrg._id } : "skip")
     const poles = polesData?.poles ?? []
+    type Channel = (typeof channels)[number]
+    type Pole = (typeof poles)[number]
     const canCreate = usePermission('channels:create')
     const canUpdate = usePermission('channels:update')
     const canDelete = usePermission('channels:delete')
@@ -108,14 +114,14 @@ export function ChannelsSettings() {
     // Auto-check token health for all active channels on mount
     useEffect(() => {
         if (!channels.length || checkingTokens) return
-        const active = channels.filter((c: any) => c.status === 'active')
+        const active = channels.filter((c: Channel) => c.status === 'active')
         if (!active.length) return
 
         let cancelled = false
         setCheckingTokens(true)
 
         Promise.allSettled(
-            active.map(async (ch: any) => {
+            active.map(async (ch: Channel) => {
                 try {
                     const status = await getChannelStatus({ channelId: ch._id as Id<"whatsappChannels"> })
                     if (status) {
@@ -134,11 +140,11 @@ export function ChannelsSettings() {
     }, [channels.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const activeChannels = channels.filter(
-        (c: any) => c.status !== 'disabled' && c.status !== 'banned',
+        (c: Channel) => c.status !== 'disabled' && c.status !== 'banned',
     )
-    const channelsWithTokenError = channels.filter((c: any) => tokenErrors[c._id])
+    const channelsWithTokenError = channels.filter((c: Channel) => tokenErrors[c._id])
     const downgradedChannels = channels.filter(
-        (c: any) => c.status === 'disabled' && c.disabledReason === 'plan_downgrade',
+        (c: Channel) => c.status === 'disabled' && c.disabledReason === 'plan_downgrade',
     )
     const maxChannels = currentPlan?.maxWhatsappChannels ?? 1
     const canAddMore = isUnlimited(maxChannels) || activeChannels.length < maxChannels
@@ -192,8 +198,8 @@ export function ChannelsSettings() {
             toast.success('Message test envoyé')
             setTestDialogChannelId(null)
             setTestPhone('')
-        } catch (e: any) {
-            toast.error(e.message || "Échec de l'envoi")
+        } catch (e) {
+            toast.error(getErrorMessage(e, "Échec de l'envoi"))
         } finally {
             setSendingTest(false)
         }
@@ -211,8 +217,8 @@ export function ChannelsSettings() {
         try {
             await setOrgDefault({ id: channelId as Id<"whatsappChannels"> })
             toast.success('Canal par défaut mis à jour')
-        } catch (e: any) {
-            toast.error(e.message || 'Erreur')
+        } catch (e) {
+            toast.error(getErrorMessage(e, 'Erreur'))
         }
     }
 
@@ -220,8 +226,8 @@ export function ChannelsSettings() {
         try {
             await disableChannel({ id: channelId as Id<"whatsappChannels"> })
             toast.success('Canal désactivé')
-        } catch (e: any) {
-            toast.error(e.message || 'Erreur')
+        } catch (e) {
+            toast.error(getErrorMessage(e, 'Erreur'))
         }
     }
 
@@ -232,8 +238,8 @@ export function ChannelsSettings() {
                 poleId: poleId as Id<"poles">,
             })
             toast.success('Pôle assigné au canal')
-        } catch (e: any) {
-            toast.error(e.message || 'Erreur')
+        } catch (e) {
+            toast.error(getErrorMessage(e, 'Erreur'))
         }
     }
 
@@ -380,7 +386,7 @@ export function ChannelsSettings() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {channels.map((channel: any) => {
+                            {channels.map((channel: Channel) => {
                                 const statusConfig = STATUS_CONFIG[channel.status] || STATUS_CONFIG.disconnected
                                 const StatusIcon = statusConfig.icon
                                 const isExpanded = expandedId === channel._id
@@ -561,8 +567,8 @@ export function ChannelsSettings() {
                                                                 </SelectTrigger>
                                                                 <SelectContent>
                                                                     <SelectItem value="none">Aucun pôle</SelectItem>
-                                                                    {poles.map((pole: any) => (
-                                                                        <SelectItem key={pole._id} value={pole._id}>
+                                                                    {poles.map((pole: Pole) => (
+                                                                        <SelectItem key={pole.id} value={pole.id}>
                                                                             <div className="flex items-center gap-2">
                                                                                 <div
                                                                                     className="h-2 w-2 rounded-full"
@@ -773,8 +779,8 @@ function AddChannelDialog({ addChannel, fetchPhoneNumbers, trigger }: AddChannel
                 setErrorMessage('Aucun numéro WhatsApp trouvé sur ce compte.')
                 setStep('idle')
             }
-        } catch (err: any) {
-            setErrorMessage(err.message || 'Connexion annulée ou non autorisée.')
+        } catch (err) {
+            setErrorMessage(getErrorMessage(err, 'Connexion annulée ou non autorisée.'))
             setStep('idle')
         }
     }
@@ -800,8 +806,8 @@ function AddChannelDialog({ addChannel, fetchPhoneNumbers, trigger }: AddChannel
                 description: selectedPhone.display_phone_number || 'Nouveau canal actif',
             })
             handleOpenChange(false)
-        } catch (err: any) {
-            setErrorMessage(err.message || 'Erreur lors de la création du canal.')
+        } catch (err) {
+            setErrorMessage(getErrorMessage(err, 'Erreur lors de la création du canal.'))
             setStep('selecting')
         }
     }

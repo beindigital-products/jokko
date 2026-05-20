@@ -36,7 +36,7 @@ export function ChangelogHero() {
                 </motion.p>
 
                 <h1 className="mt-6 font-display text-5xl font-bold leading-[1.05] tracking-tight md:text-7xl">
-                    <SplitText>Tout ce qu'on livre,</SplitText>
+                    <SplitText>Tout ce qu&apos;on livre,</SplitText>
                     <br />
                     <span className="bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] bg-clip-text text-transparent">
                         <SplitText delay={0.2}>expliqué clairement.</SplitText>
@@ -51,7 +51,7 @@ export function ChangelogHero() {
                 >
                     Chaque semaine, on déploie. Chaque semaine, on documente.
                     Nouveautés, améliorations, corrections : tout est ici, dans
-                    l'ordre chronologique.
+                    l&apos;ordre chronologique.
                 </motion.p>
 
                 <motion.a
@@ -62,7 +62,7 @@ export function ChangelogHero() {
                     className="mt-8 inline-flex items-center gap-2 rounded-full border border-border/60 bg-card px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-[var(--accent)]/40 hover:text-[var(--accent)]"
                 >
                     <Rss className="h-3.5 w-3.5" />
-                    S'abonner au flux RSS
+                    S&apos;abonner au flux RSS
                 </motion.a>
             </div>
         </section>

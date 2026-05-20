@@ -33,6 +33,10 @@ interface RechargeDialogProps {
     onOpenChange: (open: boolean) => void;
 }
 
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 const STEP_LABELS = ["Montant", "Paiement", "Confirmation"] as const;
 
 function StepIndicator({ currentStep }: { currentStep: 1 | 2 | 3 }) {
@@ -127,9 +131,9 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
             }
 
             window.location.href = result.url;
-        } catch (error: any) {
+        } catch (error) {
             toast.error("Erreur", {
-                description: error.message || "Impossible de créer la session de paiement.",
+                description: getErrorMessage(error, "Impossible de créer la session de paiement."),
             });
             setLoading(false);
         }

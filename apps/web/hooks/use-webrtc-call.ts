@@ -199,7 +199,7 @@ export function useWebRTCCall() {
             }
             throw error;
         }
-    }, [startOutboundCallMutation, confirmConnectedMutation, setCallState]);
+    }, [startOutboundCallMutation, confirmConnectedMutation, setCallState, setMicStream]);
 
     // ---- Apply remote SDP answer (for outbound calls) ----
     const applyRemoteSdpAnswer = useCallback(async (sdpAnswer: string) => {

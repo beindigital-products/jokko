@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState } from 'react'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -135,41 +135,21 @@ export function PoleModal({
     const updatePole = useMutation(api.poles.update)
 
     const isEditing = !!pole
+    const defaultValues = useMemo<PoleFormValues>(() => ({
+        name: pole?.name || '',
+        description: pole?.description || '',
+        color: pole?.color || '#10b981',
+        icon: pole?.icon || 'Building2',
+    }), [pole])
 
     const form = useForm<PoleFormValues>({
         resolver: zodResolver(poleSchema),
-        defaultValues: {
-            name: '',
-            description: '',
-            color: '#10b981',
-            icon: 'Building2',
-        },
+        defaultValues,
+        values: defaultValues,
     })
 
     // Watch for preview
     const formValues = useWatch({ control: form.control })
-
-    // Reset form when opening/changing pole
-    useEffect(() => {
-        if (open) {
-            if (pole) {
-                form.reset({
-                    name: pole.name,
-                    description: pole.description || '',
-                    color: pole.color || '#10b981',
-                    icon: pole.icon || 'Building2',
-                })
-            } else {
-                form.reset({
-                    name: '',
-                    description: '',
-                    color: '#10b981',
-                    icon: 'Building2',
-                })
-            }
-            setError(null)
-        }
-    }, [open, pole, form])
 
     const onSubmit = async (values: PoleFormValues) => {
         setError(null)

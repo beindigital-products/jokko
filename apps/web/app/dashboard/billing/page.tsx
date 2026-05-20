@@ -4,11 +4,9 @@ import { useAction, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import {
     Check,
-    CreditCard,
     Zap,
     AlertCircle,
     Plus,
-    History,
     Crown,
     Loader2,
     ExternalLink,
@@ -48,6 +46,12 @@ import { Progress } from "@/components/ui/progress";
 import { RechargeDialog } from "./_components/recharge-dialog";
 import { TrialBanner } from "@/components/billing/trial-banner";
 
+type PlanDefinition = ReturnType<typeof usePlans>['plans'][number];
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
 // ============================================
 // PLAN CONFIG
 // ============================================
@@ -73,7 +77,7 @@ const PLAN_CONFIG = {
     },
 } as const;
 
-function buildBillingPlans(planDefs: any[]) {
+function buildBillingPlans(planDefs: PlanDefinition[]) {
     return planDefs
         .filter((p) => PLAN_CONFIG[p.key as keyof typeof PLAN_CONFIG])
         .map((p) => {
@@ -90,7 +94,7 @@ function buildBillingPlans(planDefs: any[]) {
                     `${formatLimit(p.maxAgents)} agent${p.maxAgents > 1 ? 's' : ''}`,
                     `${formatLimit(p.maxWhatsappChannels)} numéro${p.maxWhatsappChannels > 1 ? 's' : ''} WhatsApp`,
                     `${formatLimit(p.maxConversationsPerMonth)} conversations/mois`,
-                    ...p.features.filter((f: any) => f.included).slice(0, 2).map((f: any) => f.label),
+                    ...p.features.filter((f) => f.included).slice(0, 2).map((f) => f.label),
                     `Support ${p.supportLevel.toLowerCase()}`,
                 ],
                 ...config,
@@ -166,9 +170,9 @@ export default function BillingPage() {
         setLoadingPlan(planKey);
         try {
             const { url } = await createCheckout({ planKey, interval: billingInterval });
-            window.location.href = url;
-        } catch (error: any) {
-            toast.error("Erreur", { description: error.message || "Impossible de créer la session de paiement." });
+            window.location.assign(url);
+        } catch (error) {
+            toast.error("Erreur", { description: getErrorMessage(error, "Impossible de créer la session de paiement.") });
             setLoadingPlan(null);
         }
     };
@@ -177,9 +181,9 @@ export default function BillingPage() {
         setLoadingPortal(true);
         try {
             const { url } = await createPortal();
-            window.location.href = url;
-        } catch (error: any) {
-            toast.error("Erreur", { description: error.message || "Impossible d'accéder au portail." });
+            window.location.assign(url);
+        } catch (error) {
+            toast.error("Erreur", { description: getErrorMessage(error, "Impossible d'accéder au portail.") });
             setLoadingPortal(false);
         }
     };

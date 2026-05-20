@@ -8,6 +8,7 @@ import { Id } from '@/convex/_generated/dataModel';
 import { ContactList, Tag } from '@/components/contacts/ContactList';
 import { Contact, ContactTag, getInitials } from '@/components/contacts/ContactCard';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
+import type { ContactFormSubmitData } from '@/components/contacts/ContactForm';
 import { ImportDialog } from '@/components/contacts/ImportDialog';
 import { DuplicatesDialog } from '@/components/contacts/DuplicatesDialog';
 import { usePermission } from '@/hooks/use-permission';
@@ -47,6 +48,53 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { formatPhoneDisplay } from '@/lib/contacts/validation';
+
+type RawContactTag = string | {
+    id?: string;
+    _id?: string;
+    name?: string;
+    color?: string;
+} | null | undefined;
+
+interface ContactNote {
+    content: string;
+    authorName?: string;
+    createdAt: number;
+}
+
+interface ContactMutationError extends Error {
+    data?: {
+        code?: string;
+        message?: string;
+    };
+}
+
+function normalizeTag(tag: RawContactTag): ContactTag {
+    if (typeof tag === 'string') {
+        return { id: tag, name: tag, color: '#808080' };
+    }
+    if (!tag) {
+        return { id: 'tag', name: 'Tag', color: '#808080' };
+    }
+
+    return {
+        id: tag.id || tag._id || tag.name || 'tag',
+        name: tag.name || tag.id || tag._id || 'Tag',
+        color: tag.color || '#808080',
+    };
+}
+
+function isContactNote(note: unknown): note is ContactNote {
+    return typeof note === 'object' && note !== null && 'content' in note && 'createdAt' in note;
+}
+
+function getErrorMessage(error: unknown, fallback = 'Erreur inconnue'): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
+function isContactMutationError(error: unknown): error is ContactMutationError {
+    return error instanceof Error && 'data' in error;
+}
 
 // ============================================
 // RELATIVE TIME HELPER
@@ -115,11 +163,7 @@ function ContactDetailDrawer({
         city: contactData.city || null,
         country: contactData.country || null,
         notes: null,
-        tags: (contactData.tags || []).map((t: any) => ({
-            id: typeof t === 'string' ? t : t.id,
-            name: typeof t === 'string' ? t : t.name,
-            color: typeof t === 'string' ? '#808080' : t.color || '#808080',
-        })),
+        tags: (contactData.tags || []).map(normalizeTag),
         isWhatsApp: contactData.isWhatsApp || null,
         isBlocked: contactData.isBlocked || null,
         createdAt: contactData.createdAt,
@@ -281,7 +325,7 @@ function ContactDetailDrawer({
                     <div className="space-y-2">
                         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</h3>
                         <div className="space-y-2">
-                            {contactData.notes.map((note: any, i: number) => (
+                            {contactData.notes.filter(isContactNote).map((note, i) => (
                                 <div key={i} className="bg-gray-50 rounded-lg p-3">
                                     <p className="text-sm text-gray-700">{note.content}</p>
                                     <div className="flex items-center gap-2 mt-1.5">
@@ -401,7 +445,7 @@ export function ContactsPageClient() {
     );
 
     // Transform results to match Contact interface
-    const contacts: Contact[] = (results || []).map((c: any) => ({
+    const contacts: Contact[] = (results || []).map((c) => ({
         id: c._id,
         phone: c.phone,
         name: c.name || null,
@@ -410,15 +454,11 @@ export function ContactsPageClient() {
         email: c.email || null,
         company: c.company || null,
         jobTitle: c.jobTitle || null,
-        notes: c.notes || null,
+        notes: Array.isArray(c.notes) ? null : c.notes || null,
         countryCode: c.countryCode || null,
         isWhatsApp: c.isWhatsApp || null,
         isBlocked: c.isBlocked || null,
-        tags: c.tags?.map((t: any) => ({
-            id: t._id,
-            name: t.name,
-            color: t.color || '#808080'
-        })) || [],
+        tags: c.tags?.map(normalizeTag) || [],
         createdAt: c.createdAt
     }));
 
@@ -431,22 +471,22 @@ export function ContactsPageClient() {
         loadMore(30);
     };
 
-    const handleCreateSubmit = async (data: any) => {
+    const handleCreateSubmit = async (data: ContactFormSubmitData) => {
         try {
             await createContact(data);
             setIsCreateDialogOpen(false);
             // Success
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            if (error.data?.code === 'DUPLICATE_CONTACT') {
+            if (isContactMutationError(error) && error.data?.code === 'DUPLICATE_CONTACT') {
                 alert(`Contact existant: ${error.data.message}`);
             } else {
-                alert(`Erreur: ${error.message}`);
+                alert(`Erreur: ${getErrorMessage(error)}`);
             }
         }
     };
 
-    const handleEditSubmit = async (data: any) => {
+    const handleEditSubmit = async (data: ContactFormSubmitData) => {
         if (!editingContact) return;
         try {
             await updateContact({
@@ -455,9 +495,9 @@ export function ContactsPageClient() {
             });
             setEditingContact(null);
             // Success
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur: ${error.message}`);
+            alert(`Erreur: ${getErrorMessage(error)}`);
         }
     };
 
@@ -475,9 +515,9 @@ export function ContactsPageClient() {
             }
             setContactToDelete(null);
             // Success
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur: ${error.message}`);
+            alert(`Erreur: ${getErrorMessage(error)}`);
         }
     };
 
@@ -544,9 +584,9 @@ export function ContactsPageClient() {
                 bulkDeleteIds.map(id => deleteContact({ id: id as Id<"contacts"> }))
             );
             setBulkDeleteIds(null);
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur lors de la suppression: ${error.message}`);
+            alert(`Erreur lors de la suppression: ${getErrorMessage(error)}`);
         }
     };
 
@@ -564,9 +604,9 @@ export function ContactsPageClient() {
                     });
                 })
             );
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur lors de l'ajout du tag: ${error.message}`);
+            alert(`Erreur lors de l'ajout du tag: ${getErrorMessage(error)}`);
         }
     };
 

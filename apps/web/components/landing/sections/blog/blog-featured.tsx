@@ -67,7 +67,7 @@ export function BlogFeatured() {
                                 <p className="mt-5 text-base leading-relaxed text-muted-foreground md:text-lg">
                                     Nouveaux formats de templates, IA native, vérification
                                     business étendue, tarifs meta modifiés. Notre analyse
-                                    complète de l'écosystème WhatsApp B2B, avec chiffres et
+                                    complète de l&apos;écosystème WhatsApp B2B, avec chiffres et
                                     comparaisons vs les canaux traditionnels.
                                 </p>
 

@@ -12,13 +12,11 @@ import {
     useEdgesState,
     Node,
     Edge,
-    Handle,
-    Position,
     ReactFlowProvider
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
-    Bot, Send, ArrowLeft, Loader2, Save, MessageSquare, Sparkles,
+    Bot, Send, ArrowLeft, Loader2, Save, Sparkles,
     Eye, EyeOff, LayoutTemplate, Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -207,7 +205,7 @@ export function FlowChatBuilder({ initialFlowId, initialNodes = [], initialEdges
                                         Assistant Flow Builder
                                     </h1>
                                     <p className="text-gray-500 text-center text-base max-w-lg mb-10 leading-relaxed">
-                                        Je suis là pour créer vos automatisations WhatsApp. Décrivez ce que vous souhaitez faire (message de bienvenue, menu, sondage...) et je m'occupe de la structure.
+                                        Je suis là pour créer vos automatisations WhatsApp. Décrivez ce que vous souhaitez faire (message de bienvenue, menu, sondage...) et je m&apos;occupe de la structure.
                                     </p>
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl">

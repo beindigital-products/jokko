@@ -17,17 +17,10 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConversationLayout } from '@/components/conversations'
 import { useCurrentOrg } from '@/hooks/use-current-org'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Loader2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface ConversationsLayoutClientProps {
-    children: React.ReactNode
-}
-
-export function ConversationsLayoutClient({
-    children,
-}: ConversationsLayoutClientProps) {
+export function ConversationsLayoutClient() {
     const { currentOrg, isLoading } = useCurrentOrg()
     const router = useRouter()
 

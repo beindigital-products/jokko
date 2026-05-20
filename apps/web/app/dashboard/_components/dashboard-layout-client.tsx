@@ -28,8 +28,6 @@ export function DashboardLayoutClient({
     children,
     user,
     organizationName,
-    organizationSlug: _organizationSlug,
-    organizationId: _organizationId,
 }: DashboardLayoutClientProps) {
     const basePath = '/dashboard'
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)

@@ -51,7 +51,7 @@ export function AssignmentSettingsDialog({ open, onOpenChange }: AssignmentSetti
             })
             toast.success("Parametres mis a jour")
             onOpenChange(false)
-        } catch (error) {
+        } catch {
             toast.error("Erreur lors de la mise a jour")
         } finally {
             setIsSaving(false)
@@ -62,7 +62,7 @@ export function AssignmentSettingsDialog({ open, onOpenChange }: AssignmentSetti
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Parametres d'attribution</DialogTitle>
+                    <DialogTitle>Parametres d&apos;attribution</DialogTitle>
                     <DialogDescription>
                         Configurez comment les conversations sont distribuees a votre equipe.
                     </DialogDescription>
