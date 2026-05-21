@@ -18,6 +18,7 @@ import type { Id } from "../../../convex/_generated/dataModel";
 import { MediaPicker } from "./conversation/MediaPicker";
 import { MessageBubble, type ConversationMessage } from "./conversation/MessageBubble";
 import { ShortcutPopover } from "./conversation/ShortcutPopover";
+import { TemplatePicker } from "./conversation/TemplatePicker";
 import { VoiceNoteRecorder } from "./conversation/VoiceNoteRecorder";
 import { uploadFileToConvex } from "./conversation/upload";
 
@@ -39,6 +40,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     );
     const markAsRead = useMutation(api.conversations.markAsRead);
     const sendMessage = useMutation(api.messages.send);
+    const sendTemplate = useMutation(api.templates.mutations.sendToConversation);
     const retryMessage = useMutation(api.messages.retry);
     const assignToMe = useMutation(api.conversations.assignToMe);
     const resolveConversation = useMutation(api.conversations.resolve);
@@ -126,6 +128,23 @@ export function MobileConversationScreen({ conversationId }: Props) {
             const message =
                 uploadError instanceof Error ? uploadError.message : "Erreur d'envoi";
             Alert.alert("Note vocale", message);
+        }
+    };
+
+    const sendTemplateMessage = async (templateId: Id<"templates">) => {
+        if (!typedConversationId) return;
+        setError(null);
+        setIsSending(true);
+        try {
+            await sendTemplate({ conversationId: typedConversationId, templateId });
+        } catch (templateError) {
+            const message =
+                templateError instanceof Error
+                    ? templateError.message
+                    : "Envoi du modèle impossible";
+            Alert.alert("Modèle WhatsApp", message);
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -379,6 +398,10 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 <MediaPicker
                     disabled={!typedConversationId || isSending}
                     onPicked={(payload) => void sendMedia(payload)}
+                />
+                <TemplatePicker
+                    disabled={!typedConversationId || isSending}
+                    onSelect={(templateId) => void sendTemplateMessage(templateId)}
                 />
                 <TextInput
                     value={draft}

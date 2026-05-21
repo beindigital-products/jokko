@@ -1,7 +1,9 @@
 
 import { v } from "convex/values";
 import { mutation, internalMutation } from "../_generated/server";
+import { internal } from "../_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requirePermission } from "../lib/auth";
 import { validateTemplate } from "../lib/templateValidation";
 import { assertWithinLimit } from "../lib/planLimits";
 import {
@@ -307,5 +309,95 @@ export const updateStatusByMetaId = internalMutation({
         });
 
         console.log(`[TEMPLATE_WEBHOOK] Updated template ${template.name} (${template._id}) to ${args.status} `);
+    },
+});
+
+/**
+ * Send an APPROVED template to an existing conversation.
+ *
+ * V1.5+ — mobile composer can pick a template and fire-and-forget.
+ * Components are passed verbatim to the WhatsApp Cloud API; if the template
+ * has no placeholders, the picker passes an empty array.
+ *
+ * Honours `organizations.demo.outboundMode === "local_only"`: stamps the
+ * message as SENT without hitting Meta (for App Store / Meta review).
+ */
+export const sendToConversation = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+        templateId: v.id("templates"),
+        components: v.optional(v.array(v.record(v.string(), v.any()))),
+    },
+    handler: async (ctx, args) => {
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+
+        const { userId } = await requirePermission(
+            ctx,
+            conversation.organizationId,
+            "messages:send",
+        );
+
+        const template = await ctx.db.get(args.templateId);
+        if (!template) throw new Error("Template not found");
+        if (template.organizationId !== conversation.organizationId) {
+            throw new Error("Template does not belong to this organization");
+        }
+        if (template.status !== "APPROVED") {
+            throw new Error("Only APPROVED templates can be sent");
+        }
+
+        const previewBody = (template.body ?? "").trim();
+        const messageContent = previewBody || `Template: ${template.name}`;
+
+        const messageId = await ctx.db.insert("messages", {
+            organizationId: conversation.organizationId,
+            conversationId: args.conversationId,
+            senderId: userId,
+            contactId: conversation.contactId,
+            type: "TEMPLATE",
+            content: messageContent,
+            direction: "OUTBOUND",
+            status: "PENDING",
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        });
+
+        await ctx.db.patch(args.conversationId, {
+            lastMessageAt: Date.now(),
+            lastMessageDirection: "OUTBOUND",
+            preview: `📤 ${template.name}`,
+            updatedAt: Date.now(),
+        });
+
+        const org = await ctx.db.get(conversation.organizationId);
+        if (org?.demo?.outboundMode === "local_only") {
+            await ctx.db.patch(messageId, {
+                status: "SENT",
+                externalId: `demo:template:${messageId}`,
+                updatedAt: Date.now(),
+            });
+            return messageId;
+        }
+
+        const contact = conversation.contactId
+            ? await ctx.db.get(conversation.contactId)
+            : null;
+        if (contact?.phone) {
+            await ctx.scheduler.runAfter(0, internal.whatsapp_actions.sendMessage, {
+                messageId,
+                organizationId: conversation.organizationId,
+                whatsappChannelId: conversation.whatsappChannelId,
+                to: contact.phone,
+                type: "template",
+                template: {
+                    name: template.metaTemplateName ?? template.name,
+                    language: { code: template.language },
+                    components: args.components ?? [],
+                },
+            });
+        }
+
+        return messageId;
     },
 });
