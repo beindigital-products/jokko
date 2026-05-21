@@ -15,6 +15,7 @@ import { useRouter } from "expo-router";
 import { theme } from "@jokko/tokens";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { MediaPicker } from "./conversation/MediaPicker";
 import { MessageBubble, type ConversationMessage } from "./conversation/MessageBubble";
 import { ShortcutPopover } from "./conversation/ShortcutPopover";
 import { VoiceNoteRecorder } from "./conversation/VoiceNoteRecorder";
@@ -120,6 +121,37 @@ export function MobileConversationScreen({ conversationId }: Props) {
             const message =
                 uploadError instanceof Error ? uploadError.message : "Erreur d'envoi";
             Alert.alert("Note vocale", message);
+        }
+    };
+
+    const sendMedia = async (payload: {
+        uri: string;
+        type: "IMAGE" | "VIDEO" | "DOCUMENT";
+        mediaType: string;
+        fileName: string;
+        fileSize?: number;
+    }) => {
+        if (!typedConversationId) return;
+        setError(null);
+        setIsSending(true);
+        try {
+            const uploadUrl = await generateUploadUrl({});
+            const storageId = await uploadFileToConvex(uploadUrl, payload.uri, payload.mediaType);
+            await sendMessage({
+                conversationId: typedConversationId,
+                type: payload.type,
+                mediaStorageId: storageId as Id<"_storage">,
+                mediaType: payload.mediaType,
+                fileName: payload.fileName,
+                fileSize: payload.fileSize,
+                isForwarded: false,
+            });
+        } catch (uploadError) {
+            const message =
+                uploadError instanceof Error ? uploadError.message : "Erreur d'envoi";
+            Alert.alert("Pièce jointe", message);
+        } finally {
+            setIsSending(false);
         }
     };
 
@@ -315,6 +347,10 @@ export function MobileConversationScreen({ conversationId }: Props) {
             ) : null}
 
             <View style={styles.composer}>
+                <MediaPicker
+                    disabled={!typedConversationId || isSending}
+                    onPicked={(payload) => void sendMedia(payload)}
+                />
                 <TextInput
                     value={draft}
                     onChangeText={setDraft}
