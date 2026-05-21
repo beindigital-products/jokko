@@ -45,15 +45,115 @@ export const list = query({
                     if (url) mediaUrl = url;
                 }
 
+                const reactions = await ctx.db
+                    .query("messageReactions")
+                    .withIndex("by_message", (q) => q.eq("messageId", msg._id))
+                    .collect();
+
                 return {
                     ...msg,
                     id: msg._id,
                     timestamp: msg._creationTime, // Use creation time as timestamp
                     mediaUrl,
-                    // Ensure other fields match UI type
+                    reactions: reactions.map((r) => ({
+                        userId: r.userId,
+                        emoji: r.emoji,
+                        createdAt: r.createdAt,
+                    })),
                 };
             }))
         };
+    },
+});
+
+// ============================================
+// Reactions (V1.5+)
+// ============================================
+
+/**
+ * Toggle a reaction on a message. Same emoji from the same user removes it.
+ * A different emoji replaces it. No WhatsApp Cloud sync yet — reactions
+ * are an internal team annotation on the conversation timeline.
+ */
+export const react = mutation({
+    args: {
+        messageId: v.id("messages"),
+        emoji: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+
+        const { userId } = await requirePermission(
+            ctx,
+            conversation.organizationId,
+            "messages:send",
+        );
+
+        if (!args.emoji || args.emoji.trim().length === 0) {
+            throw new Error("Emoji is required");
+        }
+        if (args.emoji.length > 8) {
+            throw new Error("Reaction emoji is too long");
+        }
+
+        const existing = await ctx.db
+            .query("messageReactions")
+            .withIndex("by_message_user", (q) =>
+                q.eq("messageId", args.messageId).eq("userId", userId),
+            )
+            .first();
+
+        if (existing) {
+            if (existing.emoji === args.emoji) {
+                await ctx.db.delete(existing._id);
+                return { action: "removed" as const };
+            }
+            await ctx.db.patch(existing._id, { emoji: args.emoji });
+            return { action: "replaced" as const };
+        }
+
+        await ctx.db.insert("messageReactions", {
+            organizationId: conversation.organizationId,
+            messageId: args.messageId,
+            userId,
+            emoji: args.emoji,
+            createdAt: Date.now(),
+        });
+        return { action: "added" as const };
+    },
+});
+
+/**
+ * Explicit unreact — useful if UI wants a discrete "remove" affordance
+ * beyond the toggle behaviour of react().
+ */
+export const unreact = mutation({
+    args: { messageId: v.id("messages") },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+
+        const { userId } = await requirePermission(
+            ctx,
+            conversation.organizationId,
+            "messages:send",
+        );
+
+        const existing = await ctx.db
+            .query("messageReactions")
+            .withIndex("by_message_user", (q) =>
+                q.eq("messageId", args.messageId).eq("userId", userId),
+            )
+            .first();
+
+        if (existing) await ctx.db.delete(existing._id);
     },
 });
 

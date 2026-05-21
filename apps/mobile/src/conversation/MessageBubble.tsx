@@ -16,6 +16,7 @@ export type ConversationMessage = {
     fileName?: string | null;
     fileSize?: number | null;
     replyToId?: Id<"messages"> | null;
+    reactions?: { userId: Id<"users">; emoji: string; createdAt: number }[];
 };
 
 type Props = {
@@ -23,14 +24,25 @@ type Props = {
     replyTo?: ConversationMessage | null;
     onRetry?: (messageId: Id<"messages">) => void;
     onReplyRequest?: (message: ConversationMessage) => void;
+    onReactionRequest?: (message: ConversationMessage) => void;
 };
 
-export function MessageBubble({ message, replyTo, onRetry, onReplyRequest }: Props) {
+export function MessageBubble({
+    message,
+    replyTo,
+    onRetry,
+    onReplyRequest,
+    onReactionRequest,
+}: Props) {
     const outbound = message.direction === "OUTBOUND";
     const failed = message.status === "FAILED";
+    const reactions = message.reactions ?? [];
 
     const bubble = (
-        <View
+        <Pressable
+            onLongPress={() => onReactionRequest?.(message)}
+            delayLongPress={300}
+            android_disableSound
             style={[
                 styles.bubble,
                 outbound ? styles.bubbleOutbound : styles.bubbleInbound,
@@ -55,21 +67,55 @@ export function MessageBubble({ message, replyTo, onRetry, onReplyRequest }: Pro
                     <Text style={styles.retryText}>Réessayer</Text>
                 </Pressable>
             ) : null}
-        </View>
+        </Pressable>
     );
 
     return (
         <View style={[styles.row, outbound && styles.rowOutbound]}>
-            {onReplyRequest ? (
-                <SwipeToReply
-                    direction={outbound ? "left" : "right"}
-                    onTrigger={() => onReplyRequest(message)}
-                >
-                    {bubble}
-                </SwipeToReply>
-            ) : (
-                bubble
-            )}
+            <View style={styles.column}>
+                {onReplyRequest ? (
+                    <SwipeToReply
+                        direction={outbound ? "left" : "right"}
+                        onTrigger={() => onReplyRequest(message)}
+                    >
+                        {bubble}
+                    </SwipeToReply>
+                ) : (
+                    bubble
+                )}
+                {reactions.length > 0 ? (
+                    <ReactionsChip reactions={reactions} outbound={outbound} />
+                ) : null}
+            </View>
+        </View>
+    );
+}
+
+function ReactionsChip({
+    reactions,
+    outbound,
+}: {
+    reactions: NonNullable<ConversationMessage["reactions"]>;
+    outbound: boolean;
+}) {
+    const counts = reactions.reduce<Map<string, number>>((acc, r) => {
+        acc.set(r.emoji, (acc.get(r.emoji) ?? 0) + 1);
+        return acc;
+    }, new Map());
+
+    return (
+        <View
+            style={[
+                styles.reactionsRow,
+                outbound ? styles.reactionsRowOutbound : styles.reactionsRowInbound,
+            ]}
+        >
+            {Array.from(counts.entries()).map(([emoji, count]) => (
+                <View key={emoji} style={styles.reactionPill}>
+                    <Text style={styles.reactionEmoji}>{emoji}</Text>
+                    {count > 1 ? <Text style={styles.reactionCount}>{count}</Text> : null}
+                </View>
+            ))}
         </View>
     );
 }
@@ -242,6 +288,28 @@ function formatBytes(bytes: number): string {
 const styles = StyleSheet.create({
     row: { flexDirection: "row", justifyContent: "flex-start" },
     rowOutbound: { justifyContent: "flex-end" },
+    column: { maxWidth: "82%" },
+    reactionsRow: {
+        marginTop: -6,
+        flexDirection: "row",
+        flexWrap: "wrap",
+        gap: 4,
+    },
+    reactionsRowInbound: { justifyContent: "flex-start", paddingLeft: theme.spacing.sm },
+    reactionsRowOutbound: { justifyContent: "flex-end", paddingRight: theme.spacing.sm },
+    reactionPill: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 2,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 10,
+        backgroundColor: theme.surface.default,
+        borderWidth: 1,
+        borderColor: theme.ink[300],
+    },
+    reactionEmoji: { fontSize: 12, lineHeight: 16 },
+    reactionCount: { fontSize: 11, fontWeight: "700", color: theme.ink[700] },
     bubble: {
         maxWidth: "82%",
         borderRadius: theme.radius.lg,

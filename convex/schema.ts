@@ -1614,6 +1614,17 @@ export default defineSchema({
         .index("by_user", ["userId"])
         .index("by_device", ["deviceRecordId"]),
 
+    messageReactions: defineTable({
+        organizationId: v.id("organizations"),
+        messageId: v.id("messages"),
+        userId: v.id("users"),
+        emoji: v.string(),
+        createdAt: v.number(),
+    })
+        .index("by_message", ["messageId"])
+        .index("by_message_user", ["messageId", "userId"])
+        .index("by_organization", ["organizationId"]),
+
     notificationPreferences: defineTable({
         userId: v.id("users"),
         organizationId: v.optional(v.id("organizations")),

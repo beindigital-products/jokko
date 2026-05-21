@@ -17,6 +17,7 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { MediaPicker } from "./conversation/MediaPicker";
 import { MessageBubble, type ConversationMessage } from "./conversation/MessageBubble";
+import { ReactionPicker, type ReactionEmoji } from "./conversation/ReactionPicker";
 import { ShortcutPopover } from "./conversation/ShortcutPopover";
 import { TemplatePicker } from "./conversation/TemplatePicker";
 import { VoiceNoteRecorder } from "./conversation/VoiceNoteRecorder";
@@ -33,6 +34,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [isSending, setIsSending] = useState(false);
     const [isMutating, setIsMutating] = useState(false);
     const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
+    const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
         api.conversations.getById,
@@ -42,6 +44,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const sendMessage = useMutation(api.messages.send);
     const sendTemplate = useMutation(api.templates.mutations.sendToConversation);
     const retryMessage = useMutation(api.messages.retry);
+    const reactToMessage = useMutation(api.messages.react);
     const assignToMe = useMutation(api.conversations.assignToMe);
     const resolveConversation = useMutation(api.conversations.resolve);
     const archiveConversation = useMutation(api.conversations.archive);
@@ -128,6 +131,21 @@ export function MobileConversationScreen({ conversationId }: Props) {
             const message =
                 uploadError instanceof Error ? uploadError.message : "Erreur d'envoi";
             Alert.alert("Note vocale", message);
+        }
+    };
+
+    const submitReaction = async (emoji: ReactionEmoji) => {
+        const target = reactingTo;
+        setReactingTo(null);
+        if (!target) return;
+        try {
+            await reactToMessage({ messageId: target.id, emoji });
+        } catch (reactionError) {
+            const message =
+                reactionError instanceof Error
+                    ? reactionError.message
+                    : "Réaction impossible";
+            Alert.alert("Réaction", message);
         }
     };
 
@@ -354,6 +372,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
                             }
                             onRetry={handleRetry}
                             onReplyRequest={setReplyingTo}
+                            onReactionRequest={setReactingTo}
                         />
                     ))
                 )}
@@ -434,6 +453,12 @@ export function MobileConversationScreen({ conversationId }: Props) {
                     <VoiceNoteRecorder disabled={!typedConversationId} onSend={sendVoiceNote} />
                 )}
             </View>
+
+            <ReactionPicker
+                visible={reactingTo !== null}
+                onSelect={(emoji) => void submitReaction(emoji)}
+                onClose={() => setReactingTo(null)}
+            />
         </View>
     );
 }
