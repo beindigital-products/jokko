@@ -31,6 +31,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [error, setError] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
     const [isMutating, setIsMutating] = useState(false);
+    const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
         api.conversations.getById,
@@ -77,7 +78,9 @@ export function MobileConversationScreen({ conversationId }: Props) {
         if (!typedConversationId || !canSend) return;
 
         const content = draft.trim();
+        const replyToId = replyingTo?.id;
         setDraft("");
+        setReplyingTo(null);
         setError(null);
         setIsSending(true);
 
@@ -86,10 +89,12 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 conversationId: typedConversationId,
                 content,
                 type: "TEXT",
+                replyToId,
                 isForwarded: false,
             });
         } catch {
             setDraft(content);
+            if (replyToId) setReplyingTo(replyingTo);
             setError("Message non envoyé. Vérifie le canal WhatsApp ou réessaie.");
         } finally {
             setIsSending(false);
@@ -329,12 +334,36 @@ export function MobileConversationScreen({ conversationId }: Props) {
                                     : null
                             }
                             onRetry={handleRetry}
+                            onReplyRequest={setReplyingTo}
                         />
                     ))
                 )}
             </ScrollView>
 
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+            {replyingTo ? (
+                <View style={styles.replyBanner}>
+                    <View style={styles.replyBannerBar} />
+                    <View style={styles.replyBannerText}>
+                        <Text style={styles.replyBannerAuthor}>
+                            {replyingTo.direction === "OUTBOUND" ? "Vous" : contactName}
+                        </Text>
+                        <Text style={styles.replyBannerContent} numberOfLines={1}>
+                            {(replyingTo.content ?? "").trim() || `[${replyingTo.type}]`}
+                        </Text>
+                    </View>
+                    <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Annuler la réponse"
+                        onPress={() => setReplyingTo(null)}
+                        hitSlop={10}
+                        style={({ pressed }) => [styles.replyBannerClose, pressed && styles.pressed]}
+                    >
+                        <Ionicons name="close" size={18} color={theme.ink[700]} />
+                    </Pressable>
+                </View>
+            ) : null}
 
             {showShortcutPopover ? (
                 <ShortcutPopover
@@ -578,6 +607,44 @@ const styles = StyleSheet.create({
         lineHeight: 18,
         color: theme.semantic.danger,
         fontWeight: "700",
+    },
+    replyBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: theme.spacing.sm,
+        marginHorizontal: theme.spacing.lg,
+        marginTop: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.md,
+        paddingVertical: theme.spacing.sm,
+        borderRadius: theme.radius.md,
+        borderWidth: 1,
+        borderColor: theme.ink[300],
+        backgroundColor: theme.surface.raised,
+    },
+    replyBannerBar: {
+        width: 3,
+        alignSelf: "stretch",
+        borderRadius: 2,
+        backgroundColor: theme.accent.primary,
+    },
+    replyBannerText: { flex: 1, minWidth: 0 },
+    replyBannerAuthor: {
+        fontSize: 11,
+        fontWeight: "800",
+        color: theme.accent.primary,
+        textTransform: "uppercase",
+    },
+    replyBannerContent: {
+        marginTop: 2,
+        fontSize: 13,
+        color: theme.ink[700],
+    },
+    replyBannerClose: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        alignItems: "center",
+        justifyContent: "center",
     },
     composer: {
         flexDirection: "row",

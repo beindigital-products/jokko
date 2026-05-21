@@ -2,6 +2,7 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@jokko/tokens";
 import type { Id } from "../../../../convex/_generated/dataModel";
+import { SwipeToReply } from "./SwipeToReply";
 
 export type ConversationMessage = {
     id: Id<"messages">;
@@ -21,40 +22,54 @@ type Props = {
     message: ConversationMessage;
     replyTo?: ConversationMessage | null;
     onRetry?: (messageId: Id<"messages">) => void;
+    onReplyRequest?: (message: ConversationMessage) => void;
 };
 
-export function MessageBubble({ message, replyTo, onRetry }: Props) {
+export function MessageBubble({ message, replyTo, onRetry, onReplyRequest }: Props) {
     const outbound = message.direction === "OUTBOUND";
     const failed = message.status === "FAILED";
 
+    const bubble = (
+        <View
+            style={[
+                styles.bubble,
+                outbound ? styles.bubbleOutbound : styles.bubbleInbound,
+                failed && styles.bubbleFailed,
+            ]}
+        >
+            {replyTo ? <ReplyQuote message={replyTo} outbound={outbound} /> : null}
+            <BubbleContent message={message} outbound={outbound} />
+            <View style={styles.meta}>
+                <Text style={[styles.time, outbound && styles.timeOutbound]}>
+                    {formatMessageTime(message.timestamp)}
+                </Text>
+                {outbound ? <StatusIcon status={message.status} /> : null}
+            </View>
+            {failed && onRetry ? (
+                <Pressable
+                    accessibilityRole="button"
+                    onPress={() => onRetry(message.id)}
+                    style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+                >
+                    <Ionicons name="refresh" size={14} color="#fff" />
+                    <Text style={styles.retryText}>Réessayer</Text>
+                </Pressable>
+            ) : null}
+        </View>
+    );
+
     return (
         <View style={[styles.row, outbound && styles.rowOutbound]}>
-            <View
-                style={[
-                    styles.bubble,
-                    outbound ? styles.bubbleOutbound : styles.bubbleInbound,
-                    failed && styles.bubbleFailed,
-                ]}
-            >
-                {replyTo ? <ReplyQuote message={replyTo} outbound={outbound} /> : null}
-                <BubbleContent message={message} outbound={outbound} />
-                <View style={styles.meta}>
-                    <Text style={[styles.time, outbound && styles.timeOutbound]}>
-                        {formatMessageTime(message.timestamp)}
-                    </Text>
-                    {outbound ? <StatusIcon status={message.status} /> : null}
-                </View>
-                {failed && onRetry ? (
-                    <Pressable
-                        accessibilityRole="button"
-                        onPress={() => onRetry(message.id)}
-                        style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
-                    >
-                        <Ionicons name="refresh" size={14} color="#fff" />
-                        <Text style={styles.retryText}>Réessayer</Text>
-                    </Pressable>
-                ) : null}
-            </View>
+            {onReplyRequest ? (
+                <SwipeToReply
+                    direction={outbound ? "left" : "right"}
+                    onTrigger={() => onReplyRequest(message)}
+                >
+                    {bubble}
+                </SwipeToReply>
+            ) : (
+                bubble
+            )}
         </View>
     );
 }
