@@ -26,10 +26,23 @@ export const { auth, signIn, signOut, store } = convexAuth({
         Google,
         Password<DataModel>({
             profile(params) {
+                // RGPD : si le client envoie un timestamp acceptedTermsAt
+                // au sign-up, on le persiste sur le user record. Pas requis
+                // pour les flows reset / verify (timestamp déjà présent).
+                const rawTerms = params.acceptedTermsAt;
+                const acceptedTermsAt =
+                    typeof rawTerms === "number"
+                        ? rawTerms
+                        : typeof rawTerms === "string" && rawTerms.length > 0
+                          ? Number(rawTerms)
+                          : undefined;
                 return {
                     email: params.email as string,
                     name: params.name as string,
                     emailVerified: params.emailVerificationTime as string,
+                    ...(acceptedTermsAt !== undefined && Number.isFinite(acceptedTermsAt)
+                        ? { acceptedTermsAt }
+                        : {}),
                 };
             },
             validatePasswordRequirements: (password: string) => {

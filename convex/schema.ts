@@ -62,6 +62,10 @@ export default defineSchema({
         locale: v.optional(v.string()),
         timezone: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
+        // RGPD : timestamp (ms epoch) auquel l'utilisateur a accepté les CGU
+        // et la politique de confidentialité au moment du sign-up.
+        // Persistance gérée par le callback Password.profile() dans convex/auth.ts.
+        acceptedTermsAt: v.optional(v.number()),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     }).index("email", ["email"]),
