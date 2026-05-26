@@ -1,10 +1,64 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
 
+/* @custom-variant dark — kept defined for back-compat with existing `dark:` classes
+   in components, but the `.dark` token block is intentionally removed (Decision #11,
+   light-only on web). Existing `dark:` utility classes simply do not trigger
+   unless the `.dark` class is applied (which it currently is not — no ThemeProvider
+   is wired). To re-enable dark mode later, re-introduce a `.dark { ... }` block
+   below `:root` with designer-validated tokens. */
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
-  /* Neutral scale */
+  /* =====================================================================
+     V2 DESIGN SYSTEM — "Cobalt × paper × ink"
+     ===================================================================== */
+
+  /* --- Paper surfaces --- */
+  --paper-white: #ffffff;
+  --paper-warm: #fbf9f5;
+
+  /* --- Ink scale (10-step) — design spec leans darker than legacy mobile ink --- */
+  --ink-50: oklch(0.985 0.001 80);
+  --ink-100: oklch(0.96 0.003 75);
+  --ink-200: oklch(0.91 0.005 75);
+  --ink-300: oklch(0.84 0.005 70);
+  --ink-400: oklch(0.69 0.005 65);
+  --ink-500: oklch(0.50 0.005 60);
+  --ink-600: oklch(0.39 0.005 55);
+  --ink-700: oklch(0.30 0.005 50);
+  --ink-800: oklch(0.22 0.005 45);
+  --ink-900: oklch(0.16 0.005 45);
+  --ink-soft: var(--ink-500); /* spec "ink-soft #6E6E6E" */
+
+  /* --- Accent — unified to #693BEF (Decision #10) --- */
+  --accent: oklch(0.51 0.27 287);              /* ≈ #693BEF */
+  --accent-foreground: oklch(0.985 0 0);
+  --accent-hover: oklch(0.45 0.27 287);
+  --accent-muted: oklch(0.95 0.04 285);
+  --accent-soft: oklch(0.95 0.04 285);          /* alias for accent-muted */
+  --accent-ring: oklch(0.51 0.27 287 / 40%);
+  --accent-glow: oklch(0.51 0.27 287 / 18%);
+
+  /* --- Hot pink — auth / onboarding / banner loud surfaces (Decision #12) --- */
+  --accent-hot-pink: oklch(0.72 0.21 360);      /* ≈ #FF60B4 (working estimate) */
+  --accent-hot-pink-soft: oklch(0.93 0.05 355); /* ≈ #FFE2F0 */
+  --accent-hot-pink-foreground: oklch(0.985 0 0);
+
+  /* --- Status colors --- */
+  --status-good: oklch(0.55 0.13 150);          /* ≈ #138A4E */
+  --status-good-soft: oklch(0.95 0.05 150);
+  --status-warn: oklch(0.74 0.13 70);           /* ≈ #E0A100 */
+  --status-warn-soft: oklch(0.96 0.05 70);
+  --status-danger: oklch(0.59 0.20 27);         /* ≈ #D93025 */
+  --status-danger-soft: oklch(0.96 0.05 27);
+  --status-moment: oklch(0.85 0.18 105);        /* ≈ #D6E04A — rare usage */
+  --status-moment-soft: oklch(0.97 0.06 105);
+
+  /* =====================================================================
+     LEGACY TOKENS — preserved for back-compat with existing components
+     (Slice 0 is additive; touching these is deferred to later slices)
+     ===================================================================== */
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
@@ -15,7 +69,7 @@
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
+  --destructive: var(--status-danger);
   --destructive-foreground: 210 40% 98%;
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
@@ -24,19 +78,11 @@
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
 
-  /* Brand accent — violet electric (Jokko FrontStore) */
-  --accent: oklch(0.58 0.22 285);
-  --accent-foreground: oklch(0.985 0 0);
-  --accent-hover: oklch(0.52 0.23 285);
-  --accent-muted: oklch(0.95 0.04 285);
-  --accent-ring: oklch(0.58 0.22 285 / 40%);
-  --accent-glow: oklch(0.58 0.22 285 / 18%);
-
   /* WhatsApp green — reserved for UI screenshots/mockups only */
-  --whatsapp: #25D366;
-  --whatsapp-bubble: #DCF8C6;
+  --whatsapp: #25d366;
+  --whatsapp-bubble: #dcf8c6;
 
-  /* Dark surfaces used in alternating sections */
+  /* Dark surfaces used in alternating marketing sections */
   --surface-dark: oklch(0.16 0.01 260);
   --surface-dark-elevated: oklch(0.21 0.015 260);
   --surface-dark-foreground: oklch(0.97 0 0);
@@ -70,49 +116,37 @@
   --dur-xl: 1200ms;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: 210 40% 98%;
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-
-  --accent: oklch(0.65 0.22 285);
-  --accent-foreground: oklch(0.16 0.01 260);
-  --accent-hover: oklch(0.72 0.22 285);
-  --accent-muted: oklch(0.28 0.08 285);
-  --accent-ring: oklch(0.65 0.22 285 / 50%);
-  --accent-glow: oklch(0.65 0.22 285 / 22%);
-
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
-}
+/* Dark mode block intentionally removed — see comment at top of file. */
 
 @theme inline {
+  /* V2 design tokens exposed as Tailwind utilities */
+  --color-paper: var(--paper-white);
+  --color-paper-warm: var(--paper-warm);
+  --color-ink: var(--ink-900);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-50: var(--ink-50);
+  --color-ink-100: var(--ink-100);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+  --color-ink-500: var(--ink-500);
+  --color-ink-600: var(--ink-600);
+  --color-ink-700: var(--ink-700);
+  --color-ink-800: var(--ink-800);
+  --color-ink-900: var(--ink-900);
+  --color-accent-hot-pink: var(--accent-hot-pink);
+  --color-accent-hot-pink-soft: var(--accent-hot-pink-soft);
+  --color-accent-hot-pink-foreground: var(--accent-hot-pink-foreground);
+  --color-status-good: var(--status-good);
+  --color-status-good-soft: var(--status-good-soft);
+  --color-status-warn: var(--status-warn);
+  --color-status-warn-soft: var(--status-warn-soft);
+  --color-status-danger: var(--status-danger);
+  --color-status-danger-soft: var(--status-danger-soft);
+  --color-status-moment: var(--status-moment);
+  --color-status-moment-soft: var(--status-moment-soft);
+
+  /* Legacy tokens (preserved) */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -151,7 +185,7 @@
   --radius-2xl: calc(var(--radius) + 10px);
   --radius-3xl: calc(var(--radius) + 20px);
 
-  --font-sans: var(--font-body, var(--font-inter));
+  --font-sans: var(--font-body, var(--font-geist-sans));
   --font-display: var(--font-display, var(--font-geist-sans));
   --font-mono: var(--font-mono, var(--font-geist-mono));
 
@@ -253,6 +287,26 @@ body {
     letter-spacing: -0.03em;
   }
 
+  /* Editorial italic moments — Geist Sans Italic per Decision #9.
+     Used SPARINGLY for greetings and section accents (e.g. "Bonjour, _Inès_."). */
+  .font-editorial {
+    font-family: var(--font-display), var(--font-sans), serif;
+    font-style: italic;
+    letter-spacing: -0.015em;
+  }
+
+  /* Mono uppercase eyebrow — convention: write source text in natural case,
+     CSS handles the uppercase transform (a11y: screen readers pronounce words
+     instead of letter-by-letter). */
+  .font-eyebrow {
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+  }
+
   ::selection {
     background: var(--accent);
     color: var(--accent-foreground);
@@ -280,7 +334,11 @@ body {
   display: none;
 }
 
-/* Grain / noise overlay (used via ::before on sections when needed) */
+/* Grain / noise overlay.
+   ⚠️ GUARDRAIL: never apply inside virtualized lists, data tables, or the Flow
+   builder canvas — repainting hundreds of rows with a noise filter destroys
+   perceived perf (Constraint #9). Marketing sections and full-bleed auth/loud
+   surfaces only. */
 .grain-overlay::before {
   content: "";
   position: absolute;

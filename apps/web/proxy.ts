@@ -13,6 +13,10 @@ const PUBLIC_ROUTES = [
     '/terms',
     '/api',
     '/invite',
+    // /dev pages are dev-only by construction — each page guards itself with
+    // a NODE_ENV check that returns notFound() in production. Public here to
+    // allow local QA without a sign-in.
+    '/dev',
 ]
 
 function isPublicRoute(pathname: string): boolean {

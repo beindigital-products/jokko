@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
+// Inter font was previously loaded here but never used in CSS — removed in
+// Slice 0 to drop a ~30KB font download. Geist Sans is now the primary UI font
+// (per Decision #9, italic display uses Geist Italic via .font-editorial class).
 
 export const metadata: Metadata = {
   title: {
@@ -75,16 +72,17 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${GeistSans.variable} ${GeistMono.variable} ${inter.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable}`}
       style={
         {
           "--font-display": "var(--font-geist-sans)",
-          "--font-body": "var(--font-inter)",
+          "--font-body": "var(--font-geist-sans)",
           "--font-mono": "var(--font-geist-mono)",
         } as React.CSSProperties
       }
     >
       <head>
+        {/* FB SDK — do not reorder. Sentry/CSP-sensitive block. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `

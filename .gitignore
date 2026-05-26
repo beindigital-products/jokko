@@ -65,3 +65,4 @@ apps/mobile/dist/
 
 # Claude Code runtime
 .claude/
+.gstack/
