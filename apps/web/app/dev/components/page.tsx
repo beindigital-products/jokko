@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { OAuthButton } from "@/components/ui/oauth-button"
-import { PageShellAuth } from "@/components/ui/page-shell-auth"
 
 export const dynamic = "force-static"
 
@@ -145,44 +144,6 @@ export default function DevComponentsPage() {
           </div>
         </Section>
 
-        <Section title="PageShellAuth — loud + soft" eyebrow="G · page-shell-auth.tsx">
-          <div className="space-y-6">
-            <p className="text-sm text-[var(--ink-soft)]">
-              Wrapper plein-écran utilisé par toutes les surfaces auth /
-              onboarding / bannière. Rendu ici dans un cadre 480×420 pour
-              prévisualisation.
-            </p>
-            <div className="grid gap-6 lg:grid-cols-2">
-              <FrameShell label="intensity=loud (auth default)">
-                <PageShellAuth>
-                  <PageShellAuth.Card width="sm">
-                    <p className="font-eyebrow">Connexion</p>
-                    <h2 className="mt-2 font-display text-2xl font-bold">
-                      Ravi de vous revoir.
-                    </h2>
-                    <Button variant="accent" size="lg" className="mt-6 w-full">
-                      Accéder à mon espace
-                    </Button>
-                  </PageShellAuth.Card>
-                </PageShellAuth>
-              </FrameShell>
-              <FrameShell label="intensity=soft (auxiliary)">
-                <PageShellAuth intensity="soft">
-                  <PageShellAuth.Card width="sm">
-                    <p className="font-eyebrow">Mot de passe</p>
-                    <h2 className="mt-2 font-display text-2xl font-bold">
-                      Récupération.
-                    </h2>
-                    <Button variant="accent" size="lg" className="mt-6 w-full">
-                      Envoyer le lien
-                    </Button>
-                  </PageShellAuth.Card>
-                </PageShellAuth>
-              </FrameShell>
-            </div>
-          </div>
-        </Section>
-
         <footer className="border-t border-[var(--ink-200)] pt-6">
           <p className="font-eyebrow">
             Slice 0 · feat/redesign-web · {new Date().toISOString().slice(0, 10)}
@@ -243,19 +204,3 @@ function Swatch({
   )
 }
 
-function FrameShell({
-  label,
-  children,
-}: {
-  label: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="space-y-2">
-      <p className="font-eyebrow">{label}</p>
-      <div className="relative h-[420px] overflow-hidden rounded-2xl border border-[var(--ink-200)]">
-        <div className="absolute inset-0">{children}</div>
-      </div>
-    </div>
-  )
-}

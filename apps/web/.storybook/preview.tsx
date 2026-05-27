@@ -27,8 +27,6 @@ const preview: Preview = {
           ["Colors", "Typography"],
           "Primitives",
           ["Button", "Input", "Label", "Alert", "PasswordInput", "PasswordStrength", "OAuthButton"],
-          "Shells",
-          ["PageShellAuth"],
           "Onboarding",
           ["OnboardingProgress"],
         ],

@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test"
  * Slice 0 — Foundations smoke test.
  *
  * Validates that the /dev/components demo page renders all primitives
- * (tokens, button variants, alerts, page-shell-auth, oauth button).
+ * (tokens, button variants, alerts, oauth button).
  *
  * Public route (per proxy.ts) — no auth setup needed. The page itself
  * guards with NODE_ENV check and returns notFound() in production.
@@ -76,27 +76,6 @@ test.describe("Slice 0 — /dev/components smoke", () => {
   test("OAuth Google button renders in 3 states", async ({ page }) => {
     const buttons = page.getByRole("button", { name: /Continuer avec Google/ })
     await expect(buttons).toHaveCount(3)
-  })
-
-  test("PageShellAuth renders both intensities", async ({ page }) => {
-    await expect(
-      page.locator("[data-slot='page-shell-auth'][data-intensity='loud']")
-    ).toBeVisible()
-    await expect(
-      page.locator("[data-slot='page-shell-auth'][data-intensity='soft']")
-    ).toBeVisible()
-  })
-
-  test("PageShellAuth.Card stacks violet mat over white inner", async ({ page }) => {
-    const cards = page.locator("[data-slot='page-shell-auth-card']")
-    await expect(cards.first()).toBeVisible()
-    // Card outer = violet bg
-    await expect(cards.first()).toHaveCSS(
-      "background-color",
-      /rgb|oklch/
-    )
-    // Inner white child exists
-    await expect(cards.first().locator("> div")).toBeVisible()
   })
 
   test("no console errors on initial render", async ({ page }) => {
