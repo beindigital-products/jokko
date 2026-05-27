@@ -6,7 +6,10 @@ const nextConfig: NextConfig = {
       {
         source: '/(.*)',
         headers: [
-          { key: 'X-Frame-Options', value: 'DENY' },
+          // SAMEORIGIN au lieu de DENY : autorise les iframes même-origine
+          // (utilisées par /dev/storybook pour prévisualiser les pages).
+          // Le clickjacking depuis un autre domaine reste bloqué.
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' },
