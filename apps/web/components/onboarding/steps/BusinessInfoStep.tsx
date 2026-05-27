@@ -109,8 +109,8 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
         }
     }
 
-    const inputClass = "h-11 rounded-xl border-gray-200 bg-gray-50 focus-visible:bg-white focus-visible:border-green-500 focus-visible:ring-green-500/20 transition-colors";
-    const selectTriggerClass = "h-11 rounded-xl border-gray-200 bg-gray-50 data-[state=open]:bg-white hover:bg-white focus:bg-white focus:border-green-500 focus:ring-green-500/20 transition-colors";
+    const inputClass = "h-11 rounded-xl border-[var(--ink-200)] bg-[var(--paper-warm)] focus-visible:bg-white focus-visible:border-[var(--accent)] focus-visible:ring-[var(--accent-ring)] transition-colors";
+    const selectTriggerClass = "h-11 rounded-xl border-[var(--ink-200)] bg-[var(--paper-warm)] data-[state=open]:bg-white hover:bg-white focus:bg-white focus:border-[var(--accent)] focus:ring-[var(--accent-ring)] transition-colors";
 
     return (
         <Form {...form}>
@@ -120,8 +120,8 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                     name="businessName"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-700">
-                                Nom de l&apos;entreprise <span className="text-green-600">*</span>
+                            <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
+                                Nom de l&apos;entreprise <span className="text-[var(--accent)]">*</span>
                             </FormLabel>
                             <FormControl>
                                 <Input
@@ -139,7 +139,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                                     }}
                                 />
                             </FormControl>
-                            <FormDescription className="text-xs text-gray-500">
+                            <FormDescription className="text-xs text-[var(--ink-500)]">
                                 Le nom qui sera affiché dans vos messages WhatsApp
                             </FormDescription>
                             <FormMessage />
@@ -152,8 +152,8 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                     name="slug"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-700">
-                                Identifiant unique (slug) <span className="text-green-600">*</span>
+                            <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
+                                Identifiant unique (slug) <span className="text-[var(--accent)]">*</span>
                             </FormLabel>
                             <FormControl>
                                 <div className="relative">
@@ -170,15 +170,15 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                                             field.onChange(value);
                                         }}
                                     />
-                                    <Globe className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <Globe className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ink-400)]" />
                                 </div>
                             </FormControl>
                             {field.value && (
                                 <div className={cn(
                                     'flex items-center gap-2 mt-2 px-3 py-2 rounded-lg border text-xs transition-colors',
-                                    slugStatus === 'available' && 'bg-green-50 border-green-200 text-green-700',
-                                    slugStatus === 'taken' && 'bg-red-50 border-red-200 text-red-700',
-                                    slugStatus === 'checking' && 'bg-gray-50 border-gray-200 text-gray-500',
+                                    slugStatus === 'available' && 'bg-[var(--status-good-soft)] border-[var(--status-good)]/30 text-[var(--status-good)]',
+                                    slugStatus === 'taken' && 'bg-[var(--status-danger-soft)] border-[var(--status-danger)]/30 text-[var(--status-danger)]',
+                                    slugStatus === 'checking' && 'bg-[var(--paper-warm)] border-[var(--ink-200)] text-[var(--ink-500)]',
                                 )}>
                                     {slugStatus === 'checking' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                                     {slugStatus === 'available' && <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />}
@@ -195,7 +195,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                                     </span>
                                 </div>
                             )}
-                            <FormDescription className="text-xs text-gray-500">
+                            <FormDescription className="text-xs text-[var(--ink-500)]">
                                 Votre URL d&apos;accès au dashboard.
                             </FormDescription>
                             <FormMessage />
@@ -208,8 +208,8 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                     name="businessSector"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-sm font-medium text-gray-700">
-                                Secteur d&apos;activité <span className="text-green-600">*</span>
+                            <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
+                                Secteur d&apos;activité <span className="text-[var(--accent)]">*</span>
                             </FormLabel>
                             <Select
                                 onValueChange={field.onChange}
@@ -225,7 +225,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                                     {BUSINESS_SECTORS.map((sector) => (
                                         <SelectItem key={sector.value} value={sector.value}>
                                             <div className="flex items-center gap-2">
-                                                <sector.icon className="h-4 w-4 text-gray-500" />
+                                                <sector.icon className="h-4 w-4 text-[var(--ink-500)]" />
                                                 <span>{sector.label}</span>
                                             </div>
                                         </SelectItem>
@@ -243,7 +243,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                         name="businessWebsite"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="text-sm font-medium text-gray-700">
+                                <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
                                     Site web
                                 </FormLabel>
                                 <FormControl>
@@ -265,7 +265,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                         name="businessPhone"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="text-sm font-medium text-gray-700">
+                                <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
                                     Téléphone
                                 </FormLabel>
                                 <FormControl>
@@ -289,7 +289,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                         name="timezone"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="text-sm font-medium text-gray-700">
+                                <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
                                     Fuseau horaire
                                 </FormLabel>
                                 <Select
@@ -320,7 +320,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                         name="locale"
                         render={({ field }) => (
                             <FormItem>
-                                <FormLabel className="text-sm font-medium text-gray-700">
+                                <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
                                     Langue
                                 </FormLabel>
                                 <Select
@@ -348,9 +348,9 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                 </div>
 
                 {error && (
-                    <Alert variant="destructive" className="border-red-200 bg-red-50">
+                    <Alert variant="destructive" className="border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)]">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertDescription className="text-red-700">{error}</AlertDescription>
+                        <AlertDescription className="text-[var(--status-danger)]">{error}</AlertDescription>
                     </Alert>
                 )}
 
@@ -358,7 +358,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                     type="submit"
                     size="lg"
                     disabled={isLoading || slugStatus === 'taken' || slugStatus === 'checking'}
-                    className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all group"
+                    className="w-full h-12 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:from-[var(--accent-hover)] hover:to-[var(--accent-hover)] text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all group"
                 >
                     {isLoading ? (
                         <Loader2 className="mr-2 h-5 w-5 animate-spin" />

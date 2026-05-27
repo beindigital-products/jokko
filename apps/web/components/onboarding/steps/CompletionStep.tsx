@@ -97,15 +97,15 @@ export function CompletionStep({}: CompletionStepProps) {
                     initial={{ scale: 0.6, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     transition={{ type: 'spring', stiffness: 200, damping: 16, delay: 0.05 }}
-                    className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 ring-8 ring-green-50"
+                    className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[var(--status-good-soft)] ring-8 ring-[var(--status-good-soft)]/50"
                 >
-                    <CheckCircle className="w-8 h-8 text-green-600" strokeWidth={2.5} />
+                    <CheckCircle className="w-8 h-8 text-[var(--status-good)]" strokeWidth={2.5} />
                 </motion.div>
                 <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+                    <h2 className="text-xl sm:text-2xl font-bold text-[var(--ink-900)] tracking-tight">
                         {currentOrg?.name ? `${currentOrg.name} est prêt !` : 'Tout est prêt !'}
                     </h2>
-                    <p className="mt-1.5 text-sm text-gray-500 max-w-md mx-auto">
+                    <p className="mt-1.5 text-sm text-[var(--ink-500)] max-w-md mx-auto">
                         Votre espace Jokko est configuré. Voici comment commencer.
                     </p>
                 </div>
@@ -116,8 +116,8 @@ export function CompletionStep({}: CompletionStepProps) {
                     <div className={cn(
                         'inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 border text-xs font-medium',
                         isPaidPlan
-                            ? 'bg-green-50 border-green-200 text-green-700'
-                            : 'bg-gray-50 border-gray-200 text-gray-600'
+                            ? 'bg-[var(--status-good-soft)] border-[var(--status-good)]/30 text-[var(--status-good)]'
+                            : 'bg-[var(--paper-warm)] border-[var(--ink-200)] text-[var(--ink-600)]'
                     )}>
                         <Sparkles className="h-3.5 w-3.5" />
                         Plan {currentPlan.name}
@@ -135,14 +135,14 @@ export function CompletionStep({}: CompletionStepProps) {
             )}
 
             {isPaidPlan && !currentOrg?.stripe?.status && (
-                <div className="rounded-xl border border-green-100 bg-green-50/50 p-5 text-center space-y-3">
-                    <p className="text-sm text-green-900">
+                <div className="rounded-xl border border-[var(--accent-muted)] bg-[var(--accent-muted)]/50 p-5 text-center space-y-3">
+                    <p className="text-sm text-[var(--ink-900)]">
                         Activez votre abonnement pour débloquer toutes les fonctionnalités du plan <strong>{currentPlan?.name}</strong>.
                     </p>
                     <Button
                         onClick={handleActivateSubscription}
                         disabled={checkoutLoading}
-                        className="h-10 bg-gradient-to-r from-[#14532d] to-[#059669] hover:from-[#0f4024] hover:to-[#047857] text-white rounded-xl shadow-sm hover:shadow-md transition-all"
+                        className="h-10 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:from-[var(--accent-hover)] hover:to-[var(--accent-hover)] text-white rounded-xl shadow-sm hover:shadow-md transition-all"
                     >
                         {checkoutLoading ? (
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -151,7 +151,7 @@ export function CompletionStep({}: CompletionStepProps) {
                         )}
                         Activer l&apos;abonnement
                     </Button>
-                    <p className="text-[11px] text-gray-500">
+                    <p className="text-[11px] text-[var(--ink-500)]">
                         Vous pouvez aussi activer plus tard depuis Facturation.
                     </p>
                 </div>
@@ -167,17 +167,17 @@ export function CompletionStep({}: CompletionStepProps) {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 0.25, delay: 0.1 + index * 0.05 }}
                             onClick={() => router.push(action.href)}
-                            className="group flex flex-col items-start gap-2 rounded-xl border border-gray-200 bg-white p-4 text-left hover:border-green-200 hover:bg-green-50/30 hover:shadow-sm transition-all"
+                            className="group flex flex-col items-start gap-2 rounded-xl border border-[var(--ink-200)] bg-white p-4 text-left hover:border-[var(--accent-muted)] hover:bg-[var(--accent-muted)]/30 hover:shadow-sm transition-all"
                         >
                             <div className={cn(
-                                'flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br shadow-sm shadow-green-900/20 group-hover:scale-105 transition-transform',
+                                'flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br shadow-sm shadow-[var(--accent-glow)] group-hover:scale-105 transition-transform',
                                 action.gradient
                             )}>
                                 <Icon className="h-4 w-4 text-white" />
                             </div>
                             <div>
-                                <div className="text-sm font-semibold text-gray-900">{action.title}</div>
-                                <div className="text-[11px] text-gray-500 leading-tight mt-0.5">{action.description}</div>
+                                <div className="text-sm font-semibold text-[var(--ink-900)]">{action.title}</div>
+                                <div className="text-[11px] text-[var(--ink-500)] leading-tight mt-0.5">{action.description}</div>
                             </div>
                         </motion.button>
                     );
@@ -187,7 +187,7 @@ export function CompletionStep({}: CompletionStepProps) {
             <Button
                 onClick={() => router.push('/dashboard')}
                 size="lg"
-                className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all group"
+                className="w-full h-12 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:from-[var(--accent-hover)] hover:to-[var(--accent-hover)] text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all group"
             >
                 Accéder au dashboard
                 <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-0.5 transition-transform" />

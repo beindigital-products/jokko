@@ -1,105 +1,140 @@
-'use client';
+"use client"
 
-import {
-    Check,
-    Building2,
-    CreditCard,
-    MessageCircle,
-    CheckCircle,
-    Circle,
-    LucideIcon
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import type { OnboardingStep, OnboardingStepKey } from '@/lib/onboarding/steps';
+import { Check } from "lucide-react"
 
-const ICON_MAP: Record<string, LucideIcon> = {
-    Building2,
-    CreditCard,
-    MessageCircle,
-    CheckCircle,
-    Circle,
-};
+import { cn } from "@/lib/utils"
+import type {
+  OnboardingStep,
+  OnboardingStepKey,
+} from "@/lib/onboarding/steps"
 
+/**
+ * OnboardingProgress — v2 stepper.
+ *
+ * Per design spec §5 stepper :
+ *   - 4 numbered circles connected by a line.
+ *   - Active = violet filled rounded square (rounded-md, not rounded-full).
+ *   - Completed = violet filled circle + white check.
+ *   - Future = ink-200 outlined circle.
+ *
+ * Click-back interactivity preserved : completed steps are clickable with
+ * a violet hover affordance. Future steps are not (no skip-ahead).
+ *
+ * a11y :
+ *   - source text in natural case ; CSS handles uppercase for the
+ *     step labels (mono tracker style) so screen readers pronounce words.
+ *   - `aria-current="step"` on the active step.
+ *   - Buttons that aren't clickable use `aria-disabled` + visual cue, NOT
+ *     the `disabled` attribute (per Decision #17 "hide not disable" RBAC
+ *     principle — same convention applies here even though it's UX gating).
+ */
 interface OnboardingProgressProps {
-    steps: OnboardingStep[];
-    currentStepKey: OnboardingStepKey;
-    onStepClick: (stepKey: string) => void;
+  steps: OnboardingStep[]
+  currentStepKey: OnboardingStepKey
+  onStepClick: (stepKey: string) => void
 }
 
 export function OnboardingProgress({
-    steps,
-    currentStepKey,
-    onStepClick,
+  steps,
+  currentStepKey,
+  onStepClick,
 }: OnboardingProgressProps) {
-    const currentIndex = steps.findIndex((s) => s.key === currentStepKey);
+  const currentIndex = steps.findIndex((s) => s.key === currentStepKey)
 
-    return (
-        <nav aria-label="Progression de l'onboarding" className="mb-8 sm:mb-10">
-            <ol className="flex items-start">
-                {steps.map((step, index) => {
-                    const isCompleted = index < currentIndex;
-                    const isCurrent = step.key === currentStepKey;
-                    const isClickable = index < currentIndex;
+  return (
+    <nav
+      aria-label="Progression de l'onboarding"
+      className="mb-8 sm:mb-10"
+    >
+      <ol className="flex items-start">
+        {steps.map((step, index) => {
+          const isCompleted = index < currentIndex
+          const isCurrent = step.key === currentStepKey
+          const isClickable = isCompleted
 
-                    const IconComponent = ICON_MAP[step.icon] || Circle;
+          return (
+            <li
+              key={step.key}
+              className="relative flex flex-1 flex-col items-center"
+            >
+              {/* Connecting line LEFT of the marker (not on first step) */}
+              {index > 0 ? (
+                <div
+                  aria-hidden
+                  className={cn(
+                    "absolute right-1/2 top-5 h-px w-1/2 -translate-y-1/2 transition-colors duration-300 sm:top-6",
+                    index <= currentIndex
+                      ? "bg-[var(--accent)]"
+                      : "bg-[var(--ink-200)]"
+                  )}
+                />
+              ) : null}
 
-                    return (
-                        <li key={step.key} className="flex-1 flex flex-col items-center relative">
-                            {index > 0 && (
-                                <div
-                                    className={cn(
-                                        'absolute top-5 sm:top-6 right-1/2 h-[2px] w-1/2 -translate-y-1/2 transition-colors duration-300',
-                                        index <= currentIndex ? 'bg-green-600' : 'bg-gray-200'
-                                    )}
-                                    aria-hidden="true"
-                                />
-                            )}
+              {/* Connecting line RIGHT of the marker (not on last step) */}
+              {index < steps.length - 1 ? (
+                <div
+                  aria-hidden
+                  className={cn(
+                    "absolute left-1/2 top-5 h-px w-1/2 -translate-y-1/2 transition-colors duration-300 sm:top-6",
+                    index < currentIndex
+                      ? "bg-[var(--accent)]"
+                      : "bg-[var(--ink-200)]"
+                  )}
+                />
+              ) : null}
 
-                            {index < steps.length - 1 && (
-                                <div
-                                    className={cn(
-                                        'absolute top-5 sm:top-6 left-1/2 h-[2px] w-1/2 -translate-y-1/2 transition-colors duration-300',
-                                        index < currentIndex ? 'bg-green-600' : 'bg-gray-200'
-                                    )}
-                                    aria-hidden="true"
-                                />
-                            )}
+              <button
+                type="button"
+                onClick={() => isClickable && onStepClick(step.key)}
+                aria-current={isCurrent ? "step" : undefined}
+                aria-disabled={!isClickable}
+                aria-label={`Étape ${step.order} sur ${steps.length}: ${step.title}${isCompleted ? " (complété)" : ""}${isCurrent ? " (étape actuelle)" : ""}`}
+                data-state={
+                  isCurrent
+                    ? "current"
+                    : isCompleted
+                      ? "completed"
+                      : "future"
+                }
+                className={cn(
+                  "relative z-10 flex h-10 w-10 items-center justify-center text-sm font-mono font-semibold transition-all duration-300 sm:h-12 sm:w-12",
+                  // Current = violet filled rounded SQUARE (squircle)
+                  isCurrent &&
+                    "rounded-md bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_8px_20px_-8px_var(--accent-glow)]",
+                  // Completed = violet filled CIRCLE with check
+                  isCompleted &&
+                    "rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]",
+                  // Future = outlined circle, dim ink-400
+                  !isCurrent &&
+                    !isCompleted &&
+                    "rounded-full border border-[var(--ink-200)] bg-[var(--paper-white)] text-[var(--ink-400)]",
+                  // Interactivity affordance
+                  isClickable &&
+                    "cursor-pointer hover:bg-[var(--accent-hover)]",
+                  !isClickable && "cursor-default"
+                )}
+              >
+                {isCompleted ? (
+                  <Check className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.5} aria-hidden />
+                ) : (
+                  String(step.order)
+                )}
+              </button>
 
-                            <button
-                                onClick={() => isClickable && onStepClick(step.key)}
-                                disabled={!isClickable}
-                                className={cn(
-                                    'relative z-10 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border-2 transition-all duration-300',
-                                    isCompleted && 'border-green-600 bg-green-600 text-white shadow-sm shadow-green-900/20',
-                                    isCurrent && 'border-green-600 bg-white text-green-600 shadow-sm ring-4 ring-green-100',
-                                    !isCompleted && !isCurrent && 'border-gray-200 bg-white text-gray-400',
-                                    isClickable && 'cursor-pointer hover:bg-green-700 hover:border-green-700',
-                                    !isClickable && 'cursor-default'
-                                )}
-                                aria-current={isCurrent ? 'step' : undefined}
-                                aria-label={`${step.title}${isCompleted ? ' (complété)' : ''}${isCurrent ? ' (étape actuelle)' : ''}`}
-                            >
-                                {isCompleted ? (
-                                    <Check className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.5} />
-                                ) : (
-                                    <IconComponent className="h-4 w-4 sm:h-5 sm:w-5" />
-                                )}
-                            </button>
-
-                            <span
-                                className={cn(
-                                    'mt-2.5 sm:mt-3 text-center text-xs font-medium max-w-[100px] hidden sm:block transition-colors',
-                                    isCompleted && 'text-gray-900',
-                                    isCurrent && 'text-green-700',
-                                    !isCompleted && !isCurrent && 'text-gray-400'
-                                )}
-                            >
-                                {step.title}
-                            </span>
-                        </li>
-                    );
-                })}
-            </ol>
-        </nav>
-    );
+              <span
+                className={cn(
+                  "mt-2.5 hidden max-w-[110px] text-center font-mono text-[10px] uppercase tracking-[0.15em] transition-colors sm:mt-3 sm:block",
+                  isCurrent && "text-[var(--ink-900)]",
+                  isCompleted && "text-[var(--ink-700)]",
+                  !isCompleted && !isCurrent && "text-[var(--ink-400)]"
+                )}
+              >
+                {step.title}
+              </span>
+            </li>
+          )
+        })}
+      </ol>
+    </nav>
+  )
 }

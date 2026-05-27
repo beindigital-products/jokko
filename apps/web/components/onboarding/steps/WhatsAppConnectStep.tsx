@@ -109,18 +109,18 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
 
     const qualityColor = (rating: string) => {
         const r = rating.toUpperCase();
-        if (r === 'GREEN' || r === 'HIGH') return 'bg-green-100 text-green-700 border-green-200';
-        if (r === 'YELLOW' || r === 'MEDIUM') return 'bg-amber-100 text-amber-700 border-amber-200';
-        if (r === 'RED' || r === 'LOW') return 'bg-red-100 text-red-700 border-red-200';
-        return 'bg-gray-100 text-gray-600 border-gray-200';
+        if (r === 'GREEN' || r === 'HIGH') return 'bg-[var(--status-good-soft)] text-[var(--status-good)] border-[var(--status-good)]/30';
+        if (r === 'YELLOW' || r === 'MEDIUM') return 'bg-[var(--status-warn-soft)] text-[var(--status-warn)] border-[var(--status-warn)]/30';
+        if (r === 'RED' || r === 'LOW') return 'bg-[var(--status-danger-soft)] text-[var(--status-danger)] border-[var(--status-danger)]/30';
+        return 'bg-[var(--ink-100)] text-[var(--ink-600)] border-[var(--ink-200)]';
     };
 
     if (status === 'SELECTING' || status === 'SAVING') {
         return (
             <div className="space-y-5">
                 <div className="text-center">
-                    <h3 className="text-base font-semibold text-gray-900">Choisissez votre numéro</h3>
-                    <p className="mt-1 text-sm text-gray-500">
+                    <h3 className="text-base font-semibold text-[var(--ink-900)]">Choisissez votre numéro</h3>
+                    <p className="mt-1 text-sm text-[var(--ink-500)]">
                         Sélectionnez le numéro WhatsApp Business à connecter à Jokko.
                     </p>
                 </div>
@@ -144,14 +144,14 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
                                     className={cn(
                                         'flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border bg-white transition-all',
                                         isSelected
-                                            ? 'border-green-500 ring-4 ring-green-100 shadow-sm'
-                                            : 'border-gray-200 hover:border-green-200 hover:bg-green-50/30'
+                                            ? 'border-[var(--accent)] ring-4 ring-[var(--accent-muted)] shadow-sm'
+                                            : 'border-[var(--ink-200)] hover:border-[var(--accent-muted)] hover:bg-[var(--accent-muted)]/30'
                                     )}
                                 >
                                     <RadioGroupItem value={phone.id} id={phone.id} className="mt-0.5" />
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between gap-2">
-                                            <span className="text-sm font-semibold text-gray-900 truncate">
+                                            <span className="text-sm font-semibold text-[var(--ink-900)] truncate">
                                                 {phone.verified_name || 'Numéro sans nom'}
                                             </span>
                                             <Badge
@@ -161,7 +161,7 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
                                                 {phone.quality_rating}
                                             </Badge>
                                         </div>
-                                        <span className="block text-xs text-gray-500 mt-0.5 font-mono">
+                                        <span className="block text-xs text-[var(--ink-500)] mt-0.5 font-mono">
                                             {phone.display_phone_number}
                                         </span>
                                     </div>
@@ -173,7 +173,7 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
 
                 <Button
                     onClick={handleConfirmSelection}
-                    className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all"
+                    className="w-full h-12 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:from-[var(--accent-hover)] hover:to-[var(--accent-hover)] text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all"
                     disabled={status === 'SAVING'}
                 >
                     {status === 'SAVING' ? (
@@ -186,7 +186,7 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
                 <button
                     onClick={handleSkip}
                     disabled={status === 'SAVING'}
-                    className="w-full text-center text-sm text-gray-500 hover:text-gray-900 transition-colors py-1"
+                    className="w-full text-center text-sm text-[var(--ink-500)] hover:text-[var(--ink-900)] transition-colors py-1"
                 >
                     Passer cette étape
                 </button>
@@ -196,23 +196,23 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
 
     return (
         <div className="space-y-6">
-            <div className="rounded-xl border border-green-100 bg-green-50/50 p-6 sm:p-8 text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#25D366] to-[#128C7E] shadow-sm shadow-green-900/20">
+            <div className="rounded-xl border border-[var(--accent-muted)] bg-[var(--accent-muted)]/50 p-6 sm:p-8 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#25D366] to-[#128C7E] shadow-sm shadow-[var(--accent-glow)]">
                     <MessageCircle className="h-7 w-7 text-white" />
                 </div>
 
-                <h3 className="text-base sm:text-lg font-semibold text-gray-900">
+                <h3 className="text-base sm:text-lg font-semibold text-[var(--ink-900)]">
                     Connexion WhatsApp Business
                 </h3>
-                <p className="mt-1.5 text-sm text-gray-600 max-w-sm mx-auto">
+                <p className="mt-1.5 text-sm text-[var(--ink-600)] max-w-sm mx-auto">
                     Utilisez votre compte Facebook pour connecter votre numéro WhatsApp Business en quelques clics.
                 </p>
 
                 {errorMessage && (
-                    <Alert variant="destructive" className="mt-5 border-red-200 bg-red-50 text-left">
+                    <Alert variant="destructive" className="mt-5 border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)] text-left">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle className="text-red-800">Erreur</AlertTitle>
-                        <AlertDescription className="text-red-700">{errorMessage}</AlertDescription>
+                        <AlertTitle className="text-[var(--status-danger)]">Erreur</AlertTitle>
+                        <AlertDescription className="text-[var(--status-danger)]">{errorMessage}</AlertDescription>
                     </Alert>
                 )}
 
@@ -232,7 +232,7 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
                     {status === 'FETCHING' ? "Récupération..." : !fbReady ? "Chargement..." : "Connecter WhatsApp Business"}
                 </Button>
 
-                <p className="mt-3 text-[11px] text-gray-500">
+                <p className="mt-3 text-[11px] text-[var(--ink-500)]">
                     Une fenêtre popup va s&apos;ouvrir. Assurez-vous de désactiver votre bloqueur de popups.
                 </p>
             </div>
@@ -241,7 +241,7 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
                 <button
                     onClick={handleSkip}
                     disabled={status === 'FETCHING' || status === 'SKIPPING'}
-                    className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors py-1"
+                    className="inline-flex items-center gap-1.5 text-sm text-[var(--ink-500)] hover:text-[var(--ink-900)] transition-colors py-1"
                 >
                     {status === 'SKIPPING' ? (
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -250,7 +250,7 @@ export function WhatsAppConnectStep({ onComplete }: WhatsAppConnectStepProps) {
                     )}
                     Passer cette étape — je connecterai WhatsApp plus tard
                 </button>
-                <p className="mt-1 text-[11px] text-gray-400">
+                <p className="mt-1 text-[11px] text-[var(--ink-400)]">
                     Vous pourrez connecter WhatsApp depuis Paramètres &gt; Canaux à tout moment.
                 </p>
             </div>

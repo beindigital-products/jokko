@@ -1,120 +1,146 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { OnboardingProgress } from './OnboardingProgress';
-import { BusinessInfoStep } from './steps/BusinessInfoStep';
-import { PlanSelectStep } from './steps/PlanSelectStep';
-import { WhatsAppConnectStep } from './steps/WhatsAppConnectStep';
-import { CompletionStep } from './steps/CompletionStep';
-import { Card, CardContent } from '@/components/ui/card';
+import { useEffect, useRef, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
+import { useQuery } from "convex/react"
+
+import { api } from "@/convex/_generated/api"
+import { OnboardingProgress } from "./OnboardingProgress"
+import { BusinessInfoStep } from "./steps/BusinessInfoStep"
+import { PlanSelectStep } from "./steps/PlanSelectStep"
+import { WhatsAppConnectStep } from "./steps/WhatsAppConnectStep"
+import { CompletionStep } from "./steps/CompletionStep"
 import {
-    type OnboardingStepKey,
-    ONBOARDING_STEPS,
-    getStepByKey,
-    getNextStep
-} from '@/lib/onboarding/steps';
+  type OnboardingStepKey,
+  ONBOARDING_STEPS,
+  getNextStep,
+  getStepByKey,
+} from "@/lib/onboarding/steps"
 
-const STEP_COMPONENTS: Record<OnboardingStepKey, React.ComponentType<{ onComplete: () => void }>> = {
-    BUSINESS_INFO: BusinessInfoStep,
-    PLAN_SELECT: PlanSelectStep,
-    WHATSAPP_CONNECT: WhatsAppConnectStep,
-    COMPLETED: CompletionStep,
-};
+const STEP_COMPONENTS: Record<
+  OnboardingStepKey,
+  React.ComponentType<{ onComplete: () => void }>
+> = {
+  BUSINESS_INFO: BusinessInfoStep,
+  PLAN_SELECT: PlanSelectStep,
+  WHATSAPP_CONNECT: WhatsAppConnectStep,
+  COMPLETED: CompletionStep,
+}
 
+/** Card max-width varies per step — PLAN_SELECT shows 3 plan cards. */
 const STEP_CARD_WIDTH: Record<OnboardingStepKey, string> = {
-    BUSINESS_INFO: 'max-w-2xl',
-    PLAN_SELECT: 'max-w-5xl',
-    WHATSAPP_CONNECT: 'max-w-xl',
-    COMPLETED: 'max-w-3xl',
-};
+  BUSINESS_INFO: "max-w-2xl",
+  PLAN_SELECT: "max-w-5xl",
+  WHATSAPP_CONNECT: "max-w-xl",
+  COMPLETED: "max-w-3xl",
+}
 
-const stepVariants = {
-    enter: (direction: number) => ({
-        x: direction > 0 ? 40 : -40,
-        opacity: 0,
-    }),
-    center: {
-        x: 0,
-        opacity: 1,
-    },
-    exit: (direction: number) => ({
-        x: direction < 0 ? 40 : -40,
-        opacity: 0,
-    }),
-};
-
+/**
+ * OnboardingWizard — v2.
+ *
+ * Changes from v1 :
+ *   - Drop the inner Card wrapper ; step content sits directly on a
+ *     paper-warm rounded container (border ink-200) — fewer competing layers.
+ *   - Resume logic : reads `sessionData.organization?.onboardingStep` and
+ *     initializes the wizard at the user's last step (Constraint #5 review).
+ *   - Crossfade-only transition (no slide direction, no x-shift) ; kept
+ *     `motion.div layout` to smooth width changes between steps and avoid CLS.
+ *   - No "page header" added above the wizard ; per-step h1 carries the
+ *     message (UA #6 review).
+ *
+ * Click-back UX preserved : completed steps reachable via the progress
+ * stepper. BUSINESS_INFO re-submit is now idempotent server-side
+ * (organizations.create patches existing org via session — Constraint #4 fix).
+ */
 export function OnboardingWizard() {
-    const [currentStepKey, setCurrentStepKey] = useState<OnboardingStepKey>('BUSINESS_INFO');
-    const [direction, setDirection] = useState(1);
+  const sessionData = useQuery(api.sessions.current)
+  const [currentStepKey, setCurrentStepKey] =
+    useState<OnboardingStepKey>("BUSINESS_INFO")
+  const initialSyncDone = useRef(false)
 
-    const currentStep = getStepByKey(currentStepKey);
-    const StepComponent = STEP_COMPONENTS[currentStepKey];
+  // One-shot resume sync : on first arrival of session data, jump to the
+  // user's persisted onboardingStep. Subsequent in-app navigation (handleNext,
+  // handleStepClick) is authoritative — we don't re-sync from the server on
+  // every re-render to avoid yanking the user backwards.
+  useEffect(() => {
+    if (initialSyncDone.current) return
+    if (sessionData === undefined) return // still loading
+    const persistedStep = sessionData?.organization?.onboardingStep as
+      | OnboardingStepKey
+      | undefined
+    if (
+      persistedStep &&
+      STEP_COMPONENTS[persistedStep] &&
+      persistedStep !== "COMPLETED"
+    ) {
+      setCurrentStepKey(persistedStep)
+    }
+    initialSyncDone.current = true
+  }, [sessionData])
 
-    const handleNext = () => {
-        const nextStep = getNextStep(currentStepKey);
-        if (nextStep) {
-            setDirection(1);
-            setCurrentStepKey(nextStep.key);
-        }
-    };
+  const currentStep = getStepByKey(currentStepKey)
+  const StepComponent = STEP_COMPONENTS[currentStepKey]
 
-    const handleStepClick = (stepKey: string) => {
-        const targetStep = getStepByKey(stepKey as OnboardingStepKey);
-        const current = getStepByKey(currentStepKey);
+  const handleNext = () => {
+    const nextStep = getNextStep(currentStepKey)
+    if (nextStep) {
+      setCurrentStepKey(nextStep.key)
+    }
+  }
 
-        if (targetStep && current) {
-            if (targetStep.order < current.order) {
-                setDirection(-1);
-                setCurrentStepKey(targetStep.key);
-            }
-        }
-    };
+  const handleStepClick = (stepKey: string) => {
+    const targetStep = getStepByKey(stepKey as OnboardingStepKey)
+    const current = getStepByKey(currentStepKey)
+    // Only allow jumping BACK to an earlier completed step. Forward jumps
+    // would skip required submissions.
+    if (targetStep && current && targetStep.order < current.order) {
+      setCurrentStepKey(targetStep.key)
+    }
+  }
 
-    const cardWidth = STEP_CARD_WIDTH[currentStepKey];
+  const cardWidth = STEP_CARD_WIDTH[currentStepKey]
 
-    return (
-        <div className="w-full px-3 sm:px-6 lg:px-10 py-6 sm:py-8 lg:py-12">
-            <div className="w-full max-w-5xl mx-auto">
-                <OnboardingProgress
-                    steps={ONBOARDING_STEPS}
-                    currentStepKey={currentStepKey}
-                    onStepClick={handleStepClick}
-                />
+  return (
+    <div className="w-full px-3 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
+      <div className="mx-auto w-full max-w-5xl">
+        <OnboardingProgress
+          steps={ONBOARDING_STEPS}
+          currentStepKey={currentStepKey}
+          onStepClick={handleStepClick}
+        />
 
-                <div className="text-center mb-6 sm:mb-8">
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-                        {currentStep?.title}
-                    </h1>
-                    <p className="mt-1.5 text-sm text-gray-500">
-                        {currentStep?.description}
-                    </p>
-                </div>
-            </div>
-
-            <motion.div
-                layout
-                transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}
-                className={`w-full ${cardWidth} mx-auto`}
-            >
-                <Card className="border border-gray-100 shadow-sm bg-white">
-                    <CardContent className="p-5 sm:p-7 lg:p-9">
-                    <AnimatePresence mode="wait" custom={direction}>
-                        <motion.div
-                            key={currentStepKey}
-                            custom={direction}
-                            variants={stepVariants}
-                            initial="enter"
-                            animate="center"
-                            exit="exit"
-                            transition={{ duration: 0.25, ease: [0.32, 0.72, 0, 1] }}
-                        >
-                            <StepComponent onComplete={handleNext} />
-                        </motion.div>
-                    </AnimatePresence>
-                    </CardContent>
-                </Card>
-            </motion.div>
+        <div className="mb-6 text-center sm:mb-8">
+          <h1 className="font-display text-xl font-semibold tracking-tight text-[var(--ink-900)] sm:text-2xl">
+            {currentStep?.title}
+          </h1>
+          <p className="mt-1.5 text-sm text-[var(--ink-500)]">
+            {currentStep?.description}
+          </p>
         </div>
-    );
+      </div>
+
+      {/* motion.div layout : keeps height/width transitions smooth (CLS
+          mitigation per Constraint #7). AnimatePresence : crossfade only
+          (no slide direction) per UA #1 review. */}
+      <motion.div
+        layout
+        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+        className={`mx-auto w-full ${cardWidth}`}
+      >
+        <div className="rounded-2xl border border-[var(--ink-200)] bg-[var(--paper-white)] p-5 sm:p-7 lg:p-9">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStepKey}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+            >
+              <StepComponent onComplete={handleNext} />
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </motion.div>
+    </div>
+  )
 }
