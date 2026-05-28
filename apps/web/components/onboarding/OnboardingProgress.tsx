@@ -9,13 +9,13 @@ import type {
 } from "@/lib/onboarding/steps"
 
 /**
- * OnboardingProgress — v2 stepper.
+ * OnboardingProgress — v3 stepper.
  *
- * Per design spec §5 stepper :
- *   - 4 numbered circles connected by a line.
- *   - Active = violet filled rounded square (rounded-md, not rounded-full).
- *   - Completed = violet filled circle + white check.
- *   - Future = ink-200 outlined circle.
+ * Per onboarding v3 design spec :
+ *   - 4 numbered circles (all `rounded-full`, uniform shape) connected by a line.
+ *   - Current = violet filled circle, white mono number.
+ *   - Completed = violet filled circle + white check icon.
+ *   - Future = paper-white circle, `ink-200` border, ink-400 number.
  *
  * Click-back interactivity preserved : completed steps are clickable with
  * a violet hover affordance. Future steps are not (no skip-ahead).
@@ -24,9 +24,7 @@ import type {
  *   - source text in natural case ; CSS handles uppercase for the
  *     step labels (mono tracker style) so screen readers pronounce words.
  *   - `aria-current="step"` on the active step.
- *   - Buttons that aren't clickable use `aria-disabled` + visual cue, NOT
- *     the `disabled` attribute (per Decision #17 "hide not disable" RBAC
- *     principle — same convention applies here even though it's UX gating).
+ *   - Buttons that aren't clickable use `aria-disabled` + visual cue.
  */
 interface OnboardingProgressProps {
   steps: OnboardingStep[]
@@ -97,17 +95,17 @@ export function OnboardingProgress({
                       : "future"
                 }
                 className={cn(
-                  "relative z-10 flex h-10 w-10 items-center justify-center text-sm font-mono font-semibold transition-all duration-300 sm:h-12 sm:w-12",
-                  // Current = violet filled rounded SQUARE (squircle)
+                  "relative z-10 flex h-10 w-10 items-center justify-center rounded-full text-sm font-mono font-semibold transition-all duration-300 sm:h-12 sm:w-12",
+                  // Current = violet filled circle (uniform shape with completed)
                   isCurrent &&
-                    "rounded-md bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_8px_20px_-8px_var(--accent-glow)]",
-                  // Completed = violet filled CIRCLE with check
+                    "bg-[var(--accent)] text-[var(--accent-foreground)] shadow-[0_8px_20px_-8px_var(--accent-glow)]",
+                  // Completed = violet filled circle with check
                   isCompleted &&
-                    "rounded-full bg-[var(--accent)] text-[var(--accent-foreground)]",
+                    "bg-[var(--accent)] text-[var(--accent-foreground)]",
                   // Future = outlined circle, dim ink-400
                   !isCurrent &&
                     !isCompleted &&
-                    "rounded-full border border-[var(--ink-200)] bg-[var(--paper-white)] text-[var(--ink-400)]",
+                    "border border-[var(--ink-200)] bg-[var(--paper-white)] text-[var(--ink-400)]",
                   // Interactivity affordance
                   isClickable &&
                     "cursor-pointer hover:bg-[var(--accent-hover)]",

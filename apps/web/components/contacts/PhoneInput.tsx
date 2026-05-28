@@ -126,17 +126,18 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
         return (
             <div className={cn('space-y-1', className)}>
                 <div className={cn(
-                    "flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50 focus-within:ring-2 focus-within:ring-green-500/20 focus-within:border-green-500 overflow-hidden",
-                    hasError && "border-destructive ring-destructive/20"
+                    // v3 tokens: paper-warm bg, ink-200 border, accent focus ring.
+                    "flex h-11 w-full rounded-xl border border-[var(--ink-200)] bg-[var(--paper-warm)] focus-within:ring-2 focus-within:ring-[var(--accent-ring)] focus-within:border-[var(--accent)] overflow-hidden transition-colors",
+                    hasError && "border-[var(--status-danger)] ring-[var(--status-danger)]/20"
                 )}>
                     {/* Country Selector */}
-                    <div className="flex-none border-r border-gray-200 bg-gray-50/50">
+                    <div className="flex-none border-r border-[var(--ink-200)]">
                         <Select value={country} onValueChange={handleCountryChange} disabled={disabled}>
-                            <SelectTrigger className="h-full border-0 bg-transparent px-3 rounded-none shadow-none focus:ring-0 gap-2 w-[100px]">
+                            <SelectTrigger className="h-full border-0 bg-transparent px-3 rounded-none shadow-none focus:ring-0 gap-1 w-[92px]">
                                 <SelectValue>
-                                    <span className="flex items-center gap-1">
-                                        <span className="text-lg leading-none">{currentCountryObj?.flag}</span>
-                                        <span className="text-xs text-muted-foreground">{currentCountryObj?.dialCode}</span>
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="text-base leading-none">{currentCountryObj?.flag}</span>
+                                        <span className="text-xs text-[var(--ink-500)]">{currentCountryObj?.dialCode}</span>
                                     </span>
                                 </SelectValue>
                             </SelectTrigger>
@@ -146,7 +147,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
                                         <span className="flex items-center gap-2">
                                             <span>{c.flag}</span>
                                             <span>{c.name}</span>
-                                            <span className="text-xs text-muted-foreground">{c.dialCode}</span>
+                                            <span className="text-xs text-[var(--ink-500)]">{c.dialCode}</span>
                                         </span>
                                     </SelectItem>
                                 ))}
@@ -165,23 +166,23 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
                         onBlur={onBlur}
                         placeholder={placeholder}
                         disabled={disabled}
-                        className="flex-1 bg-transparent px-3 text-sm focus:outline-none placeholder:text-muted-foreground"
+                        className="flex-1 bg-transparent px-3 text-sm text-[var(--ink-900)] focus:outline-none placeholder:text-[var(--ink-400)]"
                     />
 
                     {/* Validation Status */}
                     {showValidation && displayValue && (
                         <div className="flex items-center px-3">
                             {showValid ? (
-                                <Check className="h-4 w-4 text-green-500" />
+                                <Check className="h-4 w-4 text-[var(--status-good)]" strokeWidth={2.5} />
                             ) : showInvalid ? (
-                                <X className="h-4 w-4 text-destructive" />
+                                <X className="h-4 w-4 text-[var(--status-danger)]" strokeWidth={2.5} />
                             ) : null}
                         </div>
                     )}
                 </div>
 
                 {/* Error message */}
-                {error && <p className="text-sm text-destructive">{error}</p>}
+                {error && <p className="text-xs text-[var(--status-danger)]">{error}</p>}
             </div>
         )
     }

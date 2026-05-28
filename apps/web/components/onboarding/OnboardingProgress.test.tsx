@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react"
 import { OnboardingProgress } from "./OnboardingProgress"
 import { ONBOARDING_STEPS } from "@/lib/onboarding/steps"
 
-describe("OnboardingProgress — v2 stepper", () => {
+describe("OnboardingProgress — v3 stepper", () => {
   it("renders 4 step buttons with numeric labels", () => {
     render(
       <OnboardingProgress
@@ -88,7 +88,7 @@ describe("OnboardingProgress — v2 stepper", () => {
     expect(onStepClick).not.toHaveBeenCalled()
   })
 
-  it("current step is a rounded SQUARE (rounded-md), not circle", () => {
+  it("current step is a circle (rounded-full), uniform with completed steps", () => {
     render(
       <OnboardingProgress
         steps={ONBOARDING_STEPS}
@@ -97,8 +97,10 @@ describe("OnboardingProgress — v2 stepper", () => {
       />
     )
     const current = screen.getByRole("button", { name: /étape actuelle/i })
-    expect(current.className).toMatch(/rounded-md/)
+    expect(current.className).toMatch(/rounded-full/)
     expect(current.className).toMatch(/bg-\[var\(--accent\)\]/)
+    // v3 dropped the squircle (`rounded-md`) variant — all markers share shape now
+    expect(current.className).not.toMatch(/rounded-md/)
   })
 
   it("step labels use mono uppercase tracker (a11y: source in natural case)", () => {

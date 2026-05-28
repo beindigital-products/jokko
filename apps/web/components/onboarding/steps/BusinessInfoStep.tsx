@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, ArrowRight, Globe, CheckIcon, XIcon, AlertCircle } from 'lucide-react';
+import { Loader2, ArrowRight, CheckIcon, XIcon, AlertCircle, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,6 +24,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PhoneInput } from '@/components/contacts/PhoneInput';
 import { cn } from '@/lib/utils';
 
 import {
@@ -80,6 +81,15 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
         return () => clearTimeout(timer);
     }, [slug, checkSlug]);
 
+    // Slug suggestions shown when the chosen slug is taken (per PDF spec).
+    // Pure client-side guesses — backend `checkSlug` is the authority on whether
+    // any given suggestion is actually free; user has to click + retry.
+    const slugSuggestions = useMemo(() => {
+        if (!slug || slug.length < 3) return [];
+        const base = slug.replace(/-+$/, '');
+        return [`${base}-2`, `${base}-app`, `${base}-pro`];
+    }, [slug]);
+
     async function onSubmit(values: BusinessInfoData) {
         setIsLoading(true);
         setError(null);
@@ -125,7 +135,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                             </FormLabel>
                             <FormControl>
                                 <Input
-                                    placeholder="Ma Super Entreprise"
+                                    placeholder="Mission Impastabowl"
                                     disabled={isLoading}
                                     className={inputClass}
                                     {...field}
@@ -140,7 +150,7 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                                 />
                             </FormControl>
                             <FormDescription className="text-xs text-[var(--ink-500)]">
-                                Le nom qui sera affiché dans vos messages WhatsApp
+                                Le nom affiché dans vos conversations WhatsApp.
                             </FormDescription>
                             <FormMessage />
                         </FormItem>
@@ -152,15 +162,28 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                     name="slug"
                     render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
-                                Identifiant unique (slug) <span className="text-[var(--accent)]">*</span>
-                            </FormLabel>
+                            <div className="flex items-baseline justify-between gap-3">
+                                <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
+                                    Slug Jokko <span className="text-[var(--accent)]">*</span>
+                                </FormLabel>
+                                {/* v3 — preview the resulting tenant URL top-right, mono.
+                                    Sub-domain pattern per Q4=(a) → {slug}.jokko.com. */}
+                                <span className="font-mono text-[11px] text-[var(--ink-soft)]">
+                                    {field.value ? `${field.value}.jokko.com` : "mon-entreprise.jokko.com"}
+                                </span>
+                            </div>
                             <FormControl>
                                 <div className="relative">
                                     <Input
                                         placeholder="mon-entreprise"
                                         disabled={isLoading}
-                                        className={cn(inputClass, 'pr-10')}
+                                        aria-describedby="slug-status"
+                                        className={cn(
+                                            inputClass,
+                                            // Reserve room on the right for the inline chip.
+                                            slugStatus ? "pr-36" : "pr-3",
+                                            slugStatus === 'taken' && "border-[var(--status-danger)] focus-visible:border-[var(--status-danger)]",
+                                        )}
                                         {...field}
                                         onChange={(e) => {
                                             const value = e.target.value
@@ -170,91 +193,81 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                                             field.onChange(value);
                                         }}
                                     />
-                                    <Globe className="absolute right-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-[var(--ink-400)]" />
+                                    {/* Inline status chip — Vérification… / Disponible / Déjà utilisé.
+                                        aria-live polite so the chip change is announced to AT users
+                                        (User Advocate review point). */}
+                                    {slugStatus ? (
+                                        <span
+                                            id="slug-status"
+                                            aria-live="polite"
+                                            className={cn(
+                                                "absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium",
+                                                slugStatus === 'available' && "bg-[var(--status-good-soft)] text-[var(--status-good)]",
+                                                slugStatus === 'taken' && "bg-[var(--status-danger-soft)] text-[var(--status-danger)]",
+                                                slugStatus === 'checking' && "bg-[var(--paper-warm)] text-[var(--ink-500)]",
+                                            )}
+                                        >
+                                            {slugStatus === 'checking' && <><Sparkles className="h-3 w-3" /> Vérification…</>}
+                                            {slugStatus === 'available' && <><CheckIcon className="h-3 w-3" strokeWidth={2.5} /> Disponible</>}
+                                            {slugStatus === 'taken' && <><XIcon className="h-3 w-3" strokeWidth={2.5} /> Déjà utilisé</>}
+                                        </span>
+                                    ) : null}
                                 </div>
                             </FormControl>
-                            {field.value && (
-                                <div className={cn(
-                                    'flex items-center gap-2 mt-2 px-3 py-2 rounded-lg border text-xs transition-colors',
-                                    slugStatus === 'available' && 'bg-[var(--status-good-soft)] border-[var(--status-good)]/30 text-[var(--status-good)]',
-                                    slugStatus === 'taken' && 'bg-[var(--status-danger-soft)] border-[var(--status-danger)]/30 text-[var(--status-danger)]',
-                                    slugStatus === 'checking' && 'bg-[var(--paper-warm)] border-[var(--ink-200)] text-[var(--ink-500)]',
-                                )}>
-                                    {slugStatus === 'checking' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-                                    {slugStatus === 'available' && <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />}
-                                    {slugStatus === 'taken' && <XIcon className="h-3.5 w-3.5" strokeWidth={2.5} />}
-
-                                    <span className="font-medium">
-                                        {field.value}.jokko.com
-                                    </span>
-
-                                    <span className="ml-auto font-medium">
-                                        {slugStatus === 'checking' && 'Vérification...'}
-                                        {slugStatus === 'available' && 'Disponible'}
-                                        {slugStatus === 'taken' && 'Déjà pris'}
-                                    </span>
-                                </div>
-                            )}
-                            <FormDescription className="text-xs text-[var(--ink-500)]">
-                                Votre URL d&apos;accès au dashboard.
-                            </FormDescription>
-                            <FormMessage />
-                        </FormItem>
-                    )}
-                />
-
-                <FormField
-                    control={form.control}
-                    name="businessSector"
-                    render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
-                                Secteur d&apos;activité <span className="text-[var(--accent)]">*</span>
-                            </FormLabel>
-                            <Select
-                                onValueChange={field.onChange}
-                                defaultValue={field.value}
-                                disabled={isLoading}
-                            >
-                                <FormControl>
-                                    <SelectTrigger className={selectTriggerClass}>
-                                        <SelectValue placeholder="Sélectionnez votre secteur" />
-                                    </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                    {BUSINESS_SECTORS.map((sector) => (
-                                        <SelectItem key={sector.value} value={sector.value}>
-                                            <div className="flex items-center gap-2">
-                                                <sector.icon className="h-4 w-4 text-[var(--ink-500)]" />
-                                                <span>{sector.label}</span>
-                                            </div>
-                                        </SelectItem>
+                            {slugStatus === 'taken' && slugSuggestions.length > 0 ? (
+                                <p className="mt-1.5 text-xs text-[var(--status-danger)]">
+                                    Ce nom est pris. Essayez{' '}
+                                    {slugSuggestions.slice(0, 2).map((suggestion, idx) => (
+                                        <span key={suggestion}>
+                                            <button
+                                                type="button"
+                                                onClick={() => form.setValue('slug', suggestion)}
+                                                className="font-mono rounded bg-[var(--accent-muted)] px-1.5 py-0.5 text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white transition-colors"
+                                            >
+                                                {suggestion}
+                                            </button>
+                                            {idx === 0 ? ' ou ' : ''}
+                                        </span>
                                     ))}
-                                </SelectContent>
-                            </Select>
+                                    .
+                                </p>
+                            ) : null}
                             <FormMessage />
                         </FormItem>
                     )}
                 />
 
+                {/* 2-col row : Secteur (left) + Site web (right). v3 layout */}
                 <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
                         control={form.control}
-                        name="businessWebsite"
+                        name="businessSector"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
-                                    Site web
+                                    Secteur d&apos;activité <span className="text-[var(--accent)]">*</span>
                                 </FormLabel>
-                                <FormControl>
-                                    <Input
-                                        type="url"
-                                        placeholder="https://www.example.com"
-                                        disabled={isLoading}
-                                        className={inputClass}
-                                        {...field}
-                                    />
-                                </FormControl>
+                                <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                    disabled={isLoading}
+                                >
+                                    <FormControl>
+                                        <SelectTrigger className={selectTriggerClass}>
+                                            <SelectValue placeholder="Choisir un secteur" />
+                                        </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                        {BUSINESS_SECTORS.map((sector) => (
+                                            <SelectItem key={sector.value} value={sector.value}>
+                                                <div className="flex items-center gap-2">
+                                                    <sector.icon className="h-4 w-4 text-[var(--ink-500)]" />
+                                                    <span>{sector.label}</span>
+                                                </div>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <FormMessage />
                             </FormItem>
                         )}
@@ -262,16 +275,16 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
 
                     <FormField
                         control={form.control}
-                        name="businessPhone"
+                        name="businessWebsite"
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
-                                    Téléphone
+                                    Site web <span className="text-[var(--ink-400)] text-xs font-normal">(optionnel)</span>
                                 </FormLabel>
                                 <FormControl>
                                     <Input
-                                        type="tel"
-                                        placeholder="+221 77 123 45 67"
+                                        type="url"
+                                        placeholder="https://"
                                         disabled={isLoading}
                                         className={inputClass}
                                         {...field}
@@ -283,7 +296,30 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                     />
                 </div>
 
+                {/* 2-col row : Téléphone (PhoneInput w/ country picker) + Fuseau horaire */}
                 <div className="grid gap-4 sm:grid-cols-2">
+                    <FormField
+                        control={form.control}
+                        name="businessPhone"
+                        render={({ field }) => (
+                            <FormItem>
+                                <FormLabel className="text-sm font-medium text-[var(--ink-700)]">
+                                    Téléphone entreprise <span className="text-[var(--ink-400)] text-xs font-normal">(optionnel)</span>
+                                </FormLabel>
+                                <FormControl>
+                                    <PhoneInput
+                                        value={field.value || ''}
+                                        defaultCountry="SN"
+                                        showValidation={false}
+                                        disabled={isLoading}
+                                        onChange={(value) => field.onChange(value)}
+                                    />
+                                </FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}
+                    />
+
                     <FormField
                         control={form.control}
                         name="timezone"
@@ -314,7 +350,10 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                             </FormItem>
                         )}
                     />
+                </div>
 
+                {/* Langue alone on a half-row per PDF */}
+                <div className="grid gap-4 sm:grid-cols-2">
                     <FormField
                         control={form.control}
                         name="locale"
@@ -347,28 +386,35 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                     />
                 </div>
 
-                {error && (
+                {error ? (
                     <Alert variant="destructive" className="border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)]">
                         <AlertCircle className="h-4 w-4" />
                         <AlertDescription className="text-[var(--status-danger)]">{error}</AlertDescription>
                     </Alert>
-                )}
+                ) : null}
 
-                <Button
-                    type="submit"
-                    size="lg"
-                    disabled={isLoading || slugStatus === 'taken' || slugStatus === 'checking'}
-                    className="w-full h-12 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-hover)] hover:from-[var(--accent-hover)] hover:to-[var(--accent-hover)] text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all group"
-                >
-                    {isLoading ? (
-                        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    ) : (
-                        <>
-                            Continuer
-                            <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
-                        </>
-                    )}
-                </Button>
+                {/* v3 action row : hint left, compact button right. Divider above
+                    separates form from CTA. */}
+                <div className="border-t border-[var(--ink-200)] pt-5 flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-xs text-[var(--ink-500)]">
+                        <span className="text-[var(--accent)]">*</span> Champs obligatoires
+                    </p>
+                    <Button
+                        type="submit"
+                        variant="accent"
+                        disabled={isLoading || slugStatus === 'taken' || slugStatus === 'checking'}
+                        className="group"
+                    >
+                        {isLoading ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <>
+                                Continuer
+                                <ArrowRight className="ml-1.5 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                            </>
+                        )}
+                    </Button>
+                </div>
             </form>
         </Form>
     );

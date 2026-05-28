@@ -10,7 +10,7 @@ const meta = {
     docs: {
       description: {
         component:
-          "v2 stepper per design spec §5. Current step = violet squircle (rounded-md, mono number). Completed = violet circle + white check. Future = outlined circle + number. Click-back only on completed steps.",
+          "v3 stepper. All markers are uniform circles (rounded-full). Current = violet filled, mono number. Completed = violet filled + white check. Future = paper-white with ink-200 border. Click-back only on completed steps.",
       },
     },
   },

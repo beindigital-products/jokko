@@ -43,12 +43,18 @@ test.describe("Slice 3 — /onboarding wizard chrome", () => {
     }
   })
 
-  test("current step uses violet rounded-md (squircle) marker", async ({ page }) => {
+  test("current step is a violet circle marker (v3 uniform shape)", async ({ page }) => {
     const current = page
       .locator("nav[aria-label*='Progression']")
       .locator("[data-state='current']")
     await expect(current).toBeVisible()
     await expect(current).toHaveAttribute("aria-current", "step")
+  })
+
+  test("Jokko logo renders above the stepper", async ({ page }) => {
+    // v3 brand header — image alt is "Jokko"
+    const logo = page.getByAltText("Jokko").first()
+    await expect(logo).toBeVisible()
   })
 
   test("no green Loader2 (v2 token = accent violet)", async ({ page }) => {

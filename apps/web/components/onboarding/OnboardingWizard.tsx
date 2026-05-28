@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion"
 import { useQuery } from "convex/react"
 
 import { api } from "@/convex/_generated/api"
+import { Logo } from "@/components/ui/logo"
 import { OnboardingProgress } from "./OnboardingProgress"
 import { BusinessInfoStep } from "./steps/BusinessInfoStep"
 import { PlanSelectStep } from "./steps/PlanSelectStep"
@@ -27,13 +28,10 @@ const STEP_COMPONENTS: Record<
   COMPLETED: CompletionStep,
 }
 
-/** Card max-width varies per step — PLAN_SELECT shows 3 plan cards. */
-const STEP_CARD_WIDTH: Record<OnboardingStepKey, string> = {
-  BUSINESS_INFO: "max-w-2xl",
-  PLAN_SELECT: "max-w-5xl",
-  WHATSAPP_CONNECT: "max-w-xl",
-  COMPLETED: "max-w-3xl",
-}
+/** v3 — single, uniform card width across all steps. Avoids the visual
+ *  jump between BusinessInfo (was max-w-2xl) → WhatsApp (was max-w-xl) etc.
+ *  Plan select still fits 3 cards at this width (~240px each). */
+const STEP_CARD_WIDTH = "max-w-3xl" as const
 
 /**
  * OnboardingWizard — v2.
@@ -98,11 +96,14 @@ export function OnboardingWizard() {
     }
   }
 
-  const cardWidth = STEP_CARD_WIDTH[currentStepKey]
-
   return (
     <div className="w-full px-3 py-6 sm:px-6 sm:py-8 lg:px-10 lg:py-12">
       <div className="mx-auto w-full max-w-5xl">
+        {/* v3 — Jokko brand header above the stepper. Static logo (no link)
+            so the user doesn't accidentally exit the wizard. */}
+        <div className="mb-6 flex justify-center sm:mb-8">
+          <Logo noLink width={104} height={32} priority />
+        </div>
         <OnboardingProgress
           steps={ONBOARDING_STEPS}
           currentStepKey={currentStepKey}
@@ -125,7 +126,7 @@ export function OnboardingWizard() {
       <motion.div
         layout
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className={`mx-auto w-full ${cardWidth}`}
+        className={`mx-auto w-full ${STEP_CARD_WIDTH}`}
       >
         <div className="rounded-2xl border border-[var(--ink-200)] bg-[var(--paper-white)] p-5 sm:p-7 lg:p-9">
           <AnimatePresence mode="wait">

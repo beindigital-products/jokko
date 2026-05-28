@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Clock, Lock } from "lucide-react";
+import { Clock, Lock, AlertTriangle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTrialStatus } from "@/hooks/usePlans";
 import { cn } from "@/lib/utils";
@@ -12,86 +12,195 @@ type TrialBannerProps = {
 };
 
 /**
- * Bandeau récapitulatif du statut d'essai.
+ * Trial banner — v3, 4 tons.
  *
- * - Essai actif : affiche le compte à rebours (jours restants) + rappel "toutes features déverrouillées"
- * - Essai expiré + plan non choisi : affiche un message bloquant + CTA vers /dashboard/billing
- * - Plan sélectionné : n'affiche rien
+ * Cycle 14 jours d'essai (spec PDF section 07) avec ton qui évolue :
+ *   - `neutre` (J≥10)      : présence discrète, juste un rappel des jours restants
+ *   - `rappel` (J3-9)      : ton ambré, CTA visible
+ *   - `urgent` (J≤2)       : ton danger, CTA prominent
+ *   - `expired` (post-J0)  : ton bloquant, CTA bloquant
+ *
+ * Visibilité (Q3=b) :
+ *   - Plan payant sélectionné → null (l'org a déjà tranché)
+ *   - Aucun plan choisi (sentinel `FREE` côté schema) → bandeau actif
+ *     jusqu'à sélection d'un plan
+ *
+ * Fallback `trialEndsAt=null` (Skeptic review) :
+ *   - Si trialEndsAt n'existe pas (ex: org enterprise manuelle), on tombe en
+ *     'neutre' au lieu d'un faux "expiré" rouge.
  */
 export function TrialBanner({ variant = "page", className }: TrialBannerProps) {
-    const { isTrialing, trialDaysLeft, hasSelectedPlan, isLoading } = useTrialStatus();
+    const { isTrialing, trialDaysLeft, trialEndsAt, hasSelectedPlan, isLoading } =
+        useTrialStatus();
 
     if (isLoading) return null;
 
-    // Cas 1 : plan sélectionné → on n'affiche pas de bandeau (sauf si trial actif
-    // avec plan = on reste discret, déjà géré au niveau des badges features).
+    // Q3=(b) : on masque dès qu'un plan payant est sélectionné.
     if (hasSelectedPlan) return null;
 
-    // Cas 2 : essai actif sans plan choisi
-    if (isTrialing) {
+    // Fallback : org sans trialEndsAt → neutre (jamais expired).
+    if (trialEndsAt == null && !isTrialing) {
         return (
-            <div
-                data-testid="trial-banner"
-                data-trial-state="active"
-                className={cn(
-                    "flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-200",
-                    variant === "sidebar" && "text-xs",
-                    className,
-                )}
-            >
-                <div className="flex-1">
-                    <div className="font-semibold">
-                        Essai actif · {trialDaysLeft} j restant{trialDaysLeft > 1 ? "s" : ""}
-                    </div>
-                    <p className={cn("opacity-80", variant === "sidebar" ? "text-[11px]" : "text-sm")}>
-                        Toutes les fonctionnalités sont déverrouillées. Choisissez un plan avant la fin
-                        de l&apos;essai pour éviter le verrouillage.
-                    </p>
-                    <Button asChild size="sm" variant="outline" className="mt-2 h-7 border-amber-300 bg-white/60 text-amber-900 hover:bg-white dark:bg-amber-900/40 dark:text-amber-100">
-                        <Link href="/dashboard/billing">Choisir un plan</Link>
-                    </Button>
-                </div>
-            </div>
+            <TonePresenter
+                tone="neutre"
+                variant={variant}
+                className={className}
+                title="Essai 14 jours"
+                description="Découvrez toutes les fonctionnalités. Choisissez un plan quand vous serez prêt."
+            />
         );
     }
 
-    // Cas 3 : essai expiré et pas de plan choisi → lock global
+    if (!isTrialing) {
+        // Expired bloquant.
+        return (
+            <TonePresenter
+                tone="expired"
+                variant={variant}
+                className={className}
+                title="Essai expiré — envois suspendus"
+                description="Vos conversations restent consultables. Réactivez en 1 clic pour reprendre l'envoi."
+                cta="Activer mon abonnement"
+            />
+        );
+    }
+
+    // Active trial : tone selon jours restants.
+    const tone =
+        trialDaysLeft <= 2
+            ? "urgent"
+            : trialDaysLeft <= 9
+                ? "rappel"
+                : "neutre";
+
+    const titles = {
+        urgent: `Votre essai se termine dans ${trialDaysLeft} jour${trialDaysLeft > 1 ? "s" : ""}`,
+        rappel: `Essai · ${trialDaysLeft} jours restants`,
+        neutre: `Essai 14 jours · ${trialDaysLeft} jours restants`,
+    } as const;
+
+    const descriptions = {
+        urgent: "À l'expiration, l'envoi de nouveaux messages sera bloqué. Réactivez en 1 clic pour continuer.",
+        rappel: "Choisissez un plan pour ne pas perdre l'accès à vos automatisations.",
+        neutre: "Toutes les fonctionnalités sont déverrouillées pendant l'essai.",
+    } as const;
+
+    return (
+        <TonePresenter
+            tone={tone}
+            variant={variant}
+            className={className}
+            title={titles[tone]}
+            description={descriptions[tone]}
+            cta={tone === "neutre" ? "Choisir un plan" : "Activer mon abonnement"}
+        />
+    );
+}
+
+// ── Presenter ────────────────────────────────────────────────────────────
+
+type Tone = "neutre" | "rappel" | "urgent" | "expired";
+
+function TonePresenter({
+    tone,
+    variant,
+    className,
+    title,
+    description,
+    cta = "Choisir un plan",
+}: {
+    tone: Tone;
+    variant: "sidebar" | "page";
+    className?: string;
+    title: string;
+    description: string;
+    cta?: string;
+}) {
+    const Icon = tone === "expired" ? Lock : tone === "urgent" ? AlertTriangle : tone === "rappel" ? Clock : Sparkles;
+    const toneClasses: Record<Tone, string> = {
+        neutre: "border-[var(--ink-200)] bg-[var(--paper-warm)] text-[var(--ink-700)]",
+        rappel: "border-[var(--status-warn)]/30 bg-[var(--status-warn-soft)] text-[var(--ink-900)]",
+        urgent: "border-[var(--status-danger)]/40 bg-[var(--status-danger-soft)] text-[var(--ink-900)]",
+        expired: "border-[var(--ink-900)]/15 bg-[var(--ink-900)] text-[var(--paper-warm)]",
+    };
+    const iconColor: Record<Tone, string> = {
+        neutre: "text-[var(--accent)]",
+        rappel: "text-[var(--status-warn)]",
+        urgent: "text-[var(--status-danger)]",
+        expired: "text-[var(--paper-warm)]",
+    };
+
     return (
         <div
             data-testid="trial-banner"
-            data-trial-state="expired"
+            data-trial-state={tone}
             className={cn(
-                "flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-200",
+                "flex items-start gap-3 rounded-lg border p-3 transition-colors",
+                toneClasses[tone],
                 variant === "sidebar" && "text-xs",
                 className,
             )}
         >
-            <Lock className={cn("mt-0.5 shrink-0", variant === "sidebar" ? "h-4 w-4" : "h-5 w-5")} />
-            <div className="flex-1">
-                <div className="font-semibold">Période d&apos;essai terminée</div>
+            <Icon
+                className={cn(
+                    "mt-0.5 shrink-0",
+                    iconColor[tone],
+                    variant === "sidebar" ? "h-4 w-4" : "h-5 w-5",
+                )}
+                strokeWidth={2}
+            />
+            <div className="flex-1 min-w-0">
+                <div className="font-semibold">{title}</div>
                 <p className={cn("opacity-80", variant === "sidebar" ? "text-[11px]" : "text-sm")}>
-                    Toutes les fonctionnalités sont verrouillées tant qu&apos;aucun plan n&apos;est sélectionné.
+                    {description}
                 </p>
-                <Button asChild size="sm" className="mt-2 h-7">
-                    <Link href="/dashboard/billing">Choisir un plan</Link>
-                </Button>
+                {/* CTA omitted on neutre+sidebar to keep it discreet */}
+                {!(tone === "neutre" && variant === "sidebar") ? (
+                    <Button
+                        asChild
+                        size="sm"
+                        variant={tone === "expired" ? "default" : "outline"}
+                        className={cn(
+                            "mt-2 h-7",
+                            tone === "expired" && "bg-[var(--paper-warm)] text-[var(--ink-900)] hover:bg-white",
+                        )}
+                    >
+                        <Link href="/dashboard/billing">{cta}</Link>
+                    </Button>
+                ) : null}
             </div>
         </div>
     );
 }
 
 /**
- * Variante inline qui affiche simplement un texte "N j restants".
- * Utile dans la sidebar à côté du plan actuel.
+ * Inline pill showing "N j restants" — used in the sidebar header next to
+ * the plan label. Stays subtle even at urgent ton.
  */
 export function TrialCountdownPill({ className }: { className?: string }) {
     const { isTrialing, trialDaysLeft, isLoading } = useTrialStatus();
     if (isLoading || !isTrialing) return null;
+
+    const tone =
+        trialDaysLeft <= 2
+            ? "urgent"
+            : trialDaysLeft <= 9
+                ? "rappel"
+                : "neutre";
+
+    const toneClasses: Record<"neutre" | "rappel" | "urgent", string> = {
+        neutre: "border-[var(--ink-200)] bg-[var(--paper-warm)] text-[var(--ink-600)]",
+        rappel: "border-[var(--status-warn)]/30 bg-[var(--status-warn-soft)] text-[var(--status-warn)]",
+        urgent: "border-[var(--status-danger)]/40 bg-[var(--status-danger-soft)] text-[var(--status-danger)]",
+    };
+
     return (
         <span
             data-testid="trial-countdown"
+            data-trial-state={tone}
             className={cn(
-                "inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700",
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide",
+                toneClasses[tone],
                 className,
             )}
         >
