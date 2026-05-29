@@ -29,6 +29,8 @@ const preview: Preview = {
           ["Button", "Input", "Label", "Alert", "PasswordInput", "PasswordStrength", "OAuthButton"],
           "Onboarding",
           ["OnboardingProgress", "Steps"],
+          "Dashboard",
+          ["Primitives", "Shell", "Screens"],
         ],
       },
     },
