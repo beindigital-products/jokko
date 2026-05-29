@@ -48,6 +48,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { formatPhoneDisplay } from '@/lib/contacts/validation';
+import { PageHeader } from '@/components/dashboard/shell';
 
 type RawContactTag = string | {
     id?: string;
@@ -612,6 +613,16 @@ export function ContactsPageClient() {
 
     return (
         <div>
+            {/* v3 dashboard chrome — Phase C(a). ContactList conserve sa toolbar
+                interne (Importer/Exporter/Nouveau) ; le PageHeader ajoute juste
+                l'eyebrow + titre + breadcrumb section. */}
+            <div className="-mx-4 lg:-mx-6 mb-4">
+                <PageHeader
+                    eyebrow={`DONNÉES · ${contacts.length} CONTACT${contacts.length > 1 ? "S" : ""}`}
+                    title="Contacts"
+                    description="Annuaire unifié — synchro WhatsApp, attributs, segments. Import CSV, déduplication, export RGPD."
+                />
+            </div>
             <ContactList
                 contacts={contacts}
                 tags={tags}

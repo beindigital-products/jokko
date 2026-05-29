@@ -39,6 +39,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/dashboard/shell";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -157,21 +158,17 @@ export default function SettingsPage() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* ==================== HEADER ==================== */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                    <h1 className="font-display text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
-                        Paramètres
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                        Gérez les préférences de votre compte professionnel.
-                    </p>
-                </div>
+        <div>
+            {/* v3 dashboard chrome — Phase C(a). Body (tabs + cards) inchangé. */}
+            <div className="-mx-4 lg:-mx-6">
+                <PageHeader
+                    eyebrow="COMPTE · PRÉFÉRENCES"
+                    title="Réglages"
+                    description="Gérez les préférences de votre compte professionnel, vos canaux WhatsApp et la sécurité."
+                />
             </div>
 
-            {/* ==================== TABS ==================== */}
-            <Tabs defaultValue="profile" className="space-y-6">
+            <Tabs defaultValue="profile" className="mt-6 space-y-6">
                 <TabsList className="flex w-full overflow-x-auto no-scrollbar lg:grid lg:grid-cols-6 lg:w-[650px]">
                     <TabsTrigger value="profile" className="shrink-0 gap-1.5 text-xs cursor-pointer">
                         <User className="h-3.5 w-3.5" />
