@@ -30,7 +30,7 @@ const preview: Preview = {
           "Onboarding",
           ["OnboardingProgress", "Steps"],
           "Dashboard",
-          ["Primitives", "Shell", "Screens"],
+          ["Primitives", "Shell", "Inbox", "Contacts", "Settings", "Screens"],
         ],
       },
     },
