@@ -6,20 +6,20 @@ import { AlertTriangle, FileText, Plus, Users } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { PageHeader } from "../shell/PageHeader"
 import { HeaderButton } from "../shell/HeaderButton"
-import {
-    AttentionCard,
-    CampaignsCard,
-    FlowsCard,
-    OnboardingCard,
-    OverviewKpis,
-    TeamActivityCard,
-    type AttentionRow,
-    type CampaignRow,
-    type FlowRow,
-    type OnboardingStep,
-    type OverviewKpi,
-    type TeamActivityRow,
-} from "./OverviewPanels"
+import { OverviewKpis } from "./OverviewKpis"
+import { AttentionCard } from "./AttentionCard"
+import { TeamActivityCard } from "./TeamActivityCard"
+import { CampaignsCard } from "./CampaignsCard"
+import { FlowsCard } from "./FlowsCard"
+import { OnboardingCard } from "./OnboardingCard"
+import type {
+    AttentionRow,
+    CampaignRow,
+    FlowRow,
+    OnboardingStep,
+    OverviewKpi,
+    TeamActivityRow,
+} from "./types"
 
 export interface DashboardOverviewData {
     greetingName: string
