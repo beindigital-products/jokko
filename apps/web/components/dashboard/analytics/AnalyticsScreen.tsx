@@ -79,7 +79,7 @@ export function AnalyticsScreen({ data }: { data: AnalyticsData }) {
                 }
             />
 
-            <div className="flex-1 space-y-5 overflow-y-auto bg-[var(--paper-warm)]/30 px-7 py-7">
+            <div className="flex-1 space-y-5 overflow-y-auto bg-[var(--paper-warm)]/30 px-7 pb-8 pt-10">
                 {/* KPI row */}
                 <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
                     {data.kpis.map((k) => (
