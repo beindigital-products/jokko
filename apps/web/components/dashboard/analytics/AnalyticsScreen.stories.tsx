@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
-import { AnalyticsScreen, type AnalyticsData } from "./AnalyticsScreen"
+import { AnalyticsScreen } from "./AnalyticsScreen"
+import type { AnalyticsData } from "./types"
 
 function vdate(i: number) {
     const d = 25 + i

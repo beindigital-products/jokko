@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
-import { CampaignsScreen, type CampaignsData } from "./CampaignsScreen"
+import { CampaignsScreen } from "./CampaignsScreen"
+import type { CampaignsData } from "./types"
 
 const DATA: CampaignsData = {
     count: "6 campagnes",
