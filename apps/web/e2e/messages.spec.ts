@@ -81,4 +81,37 @@ test.describe("Inbox v3 — messages", () => {
         })
         await expect(page.getByTestId("internal-note").last()).toContainText("e2e")
     })
+
+    test("reply to a message quotes the parent in the sent bubble", async ({ page }) => {
+        const items = page.getByTestId("conversation-item")
+        test.skip((await items.count()) === 0, "Compte de test sans conversation")
+
+        await items.first().click()
+        await expect(page).toHaveURL(/\/dashboard\/conversations\/[a-z0-9]+/i)
+
+        // Reply trigger lives on each message bubble (hover-revealed but still
+        // actionable — opacity, not visibility). Wait for bubbles to mount
+        // before counting, else we race the async thread render.
+        const replyButtons = page.getByRole("button", { name: "Répondre" })
+        await replyButtons
+            .first()
+            .waitFor({ state: "attached", timeout: 10000 })
+            .catch(() => {})
+        test.skip((await replyButtons.count()) === 0, "Conversation sans message")
+        await replyButtons.last().click()
+
+        const textarea = page.locator("textarea")
+        await expect(textarea).toBeVisible()
+        const msg = `reply e2e ${Date.now()}`
+        await textarea.click()
+        await textarea.type(msg)
+
+        const quotesBefore = await page.getByTestId("message-quote").count()
+        await textarea.press("Enter")
+
+        // The sent reply renders with a quote block citing the parent message.
+        await expect(page.getByTestId("message-quote")).toHaveCount(quotesBefore + 1, {
+            timeout: 8000,
+        })
+    })
 })

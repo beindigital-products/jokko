@@ -70,6 +70,7 @@ import {
     insertMention,
     type MentionCandidate,
 } from '@/lib/dashboard/mentions'
+import { replyAuthorLabel, replyPreviewText } from '@/lib/dashboard/reply'
 import { cn } from '@/lib/utils'
 import type { Message } from '@/hooks/useMessages'
 import { toast } from 'sonner'
@@ -84,6 +85,8 @@ interface MessageInputProps {
     placeholder?: string
     replyTo?: Message | null
     onCancelReply?: () => void
+    /** Contact name, for the reply preview author label (else "Client"). */
+    contactName?: string | null
 }
 
 interface Attachment {
@@ -138,6 +141,7 @@ export function MessageInput({
     placeholder = 'Ecrivez votre message...',
     replyTo,
     onCancelReply,
+    contactName,
 }: MessageInputProps) {
     const [message, setMessage] = useState('')
     const [attachment, setAttachment] = useState<Attachment | null>(null)
@@ -641,20 +645,6 @@ export function MessageInput({
         )
     }
 
-    // Get reply preview text
-    const getReplyPreviewText = (msg: Message): string => {
-        if (msg.content) return msg.content
-        switch (msg.type) {
-            case 'IMAGE': return '📷 Photo'
-            case 'VIDEO': return '🎥 Vidéo'
-            case 'AUDIO': return '🎵 Audio'
-            case 'DOCUMENT': return '📄 Document'
-            case 'LOCATION': return '📍 Position'
-            case 'STICKER': return '🎨 Sticker'
-            default: return 'Message'
-        }
-    }
-
     return (
         <div
             className={cn(
@@ -794,10 +784,10 @@ export function MessageInput({
                             <Reply className="h-4 w-4 text-[var(--accent)] shrink-0" />
                             <div className="flex-1 min-w-0">
                                 <p className="text-xs font-medium text-[var(--accent)]">
-                                    {replyTo.direction === 'INBOUND' ? 'Client' : 'Vous'}
+                                    {replyAuthorLabel(replyTo.direction, contactName)}
                                 </p>
                                 <p className="text-sm text-[var(--ink-600)] truncate">
-                                    {getReplyPreviewText(replyTo)}
+                                    {replyPreviewText(replyTo.type, replyTo.content)}
                                 </p>
                             </div>
                             <Button

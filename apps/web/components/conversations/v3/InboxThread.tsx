@@ -32,6 +32,7 @@ import {
     initialsFromName,
 } from "@/lib/dashboard/avatar-color"
 import { formatBubbleTime, formatDaySeparator } from "@/lib/dashboard/format-time"
+import { replyAuthorLabel, replyPreviewText } from "@/lib/dashboard/reply"
 
 import { AssignmentDropdown } from "../AssignmentDropdown"
 import { CallButton } from "@/components/calls/call-button"
@@ -397,6 +398,7 @@ export function InboxThread({
         id: conversationId as Id<"conversations">,
     })
     const isBlocked = conversationData?.contact?.isBlocked
+    const contactName = conversationData?.contact?.name ?? null
 
     const { messages, isLoading, hasNextPage, loadMore, isFetchingNextPage, resendMessage } =
         useMessages({ conversationId, organizationId: currentMember?.organizationId })
@@ -511,6 +513,21 @@ export function InboxThread({
                                             timestamp={formatBubbleTime(m.timestamp)}
                                             deliveryStatus={out ? deliveryFromStatus(m.status) : undefined}
                                             bare={bare}
+                                            onReply={() => setReplyTo(m)}
+                                            quote={
+                                                m.replyTo
+                                                    ? {
+                                                          author: replyAuthorLabel(
+                                                              m.replyTo.direction,
+                                                              contactName,
+                                                          ),
+                                                          snippet: replyPreviewText(
+                                                              m.replyTo.type,
+                                                              m.replyTo.content,
+                                                          ),
+                                                      }
+                                                    : undefined
+                                            }
                                         >
                                             {body}
                                         </MessageBubble>
@@ -539,6 +556,7 @@ export function InboxThread({
                 replyTo={replyTo}
                 onCancelReply={() => setReplyTo(null)}
                 disabled={!!isBlocked}
+                contactName={contactName}
             />
         </div>
     )

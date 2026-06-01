@@ -23,6 +23,7 @@ export interface Message {
         id: string
         content: string | null
         type: string
+        direction?: 'INBOUND' | 'OUTBOUND'
     }
     isForwarded?: boolean
     reaction?: string
@@ -96,6 +97,11 @@ export function useMessages({ conversationId, organizationId }: UseMessagesProps
         // Usually chat UIs render newest at bottom.
         // If list returns newest first, we should reverse to get chronological order.
 
+        // Resolve quoted-reply content from the loaded window (id → message).
+        // Replies usually target a recent, in-view message; if the parent
+        // isn't loaded we fall back to a generic label downstream.
+        const byId = new Map(results.map((r) => [r._id, r]));
+
         return results.map((msg) => ({
             id: msg._id,
             content: msg.content || null,
@@ -113,8 +119,9 @@ export function useMessages({ conversationId, organizationId }: UseMessagesProps
             }] : undefined,
             replyTo: msg.replyToId ? {
                 id: msg.replyToId,
-                content: "Reponse", // Cannot resolve content synchronously here without join
-                type: "TEXT"
+                content: byId.get(msg.replyToId)?.content ?? null,
+                type: byId.get(msg.replyToId)?.type ?? "TEXT",
+                direction: byId.get(msg.replyToId)?.direction as 'INBOUND' | 'OUTBOUND' | undefined,
             } : undefined,
             isForwarded: msg.isForwarded,
             latitude: msg.latitude,

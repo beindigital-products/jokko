@@ -1,4 +1,4 @@
-import { Play } from "lucide-react"
+import { Play, Reply } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface MessageBubbleAudio {
@@ -7,6 +7,13 @@ export interface MessageBubbleAudio {
     progressPct?: number
     /** Optional waveform peaks (0-1). Defaults to a pleasant fake pattern. */
     waveform?: number[]
+}
+
+export interface MessageBubbleQuote {
+    /** Author label of the quoted message ("Vous", contact name…). */
+    author: string
+    /** One-line snippet of the quoted message (text or media label). */
+    snippet: string
 }
 
 interface MessageBubbleProps {
@@ -22,6 +29,10 @@ interface MessageBubbleProps {
      *  (image, video, document card) can fill edge-to-edge. The footer
      *  (timestamp + ticks) renders below the media, right-aligned. */
     bare?: boolean
+    /** Quoted parent message shown above the body (WhatsApp-style reply). */
+    quote?: MessageBubbleQuote | null
+    /** When set, a "Répondre" affordance appears on hover. */
+    onReply?: () => void
     className?: string
 }
 
@@ -43,11 +54,30 @@ export function MessageBubble({
     timestamp,
     deliveryStatus,
     bare,
+    quote,
+    onReply,
     className,
 }: MessageBubbleProps) {
     const out = side === "out"
+    const replyButton = onReply ? (
+        <button
+            type="button"
+            onClick={onReply}
+            aria-label="Répondre"
+            className="shrink-0 rounded-full p-1.5 text-[var(--ink-soft)] opacity-0 transition-opacity hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)] focus-visible:opacity-100 group-hover:opacity-100"
+        >
+            <Reply className="h-3.5 w-3.5" />
+        </button>
+    ) : null
     return (
-        <div className={cn("flex", out ? "justify-end" : "justify-start", className)}>
+        <div
+            className={cn(
+                "group flex items-center gap-1",
+                out ? "justify-end" : "justify-start",
+                className,
+            )}
+        >
+            {out ? replyButton : null}
             <div
                 className={cn(
                     "max-w-[70%]",
@@ -62,6 +92,7 @@ export function MessageBubble({
                           ),
                 )}
             >
+                {quote ? <QuoteBlock quote={quote} out={out} bare={bare} /> : null}
                 {audio ? <AudioBlock audio={audio} out={out} /> : children}
                 {timestamp || deliveryStatus ? (
                     <div
@@ -78,6 +109,43 @@ export function MessageBubble({
                         {deliveryStatus === "sent" ? <span>✓</span> : null}
                     </div>
                 ) : null}
+            </div>
+            {!out ? replyButton : null}
+        </div>
+    )
+}
+
+function QuoteBlock({
+    quote,
+    out,
+    bare,
+}: {
+    quote: MessageBubbleQuote
+    out: boolean
+    bare?: boolean
+}) {
+    return (
+        <div
+            data-testid="message-quote"
+            className={cn(
+                "rounded-md border-l-2 px-2 py-1 text-[11px] leading-snug",
+                bare && "m-1.5 mb-1",
+                !bare && "mb-1.5",
+                out
+                    ? "border-white/60 bg-white/10"
+                    : "border-[var(--accent)] bg-[var(--paper-warm)]",
+            )}
+        >
+            <div
+                className={cn(
+                    "font-semibold",
+                    out ? "text-white/90" : "text-[var(--accent)]",
+                )}
+            >
+                {quote.author}
+            </div>
+            <div className={cn("truncate", out ? "text-white/70" : "text-[var(--ink-soft)]")}>
+                {quote.snippet}
             </div>
         </div>
     )
