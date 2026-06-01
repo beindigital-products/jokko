@@ -56,18 +56,8 @@ export const list = query({
 
         // Advanced filtering in memory
         // (Convex doesn't support complex multi-field filtering efficiently yet without specific indexes)
-
-        // 1. Search (if provided)
-        if (args.search) {
-            const searchLower = args.search.toLowerCase();
-            // We need contact info to search by name/phone
-            // Optimization: fetch contacts for filtered conversations concurrently
-            // For now, simpler implementation:
-
-            // Fetch contacts for all candidates to filter by name? Expensive.
-            // Better: Search contacts first, then find conversations?
-            // Let's rely on basic search for now.
-        }
+        // NB : search is applied AFTER enrichment below, since it matches on the
+        // contact name/phone which we only resolve during enrichment.
 
         // 2. Filter tabs
         let filtered = conversations;
@@ -119,10 +109,31 @@ export const list = query({
             })
         );
 
-        // Sort by lastMessageAt desc
-        enriched.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+        // Search — match on contact name, phone (raw + digits), tags, preview.
+        let result = enriched;
+        if (args.search) {
+            const q = args.search.toLowerCase().trim();
+            const qDigits = q.replace(/\D/g, "");
+            result = result.filter((c) => {
+                const name = (c.contact?.name ?? "").toLowerCase();
+                const phone = (c.contact?.phoneNumber ?? "").toLowerCase();
+                const phoneDigits = phone.replace(/\D/g, "");
+                const tags = (c.tags ?? []).join(" ").toLowerCase();
+                const preview = (c.preview ?? "").toLowerCase();
+                return (
+                    name.includes(q) ||
+                    phone.includes(q) ||
+                    (qDigits.length > 0 && phoneDigits.includes(qDigits)) ||
+                    tags.includes(q) ||
+                    preview.includes(q)
+                );
+            });
+        }
 
-        return enriched;
+        // Sort by lastMessageAt desc
+        result.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+
+        return result;
     },
 });
 
