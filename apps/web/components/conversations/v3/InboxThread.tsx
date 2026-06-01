@@ -12,7 +12,7 @@ import {
     RotateCcw,
     Unlock,
 } from "lucide-react"
-import { useQuery } from "convex/react"
+import { useQuery, useMutation } from "convex/react"
 
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
@@ -37,6 +37,7 @@ import { replyAuthorLabel, replyPreviewText } from "@/lib/dashboard/reply"
 import { AssignmentDropdown } from "../AssignmentDropdown"
 import { CallButton } from "@/components/calls/call-button"
 import { MessageInput } from "../MessageInput"
+import { ForwardMessageModal } from "../ForwardMessageModal"
 import {
     AudioPlayer,
     DocumentPreview,
@@ -392,7 +393,29 @@ export function InboxThread({
     const { currentMember, markAsRead } = useConversations()
     const { nameByUserId } = useTeamMembers()
     const [replyTo, setReplyTo] = useState<Message | null>(null)
+    const [forwardMessage, setForwardMessage] = useState<Message | null>(null)
+    const [showForwardModal, setShowForwardModal] = useState(false)
+    const sendMutation = useMutation(api.messages.send)
     const bottomRef = useRef<HTMLDivElement>(null)
+
+    // Forward = re-send the message's content/media to another conversation
+    // (isForwarded flag). messages.send already honours local_only / WhatsApp.
+    const forwardToConversation = useCallback(
+        async (targetConversationId: string, message: Message) => {
+            const media = message.media?.[0]
+            await sendMutation({
+                conversationId: targetConversationId as Id<"conversations">,
+                content: message.content || undefined,
+                type: message.type,
+                mediaStorageId: media?.storageId as Id<"_storage"> | undefined,
+                mediaType: media?.mimeType,
+                fileName: media?.fileName,
+                fileSize: media?.fileSize,
+                isForwarded: true,
+            })
+        },
+        [sendMutation],
+    )
 
     const conversationData = useQuery(api.conversations.getById, {
         id: conversationId as Id<"conversations">,
@@ -514,6 +537,10 @@ export function InboxThread({
                                             deliveryStatus={out ? deliveryFromStatus(m.status) : undefined}
                                             bare={bare}
                                             onReply={() => setReplyTo(m)}
+                                            onForward={() => {
+                                                setForwardMessage(m)
+                                                setShowForwardModal(true)
+                                            }}
                                             quote={
                                                 m.replyTo
                                                     ? {
@@ -557,6 +584,14 @@ export function InboxThread({
                 onCancelReply={() => setReplyTo(null)}
                 disabled={!!isBlocked}
                 contactName={contactName}
+            />
+
+            <ForwardMessageModal
+                open={showForwardModal}
+                onOpenChange={setShowForwardModal}
+                message={forwardMessage}
+                currentConversationId={conversationId}
+                onForward={forwardToConversation}
             />
         </div>
     )

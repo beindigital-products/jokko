@@ -1,4 +1,4 @@
-import { Play, Reply } from "lucide-react"
+import { Forward, Play, Reply } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface MessageBubbleAudio {
@@ -33,6 +33,8 @@ interface MessageBubbleProps {
     quote?: MessageBubbleQuote | null
     /** When set, a "Répondre" affordance appears on hover. */
     onReply?: () => void
+    /** When set, a "Transférer" affordance appears on hover. */
+    onForward?: () => void
     className?: string
 }
 
@@ -56,19 +58,35 @@ export function MessageBubble({
     bare,
     quote,
     onReply,
+    onForward,
     className,
 }: MessageBubbleProps) {
     const out = side === "out"
-    const replyButton = onReply ? (
-        <button
-            type="button"
-            onClick={onReply}
-            aria-label="Répondre"
-            className="shrink-0 rounded-full p-1.5 text-[var(--ink-soft)] opacity-0 transition-opacity hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)] focus-visible:opacity-100 group-hover:opacity-100"
-        >
-            <Reply className="h-3.5 w-3.5" />
-        </button>
-    ) : null
+    const actions =
+        onReply || onForward ? (
+            <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                {onReply ? (
+                    <button
+                        type="button"
+                        onClick={onReply}
+                        aria-label="Répondre"
+                        className="rounded-full p-1.5 text-[var(--ink-soft)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)]"
+                    >
+                        <Reply className="h-3.5 w-3.5" />
+                    </button>
+                ) : null}
+                {onForward ? (
+                    <button
+                        type="button"
+                        onClick={onForward}
+                        aria-label="Transférer"
+                        className="rounded-full p-1.5 text-[var(--ink-soft)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)]"
+                    >
+                        <Forward className="h-3.5 w-3.5" />
+                    </button>
+                ) : null}
+            </div>
+        ) : null
     return (
         <div
             className={cn(
@@ -77,7 +95,7 @@ export function MessageBubble({
                 className,
             )}
         >
-            {out ? replyButton : null}
+            {out ? actions : null}
             <div
                 className={cn(
                     "max-w-[70%]",
@@ -110,7 +128,7 @@ export function MessageBubble({
                     </div>
                 ) : null}
             </div>
-            {!out ? replyButton : null}
+            {!out ? actions : null}
         </div>
     )
 }

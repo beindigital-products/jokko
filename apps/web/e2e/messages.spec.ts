@@ -124,6 +124,33 @@ test.describe("Inbox v3 — messages", () => {
         })
     })
 
+    test("transfert d'un message vers une autre conversation", async ({ page }) => {
+        const items = page.getByTestId("conversation-item")
+        test.skip((await items.count()) < 2, "Besoin de 2 conversations pour transférer")
+
+        await items.first().click()
+        await expect(page).toHaveURL(/\/dashboard\/conversations\/[a-z0-9]+/i)
+
+        // Forward trigger on each message bubble (hover-revealed).
+        const forwardButtons = page.getByRole("button", { name: "Transférer" })
+        await forwardButtons
+            .first()
+            .waitFor({ state: "attached", timeout: 10000 })
+            .catch(() => {})
+        test.skip((await forwardButtons.count()) === 0, "Conversation sans message")
+        await forwardButtons.last().click()
+
+        // v3 forward modal opens with at least one target conversation.
+        const modal = page.getByTestId("forward-modal")
+        await expect(modal).toBeVisible()
+        const targets = page.getByTestId("forward-target")
+        await expect(targets.first()).toBeVisible({ timeout: 8000 })
+
+        // Pick a target → forward succeeds → modal auto-closes.
+        await targets.first().click()
+        await expect(modal).toBeHidden({ timeout: 6000 })
+    })
+
     test("envoi d'une image téléversée → bulle image (Convex storage)", async ({ page }) => {
         const items = page.getByTestId("conversation-item")
         test.skip((await items.count()) === 0, "Compte de test sans conversation")
