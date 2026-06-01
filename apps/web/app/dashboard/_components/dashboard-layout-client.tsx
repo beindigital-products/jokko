@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Sidebar, DashboardHeader } from '@/components/dashboard'
+import { DashboardHeader } from '@/components/dashboard'
+import { AppSidebar } from '@/components/dashboard/app-sidebar'
 import { BrowserNotifications } from '@/components/browser-notifications'
 import { NotificationBanner } from '@/components/dashboard/notification-banner'
 import { TrialBanner } from '@/components/billing/trial-banner'
@@ -30,7 +30,6 @@ export function DashboardLayoutClient({
     organizationName,
 }: DashboardLayoutClientProps) {
     const basePath = '/dashboard'
-    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
     const { currentOrg } = useCurrentOrg()
     const { isTrialing, hasSelectedPlan, isLoading: trialLoading } = useTrialStatus()
     const showTopTrialBanner = !trialLoading && !hasSelectedPlan && !isTrialing
@@ -41,13 +40,9 @@ export function DashboardLayoutClient({
 
     return (
         <div className="flex h-screen bg-gray-50/50">
-            {/* Desktop Sidebar */}
+            {/* Desktop Sidebar (v3) */}
             <nav className="hidden lg:block" aria-label="Navigation principale">
-                <Sidebar
-                    basePath={basePath}
-                    isCollapsed={isSidebarCollapsed}
-                    onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                />
+                <AppSidebar basePath={basePath} />
             </nav>
 
             {/* Main Content Area */}
@@ -61,8 +56,6 @@ export function DashboardLayoutClient({
                     user={user}
                     organizationName={organizationName}
                     showSearch={true}
-                    isSidebarCollapsed={isSidebarCollapsed}
-                    onExpandSidebar={() => setIsSidebarCollapsed(false)}
                 />
 
                 {/* Page Content */}

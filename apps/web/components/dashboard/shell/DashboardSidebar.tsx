@@ -63,12 +63,70 @@ interface DashboardSidebarProps {
     active: DashboardNavKey
     /** Per-item badge counts (e.g. { conversations: 142, mentions: 1 }). */
     badges?: Partial<Record<DashboardNavKey, string | number>>
+    /** Nav keys to hide (e.g. role gating for AGENT). */
+    hiddenKeys?: DashboardNavKey[]
     /** Path prefix for nav links (default `/dashboard`). */
     basePath?: string
     onOrgClick?: () => void
     onUserClick?: () => void
     onSearchClick?: () => void
+    /** Dropdown content for the org card (org list + settings). */
+    orgMenu?: React.ReactNode
+    /** Dropdown content for the user card (account + sign out). */
+    userMenu?: React.ReactNode
 }
+
+type NavEntry = {
+    key: DashboardNavKey
+    icon: React.ComponentType<{ className?: string }>
+    label: string
+    /** Route suffix appended to basePath. */
+    path: string
+}
+
+const SECTIONS: { label: string; items: NavEntry[] }[] = [
+    {
+        label: "PILOTAGE",
+        items: [{ key: "tableau-de-bord", icon: LayoutGrid, label: "Tableau de bord", path: "" }],
+    },
+    {
+        label: "INBOX",
+        items: [
+            { key: "conversations", icon: MessageSquare, label: "Conversations", path: "/conversations" },
+            { key: "mentions", icon: AtSign, label: "Mentions", path: "/notifications" },
+            { key: "assignations", icon: Repeat, label: "Assignations", path: "/assignments" },
+        ],
+    },
+    {
+        label: "DONNÉES",
+        items: [
+            { key: "contacts", icon: BookUser, label: "Contacts", path: "/contacts" },
+            { key: "modeles", icon: FileText, label: "Modèles", path: "/modeles" },
+            { key: "campagnes", icon: Send, label: "Campagnes", path: "/campagnes" },
+        ],
+    },
+    {
+        label: "AUTOMATISATION",
+        items: [
+            { key: "automatisations", icon: Zap, label: "Automatisations", path: "/automatisations" },
+            { key: "integrations", icon: Globe, label: "Intégrations", path: "/integrations" },
+        ],
+    },
+    {
+        label: "ÉQUIPE & INSIGHTS",
+        items: [
+            { key: "equipe", icon: UsersRound, label: "Équipe", path: "/team" },
+            { key: "analytics", icon: BarChart3, label: "Analytics", path: "/analytics" },
+        ],
+    },
+    {
+        label: "COMPTE",
+        items: [
+            { key: "reglages", icon: Settings, label: "Réglages", path: "/settings" },
+            { key: "facturation", icon: Receipt, label: "Facturation", path: "/billing" },
+        ],
+    },
+]
 
 /**
  * DashboardSidebar — v3 cockpit sidebar. Composes OrgSwitcher / search /
@@ -80,32 +138,18 @@ export function DashboardSidebar({
     user,
     active,
     badges = {},
+    hiddenKeys = [],
     basePath = "/dashboard",
     onOrgClick,
     onUserClick,
     onSearchClick,
+    orgMenu,
+    userMenu,
 }: DashboardSidebarProps) {
-    const href = (k: DashboardNavKey) => {
-        const map: Record<DashboardNavKey, string> = {
-            "tableau-de-bord": "",
-            conversations: "/conversations",
-            mentions: "/conversations/mentions",
-            assignations: "/assignments",
-            contacts: "/contacts",
-            modeles: "/modeles",
-            campagnes: "/campagnes",
-            automatisations: "/automatisations",
-            integrations: "/integrations",
-            equipe: "/team",
-            analytics: "/analytics",
-            reglages: "/settings",
-            facturation: "/billing",
-        }
-        return `${basePath}${map[k]}`
-    }
+    const hidden = new Set(hiddenKeys)
 
     return (
-        <aside className="flex w-[260px] shrink-0 flex-col bg-[#FCFAF6]">
+        <aside className="flex h-full w-[260px] shrink-0 flex-col bg-[#FCFAF6]">
             {/* Org card */}
             <div className="px-3 pt-4 pb-3">
                 <OrgSwitcher
@@ -114,6 +158,7 @@ export function DashboardSidebar({
                     plan={org.plan}
                     seats={org.seats}
                     onClick={onOrgClick}
+                    menu={orgMenu}
                 />
             </div>
 
@@ -134,109 +179,24 @@ export function DashboardSidebar({
 
             {/* Nav */}
             <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-3">
-                <SidebarSection label="PILOTAGE">
-                    <SidebarItem
-                        href={href("tableau-de-bord")}
-                        icon={LayoutGrid}
-                        label="Tableau de bord"
-                        badge={badges["tableau-de-bord"]}
-                        active={active === "tableau-de-bord"}
-                    />
-                </SidebarSection>
-                <SidebarSection label="INBOX">
-                    <SidebarItem
-                        href={href("conversations")}
-                        icon={MessageSquare}
-                        label="Conversations"
-                        badge={badges.conversations}
-                        active={active === "conversations"}
-                    />
-                    <SidebarItem
-                        href={href("mentions")}
-                        icon={AtSign}
-                        label="Mentions"
-                        badge={badges.mentions}
-                        active={active === "mentions"}
-                    />
-                    <SidebarItem
-                        href={href("assignations")}
-                        icon={Repeat}
-                        label="Assignations"
-                        badge={badges.assignations}
-                        active={active === "assignations"}
-                    />
-                </SidebarSection>
-                <SidebarSection label="DONNÉES">
-                    <SidebarItem
-                        href={href("contacts")}
-                        icon={BookUser}
-                        label="Contacts"
-                        badge={badges.contacts}
-                        active={active === "contacts"}
-                    />
-                    <SidebarItem
-                        href={href("modeles")}
-                        icon={FileText}
-                        label="Modèles"
-                        badge={badges.modeles}
-                        active={active === "modeles"}
-                    />
-                    <SidebarItem
-                        href={href("campagnes")}
-                        icon={Send}
-                        label="Campagnes"
-                        badge={badges.campagnes}
-                        active={active === "campagnes"}
-                    />
-                </SidebarSection>
-                <SidebarSection label="AUTOMATISATION">
-                    <SidebarItem
-                        href={href("automatisations")}
-                        icon={Zap}
-                        label="Automatisations"
-                        badge={badges.automatisations}
-                        active={active === "automatisations"}
-                    />
-                    <SidebarItem
-                        href={href("integrations")}
-                        icon={Globe}
-                        label="Intégrations"
-                        badge={badges.integrations}
-                        active={active === "integrations"}
-                    />
-                </SidebarSection>
-                <SidebarSection label="ÉQUIPE & INSIGHTS">
-                    <SidebarItem
-                        href={href("equipe")}
-                        icon={UsersRound}
-                        label="Équipe"
-                        badge={badges.equipe}
-                        active={active === "equipe"}
-                    />
-                    <SidebarItem
-                        href={href("analytics")}
-                        icon={BarChart3}
-                        label="Analytics"
-                        badge={badges.analytics}
-                        active={active === "analytics"}
-                    />
-                </SidebarSection>
-                <SidebarSection label="COMPTE">
-                    <SidebarItem
-                        href={href("reglages")}
-                        icon={Settings}
-                        label="Réglages"
-                        badge={badges.reglages}
-                        active={active === "reglages"}
-                    />
-                    <SidebarItem
-                        href={href("facturation")}
-                        icon={Receipt}
-                        label="Facturation"
-                        badge={badges.facturation}
-                        active={active === "facturation"}
-                    />
-                </SidebarSection>
+                {SECTIONS.map((section) => {
+                    const items = section.items.filter((it) => !hidden.has(it.key))
+                    if (items.length === 0) return null
+                    return (
+                        <SidebarSection key={section.label} label={section.label}>
+                            {items.map((it) => (
+                                <SidebarItem
+                                    key={it.key}
+                                    href={`${basePath}${it.path}`}
+                                    icon={it.icon}
+                                    label={it.label}
+                                    badge={badges[it.key]}
+                                    active={active === it.key}
+                                />
+                            ))}
+                        </SidebarSection>
+                    )
+                })}
             </nav>
 
             {/* User card */}
@@ -250,6 +210,7 @@ export function DashboardSidebar({
                     subtitle={user.subtitle}
                     online={user.online}
                     onClick={onUserClick}
+                    menu={userMenu}
                 />
             </div>
         </aside>

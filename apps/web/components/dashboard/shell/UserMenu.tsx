@@ -2,6 +2,7 @@
 
 import { MoreHorizontal } from "lucide-react"
 
+import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Avatar, type AvatarColor } from "../primitives/Avatar"
 import { Chip, type ChipTone } from "../primitives/Chip"
 
@@ -14,6 +15,9 @@ interface UserMenuProps {
     subtitle?: string
     online?: boolean
     onClick?: () => void
+    /** Optional dropdown content (e.g. account + sign out). When set, the
+     *  card becomes a Radix dropdown trigger. */
+    menu?: React.ReactNode
 }
 
 /**
@@ -29,8 +33,9 @@ export function UserMenu({
     subtitle,
     online,
     onClick,
+    menu,
 }: UserMenuProps) {
-    return (
+    const card = (
         <button
             type="button"
             onClick={onClick}
@@ -55,5 +60,13 @@ export function UserMenu({
             </div>
             <MoreHorizontal className="h-3.5 w-3.5 text-[var(--ink-400)]" />
         </button>
+    )
+
+    if (!menu) return card
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>{card}</DropdownMenuTrigger>
+            {menu}
+        </DropdownMenu>
     )
 }

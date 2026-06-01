@@ -2,20 +2,25 @@
 
 import { ChevronDown } from "lucide-react"
 
+import { DropdownMenu, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+
 interface OrgSwitcherProps {
     name: string
     initial: string
     plan?: string
     seats?: string
     onClick?: () => void
+    /** Optional dropdown content (e.g. org list + settings). When set, the
+     *  card becomes a Radix dropdown trigger. */
+    menu?: React.ReactNode
 }
 
 /**
  * OrgSwitcher — sidebar top org card. Black squircle with initial,
  * org name + plan/seats meta in mono. Chevron suggests dropdown.
  */
-export function OrgSwitcher({ name, initial, plan, seats, onClick }: OrgSwitcherProps) {
-    return (
+export function OrgSwitcher({ name, initial, plan, seats, onClick, menu }: OrgSwitcherProps) {
+    const card = (
         <button
             type="button"
             onClick={onClick}
@@ -36,5 +41,13 @@ export function OrgSwitcher({ name, initial, plan, seats, onClick }: OrgSwitcher
             </div>
             <ChevronDown className="h-3.5 w-3.5 text-[var(--ink-400)]" />
         </button>
+    )
+
+    if (!menu) return card
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>{card}</DropdownMenuTrigger>
+            {menu}
+        </DropdownMenu>
     )
 }

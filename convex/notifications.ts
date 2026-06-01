@@ -286,6 +286,20 @@ export const unreadCount = query({
     },
 });
 
+/** Unread notifications of type MENTION for the current user (sidebar badge). */
+export const unreadMentionCount = query({
+    args: {},
+    handler: async (ctx) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return 0;
+        const unread = await ctx.db
+            .query("notifications")
+            .withIndex("by_user_read", (q) => q.eq("userId", userId).eq("isRead", false))
+            .collect();
+        return unread.filter((n) => n.type === "MENTION").length;
+    },
+});
+
 export const markAsRead = mutation({
     args: { notificationId: v.id("notifications") },
     handler: async (ctx, args) => {
