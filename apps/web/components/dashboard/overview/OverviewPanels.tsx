@@ -139,7 +139,7 @@ function MiniBtn({
 
 export function OverviewKpis({ kpis }: { kpis: OverviewKpi[] }) {
     return (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {kpis.map((k) => (
                 <Card key={k.label} className="px-4 py-3.5">
                     <Eyebrow className="text-[9.5px]">{k.label}</Eyebrow>

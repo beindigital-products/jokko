@@ -6,7 +6,6 @@ const KPIS: DashboardOverviewData["kpis"] = [
     { label: "Conversations reçues", value: "142", delta: "+22", deltaTone: "good", sub: "vs hier 120" },
     { label: "Réponses envoyées", value: "128", delta: "+18", deltaTone: "good", sub: "par 6 agents" },
     { label: "Temps moyen 1re rép.", value: "2m 14s", delta: "−18s", deltaTone: "good", sub: "cible 3m" },
-    { label: "Agents en ligne", value: "6 / 8", deltaTone: "mute", sub: "2 en pause déjeuner" },
     { label: "Non résolues", value: "14", delta: "−3", deltaTone: "warn", sub: "dont 2 > 24h" },
 ]
 
@@ -108,7 +107,6 @@ export const Empty: Story = {
                 { label: "Conversations reçues", value: "0", deltaTone: "mute", sub: "—" },
                 { label: "Réponses envoyées", value: "0", deltaTone: "mute", sub: "—" },
                 { label: "Temps moyen 1re rép.", value: "—", deltaTone: "mute", sub: "cible 3m" },
-                { label: "Agents en ligne", value: "1 / 1", deltaTone: "mute", sub: "vous" },
                 { label: "Non résolues", value: "0", deltaTone: "mute", sub: "tout est à jour" },
             ],
             attention: { title: "Tout est à jour", rows: [] },

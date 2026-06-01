@@ -87,8 +87,8 @@ function Skel({ className }: { className?: string }) {
 function OverviewSkeleton() {
     return (
         <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-                {[0, 1, 2, 3, 4].map((i) => (
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
                     <Skel key={i} className="h-[88px]" />
                 ))}
             </div>
