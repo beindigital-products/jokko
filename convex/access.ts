@@ -7,7 +7,7 @@
  */
 
 import { v } from "convex/values";
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalQuery, internalMutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import {
     featureUnlockSource,
@@ -155,5 +155,140 @@ export const resetTrialDev = mutation({
             updatedAt: now,
         });
         return { ok: true };
+    },
+});
+
+/**
+ * Dev-only : inspecte l'état d'abonnement / WhatsApp d'un compte par email.
+ * internalQuery → appelable uniquement depuis la CLI / le dashboard Convex,
+ * jamais depuis le client. À lancer via `convex run access:inspectAccountDev`.
+ */
+export const inspectAccountDev = internalQuery({
+    args: { email: v.string() },
+    handler: async (ctx, { email }) => {
+        const user = await ctx.db
+            .query("users")
+            .withIndex("email", (q) => q.eq("email", email))
+            .first();
+        if (!user) return { error: `Utilisateur ${email} introuvable` };
+
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .first();
+        const orgId = session?.currentOrganizationId ?? null;
+        const org = orgId ? await ctx.db.get(orgId) : null;
+
+        const memberships = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) => q.eq("userId", user._id))
+            .collect();
+
+        return {
+            userId: user._id,
+            email: user.email ?? email,
+            currentOrgId: orgId,
+            org: org
+                ? {
+                      name: org.name,
+                      plan: org.plan,
+                      hasSelectedPlan: org.hasSelectedPlan ?? null,
+                      trialEndsAt: org.trialEndsAt ?? null,
+                      isTrialing: typeof org.trialEndsAt === "number" ? Date.now() < org.trialEndsAt : null,
+                      stripeStatus: org.stripe?.status ?? null,
+                      demoOutboundMode: org.demo?.outboundMode ?? null,
+                      whatsapp: org.whatsapp
+                          ? {
+                                hasPhoneNumberId: !!org.whatsapp.phoneNumberId,
+                                hasAccessToken: !!org.whatsapp.accessToken,
+                            }
+                          : null,
+                  }
+                : null,
+            memberships: memberships.map((m) => ({ orgId: m.organizationId, role: m.role })),
+        };
+    },
+});
+
+/**
+ * Dev-only : provisionne le compte d'un email comme **abonné payant** sur son
+ * organisation courante (plan choisi + abonnement Stripe "active" simulé), ce
+ * qui retire le bandeau d'essai et débloque les features gatées par plan.
+ *
+ * `localOnlyOutbound: true` active aussi le mode `demo.outboundMode = "local_only"`
+ * : les messages sortants passent en SENT localement sans appeler l'API
+ * WhatsApp (cf. messages.send) — indispensable pour tester l'envoi sans
+ * numéro WhatsApp réel ni fenêtre 24 h ouverte. NB : l'abonnement seul NE
+ * débloque PAS l'envoi WhatsApp (l'envoi n'est pas gaté par le plan).
+ *
+ * internalMutation → CLI / dashboard uniquement. NE PAS utiliser en prod.
+ */
+export const provisionTestAccountDev = internalMutation({
+    args: {
+        email: v.string(),
+        plan: v.optional(
+            v.union(
+                v.literal("STARTER"),
+                v.literal("BUSINESS"),
+                v.literal("PRO"),
+                v.literal("ENTERPRISE"),
+            ),
+        ),
+        localOnlyOutbound: v.optional(v.boolean()),
+    },
+    handler: async (ctx, args) => {
+        const user = await ctx.db
+            .query("users")
+            .withIndex("email", (q) => q.eq("email", args.email))
+            .first();
+        if (!user) throw new Error(`Utilisateur ${args.email} introuvable`);
+
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .first();
+        const orgId = session?.currentOrganizationId;
+        if (!orgId) throw new Error("Aucune organisation courante sur la session de ce user");
+        const org = await ctx.db.get(orgId);
+        if (!org) throw new Error("Organisation introuvable");
+
+        const now = Date.now();
+        const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+        const plan = args.plan ?? "BUSINESS";
+
+        const patch: Record<string, unknown> = {
+            plan,
+            hasSelectedPlan: true,
+            stripe: {
+                customerId: org.stripe?.customerId ?? `cus_dev_${orgId}`,
+                subscriptionId: org.stripe?.subscriptionId ?? `sub_dev_${orgId}`,
+                priceId: org.stripe?.priceId,
+                status: "active",
+                currentPeriodEnd: now + THIRTY_DAYS,
+                trialUsed: true,
+            },
+            updatedAt: now,
+        };
+
+        if (args.localOnlyOutbound) {
+            patch.demo = {
+                kind: org.demo?.kind ?? "APP_REVIEW",
+                seedVersion: org.demo?.seedVersion ?? "test-account",
+                seededAt: org.demo?.seededAt ?? now,
+                outboundMode: "local_only",
+                notes: "Compte de test : envoi local (aucun appel WhatsApp). Repasser en whatsapp_api / retirer pour la prod.",
+            };
+        }
+
+        await ctx.db.patch(orgId, patch);
+
+        return {
+            ok: true,
+            orgId,
+            orgName: org.name,
+            plan,
+            stripeStatus: "active",
+            localOnlyOutbound: !!args.localOnlyOutbound,
+        };
     },
 });
