@@ -1,81 +1,43 @@
 "use client"
 
 import Link from "next/link"
-import { AlertTriangle, Plus } from "lucide-react"
+import { AlertTriangle, FileText, Plus, Users } from "lucide-react"
 
 import { cn } from "@/lib/utils"
 import { PageHeader } from "../shell/PageHeader"
 import { HeaderButton } from "../shell/HeaderButton"
-import { ActivityChart, StatusDonut, type ActivityPoint, type StatusSlice } from "./OverviewCharts"
 import {
-    AttentionQueue,
-    ChannelHealthPanel,
+    AttentionCard,
+    CampaignsCard,
+    FlowsCard,
+    OnboardingCard,
     OverviewKpis,
-    Panel,
-    RecentConversationsPanel,
-    TeamPresencePanel,
-    UsageStrip,
-    type AttentionItem,
-    type ChannelHealth,
+    TeamActivityCard,
+    type AttentionRow,
+    type CampaignRow,
+    type FlowRow,
+    type OnboardingStep,
     type OverviewKpi,
-    type RecentConversation,
-    type TeamMemberPresence,
-    type UsageItem,
+    type TeamActivityRow,
 } from "./OverviewPanels"
 
 export interface DashboardOverviewData {
     greetingName: string
     dateLabel: string
-    period: "today" | "7d"
+    subtitle?: string
     kpis: OverviewKpi[]
-    attention: AttentionItem[]
-    activity: ActivityPoint[]
-    statusBreakdown: StatusSlice[]
-    team: TeamMemberPresence[]
-    recent: RecentConversation[]
-    channels: ChannelHealth[]
-    usage: UsageItem[]
+    attention: { title: string; slaLabel?: string; rows: AttentionRow[] }
+    team: TeamActivityRow[]
+    campaigns: { rows: CampaignRow[]; total?: string }
+    flows: { items: FlowRow[]; activeLabel?: string; total24h?: string }
+    onboarding?: { steps: OnboardingStep[]; progressLabel?: string; headline?: string }
 }
 
 interface DashboardOverviewProps {
     data?: DashboardOverviewData
     loading?: boolean
-    role?: "OWNER" | "ADMIN" | "AGENT"
     trial?: { state: "active" | "expired"; daysLeft?: number } | null
-    onPeriodChange?: (p: "today" | "7d") => void
     basePath?: string
-}
-
-function PeriodToggle({
-    value,
-    onChange,
-}: {
-    value: "today" | "7d"
-    onChange?: (p: "today" | "7d") => void
-}) {
-    const opts: { key: "today" | "7d"; label: string }[] = [
-        { key: "today", label: "Aujourd'hui" },
-        { key: "7d", label: "7 jours" },
-    ]
-    return (
-        <div className="flex items-center gap-0.5 rounded-lg border border-[var(--ink-200)] bg-[var(--paper-warm)] p-0.5">
-            {opts.map((o) => (
-                <button
-                    key={o.key}
-                    type="button"
-                    onClick={() => onChange?.(o.key)}
-                    className={cn(
-                        "rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors",
-                        value === o.key
-                            ? "bg-[var(--paper-white)] text-[var(--ink-900)] shadow-sm"
-                            : "text-[var(--ink-soft)] hover:text-[var(--ink-900)]",
-                    )}
-                >
-                    {o.label}
-                </button>
-            ))}
-        </div>
-    )
 }
 
 function TrialBanner({
@@ -89,7 +51,7 @@ function TrialBanner({
     return (
         <div
             className={cn(
-                "flex items-center justify-between gap-3 rounded-xl border px-4 py-3",
+                "mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3",
                 expired
                     ? "border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)]"
                     : "border-[var(--status-warn)]/30 bg-[var(--status-warn-soft)]",
@@ -118,43 +80,21 @@ function TrialBanner({
     )
 }
 
-function StatusLegend({ data }: { data: StatusSlice[] }) {
-    const total = data.reduce((acc, d) => acc + d.value, 0) || 1
-    return (
-        <ul className="mt-3 space-y-1.5">
-            {data.map((s) => (
-                <li key={s.key} className="flex items-center gap-2 text-[12px]">
-                    <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: s.color }} />
-                    <span className="flex-1 text-[var(--ink-700)]">{s.label}</span>
-                    <span className="font-mono text-[var(--ink-soft)]">
-                        {Math.round((s.value / total) * 100)}%
-                    </span>
-                </li>
-            ))}
-        </ul>
-    )
-}
-
 function Skel({ className }: { className?: string }) {
-    return <div className={cn("animate-pulse rounded-lg bg-[var(--ink-100)]", className)} />
+    return <div className={cn("animate-pulse rounded-xl bg-[var(--ink-100)]", className)} />
 }
 
 function OverviewSkeleton() {
     return (
-        <div className="space-y-5">
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {[0, 1, 2, 3].map((i) => (
-                    <Skel key={i} className="h-[92px]" />
+        <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+                {[0, 1, 2, 3, 4].map((i) => (
+                    <Skel key={i} className="h-[88px]" />
                 ))}
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                {[0, 1, 2].map((i) => (
-                    <Skel key={i} className="h-[110px]" />
-                ))}
-            </div>
-            <div className="grid gap-4 lg:grid-cols-3">
-                <Skel className="h-[240px] lg:col-span-2" />
-                <Skel className="h-[240px]" />
+            <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+                <Skel className="h-[360px]" />
+                <Skel className="h-[360px]" />
             </div>
             <div className="grid gap-4 lg:grid-cols-3">
                 {[0, 1, 2].map((i) => (
@@ -166,76 +106,75 @@ function OverviewSkeleton() {
 }
 
 /**
- * DashboardOverview — v3 "cockpit du jour" landing page. Daily operational
- * snapshot (today / 7 days): KPIs, the attention queue, 7-day activity +
- * status split, team presence, recent conversations, channel health and
- * plan usage. Distinct from Analytics (30-day deep dive). Pure
- * presentational — wire it from `app/dashboard/page.tsx`.
+ * DashboardOverview — v3 cockpit "Tableau de bord". Daily operational
+ * snapshot: 5 KPIs, the attention triage list, team activity, recent
+ * campaigns, active flows and the onboarding checklist. Recreates the
+ * `Jokko Desktop.html` ScreenDashboard design. Pure presentational.
  */
 export function DashboardOverview({
     data,
     loading,
-    role = "OWNER",
     trial,
-    onPeriodChange,
     basePath = "/dashboard",
 }: DashboardOverviewProps) {
-    const isAdmin = role !== "AGENT"
-
     return (
-        <div className="flex h-full flex-col overflow-hidden bg-[var(--paper-warm)]/40">
+        <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--paper-white)]">
             <PageHeader
-                eyebrow="PILOTAGE · TABLEAU DE BORD"
-                title={`Bonjour ${data?.greetingName ?? ""} 👋`}
-                description={data?.dateLabel}
+                eyebrow={
+                    data
+                        ? `Bonjour ${data.greetingName} · ${data.dateLabel}`
+                        : "Tableau de bord"
+                }
+                title="Tableau de bord"
+                description={
+                    data?.subtitle ??
+                    "Ce qui demande votre attention ce matin, et un coup d'œil sur l'activité de l'équipe."
+                }
                 actions={
                     <>
-                        <PeriodToggle value={data?.period ?? "today"} onChange={onPeriodChange} />
-                        <HeaderButton icon={Plus} variant="primary">
-                            Nouvelle campagne
+                        <HeaderButton icon={Plus}>Nouvelle campagne</HeaderButton>
+                        <HeaderButton icon={FileText}>Nouveau modèle</HeaderButton>
+                        <HeaderButton icon={Users} variant="primary">
+                            Inviter un coéquipier
                         </HeaderButton>
                     </>
                 }
             />
 
-            <div className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="flex-1 overflow-y-auto bg-[var(--paper-warm)]/30 px-7 py-6">
+                {trial ? <TrialBanner trial={trial} basePath={basePath} /> : null}
+
                 {loading || !data ? (
                     <OverviewSkeleton />
                 ) : (
-                    <div className="space-y-5">
-                        {trial ? <TrialBanner trial={trial} basePath={basePath} /> : null}
-
+                    <div className="space-y-4">
                         <OverviewKpis kpis={data.kpis} />
 
-                        <AttentionQueue items={data.attention} />
-
-                        <div className="grid gap-4 lg:grid-cols-3">
-                            <Panel title="Activité · 7 jours" className="lg:col-span-2">
-                                <ActivityChart data={data.activity} />
-                            </Panel>
-                            <Panel title="Répartition des conversations">
-                                <StatusDonut data={data.statusBreakdown} />
-                                <StatusLegend data={data.statusBreakdown} />
-                            </Panel>
+                        <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+                            <AttentionCard
+                                title={data.attention.title}
+                                slaLabel={data.attention.slaLabel}
+                                rows={data.attention.rows}
+                                seeAllHref={`${basePath}/conversations`}
+                            />
+                            <TeamActivityCard rows={data.team} />
                         </div>
 
                         <div className="grid gap-4 lg:grid-cols-3">
-                            {isAdmin ? <TeamPresencePanel members={data.team} /> : null}
-                            <div className={cn(!isAdmin && "lg:col-span-2")}>
-                                <RecentConversationsPanel
-                                    items={data.recent}
-                                    seeAllHref={`${basePath}/conversations`}
-                                />
-                            </div>
-                            {isAdmin ? (
-                                <ChannelHealthPanel
-                                    channels={data.channels}
-                                    manageHref={`${basePath}/settings`}
+                            <CampaignsCard rows={data.campaigns.rows} total={data.campaigns.total} />
+                            <FlowsCard
+                                items={data.flows.items}
+                                activeLabel={data.flows.activeLabel}
+                                total24h={data.flows.total24h}
+                            />
+                            {data.onboarding ? (
+                                <OnboardingCard
+                                    steps={data.onboarding.steps}
+                                    progressLabel={data.onboarding.progressLabel}
+                                    headline={data.onboarding.headline}
                                 />
                             ) : null}
                         </div>
-
-                        {isAdmin ? <UsageStrip items={data.usage} /> : null}
                     </div>
                 )}
             </div>
