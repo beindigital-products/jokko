@@ -56,33 +56,35 @@ export default function DashboardLayout({
         }
     }, [sessionData, user, ensureSession, sessionRetries, router]);
 
-    // 3. Subdomain Redirect — only after onboarding is complete
+    // 3. Subdomain Redirect — OPT-IN only.
+    //
+    // The tenant is resolved from the session (userSessions.currentOrganizationId),
+    // NOT from the host — so this redirect is purely cosmetic. It also BREAKS auth:
+    // `window.location.href` to `{slug}.<root>` is a new origin, and the Convex
+    // auth token cookie is host-only on localhost (no `domain` attribute, see
+    // ConvexClientProvider), so the token isn't carried over → user becomes null
+    // → bounce back to /auth/sign-in. It also adds a slow full-page reload.
+    //
+    // Disabled by default. Enable only once cross-subdomain cookie sharing is
+    // verified end-to-end (cookie `domain=.<root>` matching NEXT_PUBLIC_ROOT_DOMAIN,
+    // TLS cert covering the wildcard). Never on localhost (host-only cookies + the
+    // dev `--experimental-https` cert only covers `localhost`).
     useEffect(() => {
+        if (process.env.NEXT_PUBLIC_ENABLE_SUBDOMAIN_ROUTING !== 'true') return;
         if (!sessionData?.organization?.slug) return;
         if (user?.onboardingCompleted !== true) return;
 
-        const slug = sessionData.organization.slug;
         const hostname = window.location.hostname;
-        const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'jokko.co';
+        if (hostname.includes('localhost')) return; // never on localhost
 
-        console.log(`[DashboardLayout] Subdomain Check: host=${hostname}, targetSlug=${slug}, root=${rootDomain}`);
+        const slug = sessionData.organization.slug;
+        const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'jokko.co';
 
         // Preserve query params (critical for payment redirects like ?session=...&status=...)
         const fullPath = window.location.pathname + window.location.search;
 
-        if (hostname.includes('localhost')) {
-            if (hostname === 'localhost') {
-                const port = window.location.port ? `:${window.location.port}` : '';
-                const newUrl = `${window.location.protocol}//${slug}.localhost${port}${fullPath}`;
-                console.log(`[DashboardLayout] Redirecting to localhost subdomain: ${newUrl}`);
-                window.location.href = newUrl;
-            }
-        } else {
-            if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
-                const newUrl = `${window.location.protocol}//${slug}.${rootDomain}${fullPath}`;
-                console.log(`[DashboardLayout] Redirecting to production subdomain: ${newUrl}`);
-                window.location.href = newUrl;
-            }
+        if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
+            window.location.href = `${window.location.protocol}//${slug}.${rootDomain}${fullPath}`;
         }
     }, [sessionData, user]);
 
