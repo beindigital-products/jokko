@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
-import { TeamScreen, type TeamData } from "./TeamScreen"
+import { TeamScreen } from "./TeamScreen"
+import type { TeamData } from "./types"
 
 const DATA: TeamData = {
     seats: "8 / 10 sièges",
