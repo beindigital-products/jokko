@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Mail, Phone } from "lucide-react"
+import { Mail, Phone, Sparkles, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 import { Avatar, type AvatarColor } from "../primitives/Avatar"
@@ -23,6 +23,15 @@ interface CopilotPanelProps {
     onRegenerate?: () => void
     onEmail?: () => void
     onCall?: () => void
+    /** When provided and there's no `draft` yet, shows an AI-draft entry
+     *  point (the assist feature is wired in a dedicated phase). */
+    onGenerateDraft?: () => void
+    /** Draft is being generated (spinner / disabled state). */
+    draftPending?: boolean
+    /** Override root layout (width, border). Defaults to a 300px column. */
+    className?: string
+    /** Renders a close (X) button top-right of the contact card. */
+    onClose?: () => void
 }
 
 /**
@@ -41,11 +50,30 @@ export function CopilotPanel({
     onRegenerate,
     onEmail,
     onCall,
+    onGenerateDraft,
+    draftPending,
+    className,
+    onClose,
 }: CopilotPanelProps) {
     const [tab, setTab] = useState<"copilot" | "summary">("copilot")
     return (
-        <aside className="w-[300px] shrink-0 overflow-y-auto border-l border-[var(--ink-200)]">
-            <div className="border-b border-[var(--ink-200)] px-4 pt-5 pb-3">
+        <aside
+            className={cn(
+                "w-[300px] shrink-0 overflow-y-auto border-l border-[var(--ink-200)]",
+                className,
+            )}
+        >
+            <div className="relative border-b border-[var(--ink-200)] px-4 pt-5 pb-3">
+                {onClose ? (
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        aria-label="Fermer le panneau"
+                        className="absolute right-3 top-3 rounded-md p-1 text-[var(--ink-400)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)]"
+                    >
+                        <X className="h-3.5 w-3.5" />
+                    </button>
+                ) : null}
                 <Avatar initials={initials} color={color} size="xl" />
                 <div className="mt-2 text-[14px] font-semibold text-[var(--ink-900)]">
                     {contactName}
@@ -131,6 +159,21 @@ export function CopilotPanel({
                             Régénérer
                         </button>
                     </div>
+                </div>
+            ) : onGenerateDraft ? (
+                <div className="border-b border-[var(--ink-200)] px-4 py-3">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                        Assistant IA
+                    </p>
+                    <button
+                        type="button"
+                        onClick={onGenerateDraft}
+                        disabled={draftPending}
+                        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-[var(--accent-muted)] bg-[var(--accent-muted)]/30 py-2 text-[11.5px] font-semibold text-[var(--accent)] hover:bg-[var(--accent-muted)]/60 disabled:opacity-60"
+                    >
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {draftPending ? "Génération…" : "Générer un brouillon de réponse"}
+                    </button>
                 </div>
             ) : null}
 

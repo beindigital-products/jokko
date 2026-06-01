@@ -299,6 +299,72 @@ export const send = mutation({
     },
 });
 
+/**
+ * addInternalNote — creates a team-only internal note on a conversation.
+ *
+ * Unlike `send`, this NEVER schedules a WhatsApp delivery and never
+ * overwrites the customer-facing conversation preview/lastMessage — it is
+ * a private note visible only to the team (Front/Intercom pattern). It
+ * carries optional @mentions of teammates.
+ *
+ * The mentioned users currently discover the note when they open the
+ * conversation. Proactive delivery (in-app notification + email) is wired
+ * separately — see the TODO below.
+ */
+export const addInternalNote = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+        content: v.string(),
+        mentions: v.optional(
+            v.array(
+                v.object({
+                    userId: v.id("users"),
+                    name: v.string(),
+                })
+            )
+        ),
+    },
+    handler: async (ctx, args) => {
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+
+        // Any team member can leave an internal note.
+        const { userId } = await requireMembership(ctx, conversation.organizationId);
+
+        const content = args.content.trim();
+        if (!content) throw new Error("Note vide");
+
+        const messageId = await ctx.db.insert("messages", {
+            organizationId: conversation.organizationId,
+            conversationId: args.conversationId,
+            senderId: userId,
+            // No contactId — a note is not addressed to the contact.
+            type: "TEXT",
+            content,
+            // Internal notes never leave Jokko.
+            direction: "OUTBOUND",
+            status: "SENT",
+            isInternal: true,
+            mentions: args.mentions,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        });
+
+        // NOTE: we intentionally do NOT patch conversation.preview /
+        // lastMessageDirection here — an internal note must not masquerade
+        // as the last customer message in the inbox list.
+
+        // TODO(mentions): for each args.mentions[].userId, deliver proactively:
+        //   - createNotification(ctx, { organizationId, userId, type: "MENTION",
+        //       title, message, link, metadata: { conversationId, messageId } })
+        //   - sendMentionEmail({ to: <user email>, ... })  // convex/lib/email.ts
+        // Deferred per product decision — mentioned users currently see the
+        // note when they open the conversation.
+
+        return messageId;
+    },
+});
+
 export const retry = mutation({
     args: {
         messageId: v.id("messages"),

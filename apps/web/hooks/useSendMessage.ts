@@ -31,7 +31,31 @@ export function useSendMessage(conversationId: string) {
     const [isSending, setIsSending] = useState(false);
 
     const sendMessageMutation = useMutation(api.messages.send);
+    const addInternalNoteMutation = useMutation(api.messages.addInternalNote);
     const generateUploadUrlMutation = useMutation(api.files.generateUploadUrl);
+
+    /** Creates a team-only internal note (never sent to WhatsApp). */
+    const addInternalNote = async ({
+        content,
+        mentions,
+    }: {
+        content: string;
+        mentions?: { userId: string; name: string }[];
+    }) => {
+        setIsSending(true);
+        try {
+            await addInternalNoteMutation({
+                conversationId: conversationId as Id<"conversations">,
+                content,
+                mentions: mentions?.map((m) => ({
+                    userId: m.userId as Id<"users">,
+                    name: m.name,
+                })),
+            });
+        } finally {
+            setIsSending(false);
+        }
+    };
 
     const sendMessage = async ({ text, replyToMessageId }: SendTextArgs) => {
         setIsSending(true);
@@ -121,6 +145,7 @@ export function useSendMessage(conversationId: string) {
         sendMessage,
         sendMedia,
         sendForward,
+        addInternalNote,
         isSending
     };
 }

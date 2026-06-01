@@ -23,7 +23,7 @@
 
 'use client'
 
-import { useState, useRef, useEffect, KeyboardEvent } from 'react'
+import { useState, useRef, useEffect, useMemo, KeyboardEvent } from 'react'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
 import EmojiPicker, { EmojiClickData, Theme } from 'emoji-picker-react'
@@ -62,6 +62,14 @@ import {
 } from '@/components/ui/tooltip'
 import { useSendMessage } from '@/hooks/useSendMessage'
 import { useTypingIndicator } from '@/hooks/useRealtime'
+import { useTeamMembers } from '@/hooks/useTeamMembers'
+import { MentionPicker } from '@/components/dashboard/inbox'
+import {
+    resolveMentions,
+    detectMentionQuery,
+    insertMention,
+    type MentionCandidate,
+} from '@/lib/dashboard/mentions'
 import { cn } from '@/lib/utils'
 import type { Message } from '@/hooks/useMessages'
 import { toast } from 'sonner'
@@ -138,10 +146,27 @@ export function MessageInput({
     const fileInputRef = useRef<HTMLInputElement>(null)
     const emojiPickerRef = useRef<HTMLDivElement>(null)
 
+    // Compose mode : 'reply' = WhatsApp message to the contact, 'note' =
+    // team-only internal note (with @mentions, never sent to WhatsApp).
+    const [mode, setMode] = useState<'reply' | 'note'>('reply')
+
     // Shortcuts state
     const [showShortcuts, setShowShortcuts] = useState(false)
     const [shortcutQuery, setShortcutQuery] = useState('')
     const shortcuts = useQuery(api.shortcuts.suggest, showShortcuts ? { search: shortcutQuery } : "skip")
+
+    // @mention state (note mode only)
+    const [showMentions, setShowMentions] = useState(false)
+    const [mentionQuery, setMentionQuery] = useState('')
+    const [mentionStart, setMentionStart] = useState(0)
+    const [activeMentionId, setActiveMentionId] = useState<string | undefined>(undefined)
+    const [pickedMentions, setPickedMentions] = useState<MentionCandidate[]>([])
+    const { members: teamMembers } = useTeamMembers()
+    const filteredMembers = useMemo(() => {
+        const q = mentionQuery.trim().toLowerCase()
+        if (!q) return teamMembers
+        return teamMembers.filter((m) => m.name.toLowerCase().includes(q))
+    }, [teamMembers, mentionQuery])
 
     // Audio recording state
     const [isRecording, setIsRecording] = useState(false)
@@ -149,7 +174,7 @@ export function MessageInput({
     const recorderRef = useRef<Mp3Recorder | null>(null)
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-    const { sendMessage, sendMedia, isSending } = useSendMessage(conversationId)
+    const { sendMessage, sendMedia, addInternalNote, isSending } = useSendMessage(conversationId)
     const { sendTyping } = useTypingIndicator(conversationId)
     const getDownloadUrl = useMutation(api.files.getDownloadUrl)
 
@@ -401,11 +426,55 @@ export function MessageInput({
         setRecordingDuration(0)
     }
 
-    // Send message
+    // Insert a picked teammate as an @mention token (note mode)
+    const handleMentionSelect = (member: { id: string; name: string }) => {
+        const caret = textareaRef.current?.selectionStart ?? message.length
+        const { text, caret: newCaret } = insertMention(message, caret, mentionStart, member.name)
+        setMessage(text)
+        setPickedMentions((prev) =>
+            prev.some((p) => p.userId === member.id)
+                ? prev
+                : [...prev, { userId: member.id, name: member.name }],
+        )
+        setShowMentions(false)
+        setMentionQuery('')
+        setTimeout(() => {
+            const el = textareaRef.current
+            if (el) {
+                el.focus()
+                el.setSelectionRange(newCaret, newCaret)
+                adjustHeight()
+            }
+        }, 0)
+    }
+
+    // Send message. `disabled` (blocked contact) gates WhatsApp replies but
+    // NOT internal notes — team coordination stays available on blocked contacts.
     const handleSend = async () => {
-        if (isSending || disabled) return
+        if (isSending) return
+        if (disabled && mode !== 'note') return
 
         const trimmedMessage = message.trim()
+
+        // ── Internal note path (team-only, with @mentions) ──────────────
+        if (mode === 'note') {
+            if (!trimmedMessage) return
+            try {
+                await addInternalNote({
+                    content: trimmedMessage,
+                    mentions: resolveMentions(trimmedMessage, pickedMentions),
+                })
+            } catch (error) {
+                const msg = error instanceof Error ? error.message : 'Erreur inconnue'
+                toast.error(`Erreur lors de l'ajout de la note: ${msg}`)
+                return
+            }
+            setMessage('')
+            setPickedMentions([])
+            setShowMentions(false)
+            if (textareaRef.current) textareaRef.current.style.height = 'auto'
+            return
+        }
 
         // Build replyTo info for optimistic display
         const replyToInfo = replyTo
@@ -470,16 +539,31 @@ export function MessageInput({
         const newValue = e.target.value
         setMessage(newValue)
         adjustHeight()
-        sendTyping()
 
-        // Shortcut detection
         const cursorPosition = e.target.selectionStart
         const textBeforeCursor = newValue.slice(0, cursorPosition)
 
-        // Match a slash that is either at the start or preceded by a space, followed by non-space chars
-        // Regex: (?:^|\s)(\/[\w-]*)$
-        const match = textBeforeCursor.match(/(?:^|\s)(\/[\w-]*)$/)
+        // Note mode : detect @mention; do NOT emit typing (it's internal).
+        if (mode === 'note') {
+            const mention = detectMentionQuery(textBeforeCursor)
+            if (mention) {
+                setMentionQuery(mention.query)
+                setMentionStart(mention.start)
+                setShowMentions(true)
+                setActiveMentionId(undefined)
+            } else {
+                setShowMentions(false)
+                setMentionQuery('')
+            }
+            // No `/` shortcuts in note mode.
+            setShowShortcuts(false)
+            return
+        }
 
+        sendTyping()
+
+        // Shortcut detection (reply mode only)
+        const match = textBeforeCursor.match(/(?:^|\s)(\/[\w-]*)$/)
         if (match) {
             const query = match[1] // e.g. "/hel"
             setShortcutQuery(query)
@@ -490,12 +574,16 @@ export function MessageInput({
         }
     }
 
-    const canSend = (message.trim() || attachment) && !isSending && !disabled
+    const isNote = mode === 'note'
+    // Blocked contact disables replies but never notes.
+    const effectiveDisabled = disabled && !isNote
+    const canSend =
+        (message.trim() || (mode === 'reply' && attachment)) && !isSending && !effectiveDisabled
 
     // Recording UI
     if (isRecording) {
         return (
-            <div className="border-t border-gray-200/80 bg-white p-4">
+            <div className="border-t border-[var(--ink-200)] bg-[var(--paper-white)] p-4">
                 <motion.div
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -506,7 +594,7 @@ export function MessageInput({
                         variant="ghost"
                         size="icon"
                         onClick={cancelRecording}
-                        className="shrink-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                        className="shrink-0 text-[var(--status-danger)] hover:text-[var(--status-danger)] hover:bg-[var(--status-danger-soft)]"
                     >
                         <Trash2 className="h-5 w-5" />
                     </Button>
@@ -516,9 +604,9 @@ export function MessageInput({
                         <motion.div
                             animate={{ scale: [1, 1.2, 1] }}
                             transition={{ repeat: Infinity, duration: 1 }}
-                            className="h-3 w-3 rounded-full bg-red-500"
+                            className="h-3 w-3 rounded-full bg-[var(--status-danger)]"
                         />
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-sm font-medium text-[var(--ink-700)]">
                             Enregistrement... {formatDuration(recordingDuration)}
                         </span>
                         {/* Waveform animation */}
@@ -526,7 +614,7 @@ export function MessageInput({
                             {Array.from({ length: 20 }).map((_, i) => (
                                 <motion.div
                                     key={i}
-                                    className="w-[3px] bg-green-500 rounded-full"
+                                    className="w-[3px] bg-[var(--accent)] rounded-full"
                                     animate={{
                                         height: [4, RECORDING_WAVEFORM_HEIGHTS[i], 4],
                                     }}
@@ -544,7 +632,7 @@ export function MessageInput({
                     <Button
                         onClick={stopRecordingAndSend}
                         size="icon"
-                        className="shrink-0 rounded-full bg-green-500 hover:bg-green-600 h-10 w-10"
+                        className="shrink-0 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] h-10 w-10"
                     >
                         <Send className="h-5 w-5" />
                     </Button>
@@ -568,19 +656,77 @@ export function MessageInput({
     }
 
     return (
-        <div className="border-t border-gray-200/80 bg-white p-4 relative">
-            {/* Shortcuts Popup */}
+        <div
+            className={cn(
+                'border-t border-[var(--ink-200)] p-4 relative transition-colors',
+                isNote ? 'bg-[var(--status-warn-soft)]/40' : 'bg-[var(--paper-white)]',
+            )}
+        >
+            {/* Mode toggle : Réponse (WhatsApp) / Note interne (équipe) */}
+            <div className="mb-3 flex items-center gap-1.5">
+                <button
+                    type="button"
+                    onClick={() => { setMode('reply'); setShowMentions(false) }}
+                    className={cn(
+                        'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
+                        mode === 'reply'
+                            ? 'bg-[var(--ink-900)] text-white'
+                            : 'text-[var(--ink-soft)] hover:text-[var(--ink-900)]',
+                    )}
+                >
+                    Réponse
+                </button>
+                <button
+                    type="button"
+                    onClick={() => { setMode('note'); setShowShortcuts(false); setShowEmojiPicker(false) }}
+                    className={cn(
+                        'rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors',
+                        mode === 'note'
+                            ? 'bg-[var(--status-warn)] text-white'
+                            : 'text-[var(--ink-soft)] hover:text-[var(--ink-900)]',
+                    )}
+                >
+                    Note interne
+                </button>
+                {isNote ? (
+                    <span className="ml-1 text-[11px] text-[var(--ink-soft)]">
+                        Visible par l&apos;équipe uniquement · @ pour mentionner
+                    </span>
+                ) : null}
+            </div>
+
+            {/* @mention popup (note mode) */}
             <AnimatePresence>
-                {showShortcuts && shortcuts && shortcuts.length > 0 && (
+                {isNote && showMentions && filteredMembers.length > 0 && (
                     <motion.div
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 10 }}
-                        className="absolute bottom-full left-4 mb-2 z-50 w-72 bg-white rounded-lg shadow-xl border border-gray-100 overflow-hidden"
+                        className="absolute bottom-full left-4 mb-2 z-50"
                     >
-                        <div className="bg-gray-50 px-3 py-2 border-b border-gray-100 flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-amber-500" />
-                            <span className="text-xs font-medium text-gray-500">Raccourcis rapides</span>
+                        <MentionPicker
+                            members={filteredMembers}
+                            query={mentionQuery}
+                            activeId={activeMentionId ?? filteredMembers[0]?.id}
+                            onSelect={(m) => handleMentionSelect(m)}
+                            onHover={(id) => setActiveMentionId(id)}
+                        />
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Shortcuts Popup */}
+            <AnimatePresence>
+                {!isNote && showShortcuts && shortcuts && shortcuts.length > 0 && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute bottom-full left-4 mb-2 z-50 w-72 bg-[var(--paper-white)] rounded-lg shadow-xl border border-[var(--ink-200)] overflow-hidden"
+                    >
+                        <div className="bg-[var(--paper-warm)] px-3 py-2 border-b border-[var(--ink-200)] flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-[var(--accent)]" />
+                            <span className="text-xs font-medium text-[var(--ink-soft)]">Raccourcis rapides</span>
                         </div>
                         <div className="max-h-60 overflow-y-auto p-1">
                             {(() => {
@@ -609,19 +755,19 @@ export function MessageInput({
 
                                     return (
                                         <div key={type} className="mb-2 last:mb-0">
-                                            <div className="px-3 py-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider sticky top-0 bg-white/95 backdrop-blur-sm z-10">
+                                            <div className="px-3 py-1.5 font-mono text-[10px] font-medium text-[var(--ink-soft)] uppercase tracking-wider sticky top-0 bg-[var(--paper-white)]/95 backdrop-blur-sm z-10">
                                                 {group.label}
                                             </div>
                                             {group.items.map((s) => (
                                                 <button
                                                     key={s._id}
                                                     onClick={() => handleShortcutSelect(s)}
-                                                    className="w-full text-left px-3 py-2 rounded-md hover:bg-gray-50 text-sm flex flex-col gap-0.5 transition-colors group"
+                                                    className="w-full text-left px-3 py-2 rounded-md hover:bg-[var(--paper-warm)] text-sm flex flex-col gap-0.5 transition-colors group"
                                                 >
-                                                    <span className="font-medium text-gray-900 group-hover:text-green-600">
+                                                    <span className="font-mono font-medium text-[var(--ink-900)] group-hover:text-[var(--accent)]">
                                                         {s.shortcut}
                                                     </span>
-                                                    <span className="text-gray-500 line-clamp-2 text-xs">
+                                                    <span className="text-[var(--ink-soft)] line-clamp-2 text-xs">
                                                         {s.text || <span className="italic opacity-50">Sans texte</span>}
                                                     </span>
                                                 </button>
@@ -644,13 +790,13 @@ export function MessageInput({
                         exit={{ opacity: 0, height: 0 }}
                         className="mb-3"
                     >
-                        <div className="flex items-center gap-2 rounded-xl bg-gray-50 p-3 border-l-4 border-green-500">
-                            <Reply className="h-4 w-4 text-green-600 shrink-0" />
+                        <div className="flex items-center gap-2 rounded-xl bg-[var(--paper-warm)] p-3 border-l-4 border-[var(--accent)]">
+                            <Reply className="h-4 w-4 text-[var(--accent)] shrink-0" />
                             <div className="flex-1 min-w-0">
-                                <p className="text-xs font-medium text-green-600">
+                                <p className="text-xs font-medium text-[var(--accent)]">
                                     {replyTo.direction === 'INBOUND' ? 'Client' : 'Vous'}
                                 </p>
-                                <p className="text-sm text-gray-600 truncate">
+                                <p className="text-sm text-[var(--ink-600)] truncate">
                                     {getReplyPreviewText(replyTo)}
                                 </p>
                             </div>
@@ -676,7 +822,7 @@ export function MessageInput({
                         exit={{ opacity: 0, height: 0 }}
                         className="mb-3"
                     >
-                        <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-3">
+                        <div className="flex items-center gap-3 rounded-xl bg-[var(--paper-warm)] p-3">
                             {attachment.preview ? (
                                 attachment.type === 'video' ? (
                                     <video
@@ -695,15 +841,15 @@ export function MessageInput({
                                     />
                                 )
                             ) : (
-                                <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-gray-200">
-                                    <FileText className="h-8 w-8 text-gray-400" />
+                                <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-[var(--ink-100)]">
+                                    <FileText className="h-8 w-8 text-[var(--ink-400)]" />
                                 </div>
                             )}
                             <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-900 truncate">
+                                <p className="text-sm font-medium text-[var(--ink-900)] truncate">
                                     {attachment.file ? attachment.file.name : "Média"}
                                 </p>
-                                <p className="text-xs text-gray-500">
+                                <p className="text-xs text-[var(--ink-soft)]">
                                     {attachment.file ? (attachment.file.size / 1024 / 1024).toFixed(2) + " MB" : ""}
                                 </p>
                             </div>
@@ -732,8 +878,8 @@ export function MessageInput({
                                 disabled={disabled}
                                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                                 className={cn(
-                                    'shrink-0 text-gray-500 hover:text-gray-700',
-                                    showEmojiPicker && 'text-green-600 bg-green-50'
+                                    'shrink-0 text-[var(--ink-soft)] hover:text-[var(--ink-700)]',
+                                    showEmojiPicker && 'text-[var(--accent)] bg-[var(--accent-muted)]'
                                 )}
                             >
                                 <Smile className="h-5 w-5" />
@@ -765,7 +911,8 @@ export function MessageInput({
                     </AnimatePresence>
                 </div>
 
-                {/* Attachment Button */}
+                {/* Attachment Button — hidden in note mode (notes are text-only) */}
+                {!isNote && (
                 <DropdownMenu>
                     <Tooltip>
                         <TooltipTrigger asChild>
@@ -774,7 +921,7 @@ export function MessageInput({
                                     variant="ghost"
                                     size="icon"
                                     disabled={disabled || isSending}
-                                    className="shrink-0 text-gray-500 hover:text-gray-700"
+                                    className="shrink-0 text-[var(--ink-soft)] hover:text-[var(--ink-700)]"
                                 >
                                     <Paperclip className="h-5 w-5" />
                                 </Button>
@@ -814,6 +961,7 @@ export function MessageInput({
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
+                )}
 
                 {/* Hidden File Input */}
                 <input
@@ -830,28 +978,34 @@ export function MessageInput({
                         value={message}
                         onChange={handleChange}
                         onKeyDown={handleKeyDown}
-                        placeholder={placeholder}
-                        disabled={disabled || isSending}
+                        placeholder={isNote ? 'Note interne… tapez @ pour mentionner un coéquipier' : placeholder}
+                        disabled={effectiveDisabled || isSending}
                         className={cn(
-                            'min-h-[44px] max-h-[150px] resize-none rounded-2xl border-gray-200',
-                            'bg-gray-50 focus:bg-white pr-12',
-                            'placeholder:text-gray-400'
+                            'min-h-[44px] max-h-[150px] resize-none rounded-2xl pr-12 placeholder:text-[var(--ink-400)]',
+                            isNote
+                                ? 'border-[var(--status-warn)]/40 bg-[var(--status-warn-soft)]/40 focus:bg-[var(--status-warn-soft)]/60 focus-visible:ring-[var(--status-warn)]/30 focus-visible:border-[var(--status-warn)]'
+                                : 'border-[var(--ink-200)] bg-[var(--paper-warm)] focus:bg-[var(--paper-white)] focus-visible:ring-[var(--accent-ring)] focus-visible:border-[var(--accent)]',
                         )}
                         rows={1}
                     />
                 </div>
 
-                {/* Send/Voice Button */}
+                {/* Send/Voice Button. Note mode : always Send (no voice in notes). */}
                 <motion.div
                     initial={false}
-                    animate={{ scale: canSend ? 1 : 0.9 }}
+                    animate={{ scale: canSend || isNote ? 1 : 0.9 }}
                 >
-                    {canSend ? (
+                    {canSend || isNote ? (
                         <Button
                             onClick={handleSend}
                             disabled={!canSend}
                             size="icon"
-                            className="shrink-0 rounded-full bg-green-500 hover:bg-green-600 h-10 w-10"
+                            className={cn(
+                                'shrink-0 rounded-full h-10 w-10 text-white',
+                                isNote
+                                    ? 'bg-[var(--status-warn)] hover:brightness-95'
+                                    : 'bg-[var(--accent)] hover:bg-[var(--accent-hover)]',
+                            )}
                         >
                             {isSending ? (
                                 <Loader2 className="h-5 w-5 animate-spin" />
@@ -867,7 +1021,7 @@ export function MessageInput({
                                     size="icon"
                                     disabled={disabled || isSending}
                                     onClick={startRecording}
-                                    className="shrink-0 text-gray-500 hover:text-green-600 hover:bg-green-50 h-10 w-10"
+                                    className="shrink-0 text-[var(--ink-soft)] hover:text-[var(--accent)] hover:bg-[var(--accent-muted)] h-10 w-10"
                                 >
                                     <Mic className="h-5 w-5" />
                                 </Button>

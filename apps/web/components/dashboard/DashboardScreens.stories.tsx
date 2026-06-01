@@ -1629,13 +1629,13 @@ function UsageCard({
 // ─── Stories ────────────────────────────────────────────────────────────
 
 const meta = {
-    title: "Dashboard/Screens",
+    title: "Dashboard/Legacy Mockups",
     parameters: {
         layout: "fullscreen",
         docs: {
             description: {
                 component:
-                    "Visuel statique des 10 écrans cockpit (PDF Jokko Desktop). Pages prod dépendent de Convex queries — ces stories rendent les chrome + densité pour valider tokens, hiérarchie, layout. Cf .context/design-extraction-dashboard.md.",
+                    "⚠ Legacy : maquettes statiques des 10 écrans cockpit (PDF Jokko Desktop). Conservées en référence tant que les écrans Modèles / Campagnes / Flows / Team / Analytics / Billing n'ont pas leurs composants modulaires. Les écrans Inbox / Contacts / Settings sont déjà composables dans Dashboard/Inbox, Dashboard/Contacts, Dashboard/Settings.",
             },
         },
     },

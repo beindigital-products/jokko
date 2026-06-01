@@ -31,6 +31,10 @@ export interface Message {
     locationName?: string
     locationAddress?: string
     interactive?: InteractiveMessageContent
+    /** Team-only internal note (not sent to WhatsApp). */
+    isInternal?: boolean
+    /** @mentions inside an internal note. */
+    mentions?: { userId: string; name: string }[]
 }
 
 export interface InteractiveMessageContent {
@@ -118,6 +122,8 @@ export function useMessages({ conversationId, organizationId }: UseMessagesProps
             locationName: msg.locationName,
             locationAddress: msg.locationAddress,
             interactive: msg.interactive as InteractiveMessageContent | undefined,
+            isInternal: msg.isInternal,
+            mentions: msg.mentions,
         })).reverse();
     }, [results]);
 

@@ -35,6 +35,13 @@ interface ConversationListProps {
     activeEntryId?: string
     onEntryClick?: (id: string) => void
     onSearch?: (q: string) => void
+    /** Override root layout (width, border). Defaults to a fixed 340px
+     *  column — consumers in a responsive shell can pass e.g. "w-full". */
+    className?: string
+    /** Shown below the header while data loads. */
+    loading?: boolean
+    /** Empty-state message when there are no entries (and not loading). */
+    emptyLabel?: string
 }
 
 /**
@@ -51,9 +58,17 @@ export function ConversationList({
     activeEntryId,
     onEntryClick,
     onSearch,
+    className,
+    loading,
+    emptyLabel = "Aucune conversation.",
 }: ConversationListProps) {
     return (
-        <div className="flex h-full w-[340px] shrink-0 flex-col border-r border-[var(--ink-200)]">
+        <div
+            className={cn(
+                "flex h-full w-[340px] shrink-0 flex-col border-r border-[var(--ink-200)]",
+                className,
+            )}
+        >
             <div className="border-b border-[var(--ink-200)] px-5 pt-7 pb-3">
                 <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
                     {eyebrow}
@@ -102,21 +117,41 @@ export function ConversationList({
                 </div>
             </div>
             <ul className="flex-1 divide-y divide-[var(--ink-100)] overflow-y-auto">
-                {entries.map((e) => (
-                    <ConversationListItem
-                        key={e.id}
-                        contactName={e.contactName}
-                        initials={e.initials}
-                        color={e.color}
-                        snippet={e.snippet}
-                        timestamp={e.timestamp}
-                        tags={e.tags}
-                        unread={e.unread}
-                        unreadCount={e.unreadCount}
-                        active={e.id === activeEntryId}
-                        onClick={() => onEntryClick?.(e.id)}
-                    />
-                ))}
+                {loading ? (
+                    <li className="px-4 py-3">
+                        <div className="space-y-3">
+                            {[0, 1, 2, 3, 4].map((i) => (
+                                <div key={i} className="flex items-start gap-2.5">
+                                    <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-[var(--ink-100)]" />
+                                    <div className="flex-1 space-y-1.5">
+                                        <div className="h-3 w-2/3 animate-pulse rounded bg-[var(--ink-100)]" />
+                                        <div className="h-2.5 w-1/2 animate-pulse rounded bg-[var(--ink-100)]" />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </li>
+                ) : entries.length === 0 ? (
+                    <li className="px-4 py-10 text-center text-[12px] text-[var(--ink-soft)]">
+                        {emptyLabel}
+                    </li>
+                ) : (
+                    entries.map((e) => (
+                        <ConversationListItem
+                            key={e.id}
+                            contactName={e.contactName}
+                            initials={e.initials}
+                            color={e.color}
+                            snippet={e.snippet}
+                            timestamp={e.timestamp}
+                            tags={e.tags}
+                            unread={e.unread}
+                            unreadCount={e.unreadCount}
+                            active={e.id === activeEntryId}
+                            onClick={() => onEntryClick?.(e.id)}
+                        />
+                    ))
+                )}
             </ul>
         </div>
     )

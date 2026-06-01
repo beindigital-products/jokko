@@ -9,6 +9,8 @@ export interface ThreadMessage {
     body: React.ReactNode
     timestamp?: string
     deliveryStatus?: "sent" | "delivered" | "read"
+    /** Render rich media edge-to-edge (no bubble bg/padding). */
+    bare?: boolean
 }
 
 export interface ThreadDayGroup {
@@ -50,6 +52,7 @@ export function ConversationThread({
                                 side={m.side}
                                 timestamp={m.timestamp}
                                 deliveryStatus={m.deliveryStatus}
+                                bare={m.bare}
                             >
                                 {m.body}
                             </MessageBubble>

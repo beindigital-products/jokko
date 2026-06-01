@@ -1055,6 +1055,21 @@ export default defineSchema({
         replyToId: v.optional(v.id("messages")),
         isForwarded: v.optional(v.boolean()),
 
+        // Internal note (team-only, NOT sent to WhatsApp). When true the
+        // message is a private note visible only to the team.
+        isInternal: v.optional(v.boolean()),
+        // @mentions inside an internal note. Each entry points at a member
+        // user; `name` is denormalized for cheap rendering. The proactive
+        // notification + email to the mentioned user is wired separately.
+        mentions: v.optional(
+            v.array(
+                v.object({
+                    userId: v.id("users"),
+                    name: v.string(),
+                })
+            )
+        ),
+
         // External ID (WhatsApp Message ID)
         externalId: v.optional(v.string()),
 

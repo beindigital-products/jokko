@@ -17,7 +17,7 @@ const ENTRIES: ContactsTableEntry[] = [
 ]
 
 const meta = {
-    title: "Dashboard/Contacts",
+    title: "Dashboard/Contacts/Table",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta
@@ -25,8 +25,8 @@ const meta = {
 export default meta
 type Story = StoryObj
 
-export const Table: Story = {
-    name: "ContactsTable",
+export const Default: Story = {
+    name: "Default · 8 rows with selection",
     render: () => {
         const [selected, setSelected] = useState<Set<string>>(new Set())
         return (
@@ -52,8 +52,8 @@ export const Table: Story = {
     },
 }
 
-export const EmptyTable: Story = {
-    name: "ContactsTable · empty state",
+export const Empty: Story = {
+    name: "Empty state",
     render: () => (
         <div className="bg-[var(--paper-white)]">
             <ContactsTable entries={[]} />

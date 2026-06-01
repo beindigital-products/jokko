@@ -13,29 +13,33 @@ export default meta
 type Story = StoryObj
 
 export const TitleOnly: Story = {
-    args: {
-        eyebrow: "PILOTAGE",
-        title: "Tableau de bord",
-        description: "Vue d'ensemble — KPIs, alertes, raccourcis.",
-    },
+    render: () => (
+        <PageHeader
+            eyebrow="PILOTAGE"
+            title="Tableau de bord"
+            description="Vue d'ensemble — KPIs, alertes, raccourcis."
+        />
+    ),
 }
 
 export const WithActions: Story = {
-    args: {
-        eyebrow: "DONNÉES · 2 408 CONTACTS",
-        title: "Contacts",
-        description: "Annuaire unifié — synchro WhatsApp, attributs, segments.",
-        actions: (
-            <>
-                <HeaderButton icon={Filter}>Filtres</HeaderButton>
-                <HeaderButton icon={Upload}>Importer</HeaderButton>
-                <HeaderButton icon={Download}>Exporter</HeaderButton>
-                <HeaderButton icon={Plus} variant="primary">
-                    Nouveau contact
-                </HeaderButton>
-            </>
-        ),
-    },
+    render: () => (
+        <PageHeader
+            eyebrow="DONNÉES · 2 408 CONTACTS"
+            title="Contacts"
+            description="Annuaire unifié — synchro WhatsApp, attributs, segments."
+            actions={
+                <>
+                    <HeaderButton icon={Filter}>Filtres</HeaderButton>
+                    <HeaderButton icon={Upload}>Importer</HeaderButton>
+                    <HeaderButton icon={Download}>Exporter</HeaderButton>
+                    <HeaderButton icon={Plus} variant="primary">
+                        Nouveau contact
+                    </HeaderButton>
+                </>
+            }
+        />
+    ),
 }
 
 export const HeaderButtonVariants: Story = {

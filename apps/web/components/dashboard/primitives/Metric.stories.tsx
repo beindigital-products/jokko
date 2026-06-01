@@ -13,20 +13,20 @@ export default meta
 type Story = StoryObj
 
 export const Default: Story = {
-    args: {
-        eyebrow: "CONVERSATIONS",
-        value: "4 612",
-        trend: "↗ +12% vs mois préc.",
-    },
+    render: () => (
+        <Metric eyebrow="CONVERSATIONS" value="4 612" trend="↗ +12% vs mois préc." />
+    ),
 }
 
 export const TrendNeutral: Story = {
-    args: {
-        eyebrow: "COÛT META · MOIS",
-        value: "€148.72",
-        trend: "€820 budget",
-        trendDirection: "neutral",
-    },
+    render: () => (
+        <Metric
+            eyebrow="COÛT META · MOIS"
+            value="€148.72"
+            trend="€820 budget"
+            trendDirection="neutral"
+        />
+    ),
 }
 
 export const FourKpis: Story = {
