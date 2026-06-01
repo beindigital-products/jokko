@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test"
+import path from "path"
 
 /**
  * Inbox v3 — messages flow e2e.
@@ -14,6 +15,14 @@ test.describe("Inbox v3 — messages", () => {
     test.beforeEach(async ({ page }) => {
         await page.goto("/dashboard/conversations")
         await page.waitForLoadState("networkidle")
+        // Let the Convex query populate the list before tests count items
+        // (websocket query resolves after networkidle). Best-effort: a truly
+        // empty account just falls through to each test's skip guard.
+        await page
+            .getByTestId("conversation-item")
+            .first()
+            .waitFor({ state: "attached", timeout: 8000 })
+            .catch(() => {})
     })
 
     test("renders the v3 conversation list (eyebrow + filters)", async ({ page }) => {
@@ -112,6 +121,62 @@ test.describe("Inbox v3 — messages", () => {
         // The sent reply renders with a quote block citing the parent message.
         await expect(page.getByTestId("message-quote")).toHaveCount(quotesBefore + 1, {
             timeout: 8000,
+        })
+    })
+
+    test("envoi d'une image téléversée → bulle image (Convex storage)", async ({ page }) => {
+        const items = page.getByTestId("conversation-item")
+        test.skip((await items.count()) === 0, "Compte de test sans conversation")
+
+        await items.first().click()
+        await expect(page).toHaveURL(/\/dashboard\/conversations\/[a-z0-9]+/i)
+        await expect(page.locator("textarea")).toBeVisible()
+
+        const imagesBefore = await page.locator('img[src*="convex"]').count()
+
+        // Push the file straight to the hidden input (skip the OS picker).
+        await page.setInputFiles(
+            'input[type="file"]',
+            path.join(__dirname, "fixtures", "qa-image.png"),
+        )
+        // Attachment preview appears before sending.
+        await expect(page.locator('img[alt="Preview"]')).toBeVisible({ timeout: 5000 })
+
+        // Attachment makes the composer sendable → Enter sends the media.
+        await page.locator("textarea").click()
+        await page.locator("textarea").press("Enter")
+
+        // The uploaded image renders from Convex storage as a new bubble.
+        await expect(page.locator('img[src*="convex"]')).toHaveCount(imagesBefore + 1, {
+            timeout: 15000,
+        })
+    })
+
+    test("message vocal : enregistrer puis envoyer → bulle audio", async ({ page }) => {
+        const items = page.getByTestId("conversation-item")
+        test.skip((await items.count()) === 0, "Compte de test sans conversation")
+
+        await items.first().click()
+        await expect(page).toHaveURL(/\/dashboard\/conversations\/[a-z0-9]+/i)
+        await expect(page.locator("textarea")).toBeVisible()
+
+        const audiosBefore = await page.locator("audio").count()
+
+        // Empty composer → the mic button is shown (record voice message).
+        const mic = page.locator("button:has(.lucide-mic)")
+        await expect(mic).toBeVisible()
+        await mic.click()
+
+        // Recording UI appears (fake mic granted via launch flags).
+        await expect(page.getByText(/Enregistrement/i)).toBeVisible({ timeout: 5000 })
+        await page.waitForTimeout(1500) // capture ~1.5s
+
+        // Send the recording (Send button inside the recording UI).
+        await page.locator("button:has(.lucide-send)").click()
+
+        // A voice message (audio element from Convex storage) lands in the thread.
+        await expect(page.locator("audio")).toHaveCount(audiosBefore + 1, {
+            timeout: 20000,
         })
     })
 })

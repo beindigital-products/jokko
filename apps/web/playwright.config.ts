@@ -25,6 +25,15 @@ export default defineConfig({
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: AUTH_FILE,
+                // Fake mic so the voice-message flow (getUserMedia → record →
+                // send) can run headless; auto-accept the permission prompt.
+                permissions: ['microphone'],
+                launchOptions: {
+                    args: [
+                        '--use-fake-ui-for-media-stream',
+                        '--use-fake-device-for-media-stream',
+                    ],
+                },
             },
             dependencies: ['setup'],
         },
