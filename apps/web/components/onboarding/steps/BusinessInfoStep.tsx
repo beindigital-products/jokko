@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/select';
 import { PhoneInput } from '@/components/contacts/PhoneInput';
 import { cn } from '@/lib/utils';
+import { tenantHost } from '@/lib/root-domain';
 
 import {
     businessInfoSchema,
@@ -167,9 +168,10 @@ export function BusinessInfoStep({ onComplete }: BusinessInfoStepProps) {
                                     Slug Jokko <span className="text-[var(--accent)]">*</span>
                                 </FormLabel>
                                 {/* v3 — preview the resulting tenant URL top-right, mono.
-                                    Sub-domain pattern per Q4=(a) → {slug}.jokko.com. */}
+                                    Domain derived from ROOT_DOMAIN so it matches the
+                                    auth cookie + subdomain redirect (no .co/.com drift). */}
                                 <span className="font-mono text-[11px] text-[var(--ink-soft)]">
-                                    {field.value ? `${field.value}.jokko.com` : "mon-entreprise.jokko.com"}
+                                    {field.value ? tenantHost(field.value) : tenantHost("mon-entreprise")}
                                 </span>
                             </div>
                             <FormControl>

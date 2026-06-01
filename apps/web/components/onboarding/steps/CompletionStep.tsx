@@ -20,6 +20,7 @@ import { useChannels } from '@/hooks/useChannels';
 import { useMutation, useAction } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { cn } from '@/lib/utils';
+import { tenantHost } from '@/lib/root-domain';
 
 interface CompletionStepProps {
     onComplete: () => void;
@@ -115,7 +116,7 @@ export function CompletionStep({}: CompletionStepProps) {
                 {currentOrg ? (
                     <ChecklistItem
                         title="Organisation configurée"
-                        subtitle={`${currentOrg.name} · ${currentOrg.slug}.jokko.com`}
+                        subtitle={`${currentOrg.name} · ${tenantHost(currentOrg.slug)}`}
                     />
                 ) : null}
                 {currentPlan ? (

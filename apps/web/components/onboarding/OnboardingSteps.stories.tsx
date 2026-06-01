@@ -113,7 +113,7 @@ function BusinessInfoPreview() {
         </div>
         <div className="mt-2 flex items-center gap-2 rounded-lg border border-[var(--status-good)]/30 bg-[var(--status-good-soft)] px-3 py-2 text-xs text-[var(--status-good)]">
           <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-          <span className="font-medium">ma-super-entreprise.jokko.com</span>
+          <span className="font-medium">ma-super-entreprise.jokko.co</span>
           <span className="ml-auto font-medium">Disponible</span>
         </div>
         <p className="text-xs text-[var(--ink-500)]">
@@ -565,7 +565,7 @@ function CompletionPreview() {
         <ChecklistRow title="Compte créé" />
         <ChecklistRow
           title="Organisation configurée"
-          subtitle="Mission Impastabowl · mission-impastabowl.jokko.com"
+          subtitle="Mission Impastabowl · mission-impastabowl.jokko.co"
         />
         <ChecklistRow
           title="Plan Business"
