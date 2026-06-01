@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireMembership, requirePermission } from "./lib/auth";
+import { createNotification } from "./notifications";
 import { paginationOptsValidator } from "convex/server";
 
 // ============================================
@@ -354,12 +355,38 @@ export const addInternalNote = mutation({
         // lastMessageDirection here — an internal note must not masquerade
         // as the last customer message in the inbox list.
 
-        // TODO(mentions): for each args.mentions[].userId, deliver proactively:
-        //   - createNotification(ctx, { organizationId, userId, type: "MENTION",
-        //       title, message, link, metadata: { conversationId, messageId } })
-        //   - sendMentionEmail({ to: <user email>, ... })  // convex/lib/email.ts
-        // Deferred per product decision — mentioned users currently see the
-        // note when they open the conversation.
+        // Notify each mentioned teammate (except the author) so they can
+        // access the note from the bell / notifications page (the click
+        // navigates to the conversation via `link`). Email delivery stays
+        // deferred — see sendMentionEmail TODO below.
+        if (args.mentions && args.mentions.length > 0) {
+            const author = await ctx.db.get(userId);
+            const authorName = author?.name || author?.email || "Un coéquipier";
+            const contact = conversation.contactId
+                ? await ctx.db.get(conversation.contactId)
+                : null;
+            const where = contact?.name || contact?.phone || "une conversation";
+            const seen = new Set<string>();
+            for (const m of args.mentions) {
+                if (m.userId === userId) continue; // don't notify yourself
+                if (seen.has(m.userId)) continue;
+                seen.add(m.userId);
+                await createNotification(ctx, {
+                    organizationId: conversation.organizationId,
+                    userId: m.userId,
+                    type: "MENTION",
+                    title: `${authorName} vous a mentionné`,
+                    message: `Sur ${where} : ${content.slice(0, 140)}`,
+                    link: `/dashboard/conversations/${args.conversationId}`,
+                    metadata: {
+                        conversationId: String(args.conversationId),
+                        messageId: String(messageId),
+                    },
+                });
+                // TODO(mentions-email): sendMentionEmail({ to: <user email>, ... })
+                //   convex/lib/email.ts — proactive email still deferred.
+            }
+        }
 
         return messageId;
     },

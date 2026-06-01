@@ -182,3 +182,101 @@ describe("messages.react", () => {
         ]);
     });
 });
+
+describe("messages.addInternalNote", () => {
+    let t: any;
+    let authorId: string;
+    let mateId: string;
+    let orgId: string;
+    let conversationId: string;
+    let preview: string;
+    let asAuthor: any;
+
+    beforeEach(async () => {
+        t = convexTest(schema, modules);
+
+        const ids = await t.run(async (ctx: any) => {
+            const author = await ctx.db.insert("users", { email: "author@test.com", name: "Tom" });
+            const mate = await ctx.db.insert("users", { email: "mate@test.com", name: "Inès" });
+            const org = await ctx.db.insert("organizations", {
+                name: "Org", ownerId: author, plan: "BUSINESS",
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            for (const [u, role] of [[author, "OWNER"], [mate, "AGENT"]] as const) {
+                await ctx.db.insert("memberships", {
+                    userId: u, organizationId: org, role, status: "ONLINE",
+                    maxConversations: 10, activeConversations: 0,
+                    lastSeenAt: Date.now(), joinedAt: Date.now(),
+                });
+            }
+            await ctx.db.insert("userSessions", {
+                userId: author, currentOrganizationId: org, lastActivityAt: Date.now(),
+            });
+            const contactId = await ctx.db.insert("contacts", {
+                organizationId: org, name: "Mehdi", phone: "+221770000000",
+                searchName: "mehdi", tags: [], createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            const convId = await ctx.db.insert("conversations", {
+                organizationId: org, contactId, channel: "WHATSAPP", status: "OPEN",
+                lastMessageAt: Date.now(), lastMessageDirection: "INBOUND",
+                preview: "dernier message client", unreadCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(), tags: [],
+            });
+            return { author, mate, org, convId };
+        });
+        authorId = ids.author;
+        mateId = ids.mate;
+        orgId = ids.org;
+        conversationId = ids.convId;
+        preview = "dernier message client";
+        asAuthor = t.withIdentity({ subject: authorId, issuer: "test" });
+    });
+
+    const notifsFor = (uid: string) =>
+        t.run(async (ctx: any) =>
+            ctx.db.query("notifications")
+                .filter((q: any) => q.eq(q.field("userId"), uid))
+                .collect());
+
+    it("creates an internal note (isInternal + mentions, no WhatsApp send)", async () => {
+        const id = await asAuthor.mutation(api.messages.addInternalNote, {
+            conversationId,
+            content: "@Inès peux-tu vérifier ?",
+            mentions: [{ userId: mateId, name: "Inès" }],
+        });
+        const msg = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(msg.isInternal).toBe(true);
+        expect(msg.direction).toBe("OUTBOUND");
+        expect(msg.contactId).toBeUndefined();
+        expect(msg.mentions).toEqual([{ userId: mateId, name: "Inès" }]);
+    });
+
+    it("notifies the mentioned teammate (MENTION + link to conversation)", async () => {
+        await asAuthor.mutation(api.messages.addInternalNote, {
+            conversationId,
+            content: "@Inès regarde ça",
+            mentions: [{ userId: mateId, name: "Inès" }],
+        });
+        const mateNotifs = await notifsFor(mateId);
+        expect(mateNotifs).toHaveLength(1);
+        expect(mateNotifs[0].type).toBe("MENTION");
+        expect(mateNotifs[0].link).toBe(`/dashboard/conversations/${conversationId}`);
+    });
+
+    it("does NOT notify the author for their own mention", async () => {
+        await asAuthor.mutation(api.messages.addInternalNote, {
+            conversationId,
+            content: "@Tom note perso",
+            mentions: [{ userId: authorId, name: "Tom" }],
+        });
+        expect(await notifsFor(authorId)).toHaveLength(0);
+    });
+
+    it("does not overwrite the customer-facing conversation preview", async () => {
+        await asAuthor.mutation(api.messages.addInternalNote, {
+            conversationId, content: "note interne", mentions: [],
+        });
+        const conv = await t.run(async (ctx: any) => ctx.db.get(conversationId));
+        expect(conv.preview).toBe(preview);
+    });
+});
