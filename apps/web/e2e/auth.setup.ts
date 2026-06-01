@@ -3,22 +3,22 @@ import path from 'path';
 
 const AUTH_FILE = path.join(__dirname, '.auth', 'user.json');
 
+// Credentials from env (fall back to the shared test account). The subdomain
+// redirect is opt-in/off, so we log in on the main domain — no subdomain hop.
+const EMAIL = process.env.E2E_EMAIL || 'momoseck8@gmail.com';
+const PASSWORD = process.env.E2E_PASSWORD || 'Password123!';
+
 setup('authenticate', async ({ page }) => {
-    // Login directly on the org subdomain
-    await page.goto('https://be-in-digital.localhost:1000/sign-in');
+    await page.goto('/auth/sign-in');
     await page.waitForLoadState('networkidle');
 
-    // Fill login form
-    await page.locator('#email').fill('momoseck8@gmail.com');
-    await page.locator('#password').fill('Password123!');
+    await page.locator('#email').fill(EMAIL);
+    await page.locator('#password').fill(PASSWORD);
+    await page.getByRole('button', { name: /acc[eé]der|se connecter/i }).click();
 
-    // Submit
-    await page.getByRole('button', { name: /se connecter|acc[eé]der/i }).click();
-
-    // Wait for auth to complete and page to settle
-    await page.waitForTimeout(8000);
+    // Lands on the dashboard (same origin — no subdomain bounce).
+    await page.waitForURL(/\/dashboard/, { timeout: 30000 });
     await page.waitForLoadState('networkidle');
 
-    // Save auth state with cookies on the subdomain
     await page.context().storageState({ path: AUTH_FILE });
 });

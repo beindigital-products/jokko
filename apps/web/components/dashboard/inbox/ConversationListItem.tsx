@@ -39,6 +39,7 @@ export function ConversationListItem({
             <button
                 type="button"
                 onClick={onClick}
+                data-testid="conversation-item"
                 className={cn(
                     "flex w-full items-start gap-2.5 px-4 py-3 text-left transition-colors",
                     active
