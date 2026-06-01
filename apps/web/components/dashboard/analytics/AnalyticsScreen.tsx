@@ -47,7 +47,7 @@ function Card({ children, className }: { children: React.ReactNode; className?: 
     return (
         <div
             className={cn(
-                "rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)] p-[18px]",
+                "rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)] p-6",
                 className,
             )}
         >
@@ -79,16 +79,16 @@ export function AnalyticsScreen({ data }: { data: AnalyticsData }) {
                 }
             />
 
-            <div className="flex-1 space-y-4 overflow-y-auto bg-[var(--paper-warm)]/30 px-7 py-6">
+            <div className="flex-1 space-y-5 overflow-y-auto bg-[var(--paper-warm)]/30 px-7 py-7">
                 {/* KPI row */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
                     {data.kpis.map((k) => (
                         <Card key={k.label}>
                             <Eyebrow>{k.label}</Eyebrow>
-                            <div className="mt-2 font-display text-[34px] font-bold leading-none tabular-nums tracking-tight text-[var(--ink-900)]">
+                            <div className="mt-3 font-display text-[34px] font-bold leading-none tabular-nums tracking-tight text-[var(--ink-900)]">
                                 {k.value}
                             </div>
-                            <div className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[var(--status-good)]">
+                            <div className="mt-2.5 flex items-center gap-1.5 text-[12px] text-[var(--status-good)]">
                                 <ArrowUpRight className="h-3 w-3" strokeWidth={2} />
                                 <span className="font-mono tabular-nums">{k.delta}</span>
                                 <span className="text-[var(--ink-soft)]">{k.sub ?? "vs mois préc."}</span>
@@ -98,9 +98,9 @@ export function AnalyticsScreen({ data }: { data: AnalyticsData }) {
                 </div>
 
                 {/* Volume + top agents */}
-                <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
-                    <Card className="px-5 py-[18px]">
-                        <div className="mb-4 flex items-baseline justify-between gap-3">
+                <div className="grid gap-5 lg:grid-cols-3">
+                    <Card className="lg:col-span-2">
+                        <div className="mb-5 flex items-baseline justify-between gap-3">
                             <div>
                                 <Eyebrow>Volume conversations</Eyebrow>
                                 <div className="mt-1 font-editorial text-[20px] tracking-tight text-[var(--ink-900)]">
@@ -122,7 +122,7 @@ export function AnalyticsScreen({ data }: { data: AnalyticsData }) {
                         <VolumeChart data={data.volume} />
                     </Card>
 
-                    <Card className="px-5 py-[18px]">
+                    <Card>
                         <Eyebrow>Top agents · 30j</Eyebrow>
                         <div className="mt-3.5 flex flex-col gap-3">
                             {data.topAgents.map((a, i) => (
@@ -150,8 +150,8 @@ export function AnalyticsScreen({ data }: { data: AnalyticsData }) {
                 </div>
 
                 {/* Status + heatmap */}
-                <div className="grid gap-4 lg:grid-cols-2">
-                    <Card className="px-5 py-[18px]">
+                <div className="grid gap-5 lg:grid-cols-2">
+                    <Card>
                         <Eyebrow>Répartition par statut</Eyebrow>
                         <div className="mt-3 flex items-center gap-6">
                             <StatusDonut data={data.status} />
@@ -172,7 +172,7 @@ export function AnalyticsScreen({ data }: { data: AnalyticsData }) {
                         </div>
                     </Card>
 
-                    <Card className="px-5 py-[18px]">
+                    <Card>
                         <Eyebrow>Heures de pointe</Eyebrow>
                         <Heatmap data={data.heatmap} />
                     </Card>
