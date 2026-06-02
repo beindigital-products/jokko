@@ -39,7 +39,7 @@ export function UserMenu({
         <button
             type="button"
             onClick={onClick}
-            className="flex w-full items-center gap-2 rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)] px-2 py-2 text-left hover:bg-[var(--paper-warm)] transition-colors"
+            className="flex w-full items-center gap-2 rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)] px-2 py-2 text-left transition-colors hover:bg-[var(--paper-warm)] group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:border-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:p-0"
         >
             <Avatar
                 initials={initials}
@@ -47,7 +47,7 @@ export function UserMenu({
                 size="md"
                 status={online ? "online" : undefined}
             />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
                 <div className="flex items-center gap-1.5">
                     <span className="truncate text-[13px] font-semibold text-[var(--ink-900)]">
                         {name}
@@ -58,7 +58,7 @@ export function UserMenu({
                     <div className="text-[11px] text-[var(--ink-soft)]">{subtitle}</div>
                 ) : null}
             </div>
-            <MoreHorizontal className="h-3.5 w-3.5 text-[var(--ink-400)]" />
+            <MoreHorizontal className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)] group-data-[collapsible=icon]:hidden" />
         </button>
     )
 

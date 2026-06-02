@@ -16,6 +16,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
+    SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { OrgSwitcher } from "./OrgSwitcher"
@@ -174,29 +175,41 @@ export function DashboardSidebar({
 
     return (
         <Sidebar
-            collapsible="offcanvas"
+            collapsible="icon"
             data-testid="app-sidebar"
             aria-label="Navigation principale"
             className="[&_[data-sidebar=sidebar]]:bg-[#FCFAF6]"
         >
-            {/* Org card + search */}
-            <SidebarHeader className="gap-2 p-3">
-                <OrgSwitcher
-                    name={org.name}
-                    initial={org.initial}
-                    plan={org.plan}
-                    seats={org.seats}
-                    onClick={onOrgClick}
-                    menu={orgMenu}
-                />
+            {/* Org card + collapse toggle + search */}
+            <SidebarHeader className="gap-2 p-3 group-data-[collapsible=icon]:p-2">
+                <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
+                    <div className="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
+                        <OrgSwitcher
+                            name={org.name}
+                            initial={org.initial}
+                            plan={org.plan}
+                            seats={org.seats}
+                            onClick={onOrgClick}
+                            menu={orgMenu}
+                        />
+                    </div>
+                    <SidebarTrigger
+                        aria-label="Replier le menu"
+                        className="size-8 shrink-0 text-[var(--ink-500)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-900)]"
+                    />
+                </div>
                 <button
                     type="button"
                     onClick={onSearchClick}
-                    className="flex w-full items-center gap-2 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 py-1.5 transition-colors hover:bg-[var(--paper-warm)]"
+                    className="flex w-full items-center gap-2 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 py-1.5 transition-colors hover:bg-[var(--paper-warm)] group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:p-0"
                 >
-                    <Search className="h-3.5 w-3.5 text-[var(--ink-400)]" />
-                    <span className="flex-1 text-left text-[12px] text-[var(--ink-400)]">Rechercher</span>
-                    <span className="font-mono text-[10px] text-[var(--ink-400)]">⌘K</span>
+                    <Search className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                    <span className="flex-1 text-left text-[12px] text-[var(--ink-400)] group-data-[collapsible=icon]:hidden">
+                        Rechercher
+                    </span>
+                    <span className="font-mono text-[10px] text-[var(--ink-400)] group-data-[collapsible=icon]:hidden">
+                        ⌘K
+                    </span>
                 </button>
             </SidebarHeader>
 
@@ -217,6 +230,7 @@ export function DashboardSidebar({
                                             <SidebarMenuButton
                                                 asChild
                                                 isActive={active === it.key}
+                                                tooltip={it.label}
                                                 className={ITEM_CLASS}
                                             >
                                                 <Link href={`${basePath}${it.path}`}>
@@ -239,7 +253,7 @@ export function DashboardSidebar({
             </SidebarContent>
 
             {/* User card */}
-            <SidebarFooter className="p-3">
+            <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
                 <UserMenu
                     name={user.name}
                     initials={user.initials}
