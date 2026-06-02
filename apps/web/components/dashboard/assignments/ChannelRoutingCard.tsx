@@ -20,7 +20,7 @@ export function ChannelRoutingCard({ channels }: ChannelRoutingCardProps) {
                 {channels.map((r) => (
                     <div
                         key={r.city}
-                        className="flex items-center gap-2.5 rounded-[10px] border border-[var(--ink-200)] px-[14px] py-[11px]"
+                        className="flex items-center gap-2.5 border border-[var(--ink-200)] px-[14px] py-[11px]"
                         style={{ background: "var(--paper-warm)" }}
                     >
                         {/* WhatsApp icon badge */}

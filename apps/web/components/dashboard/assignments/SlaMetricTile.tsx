@@ -14,7 +14,7 @@ export function SlaMetricTile({ metric }: SlaMetricTileProps) {
 
     return (
         <div
-            className="rounded-[10px] border border-[var(--ink-200)] px-4 py-[14px]"
+            className="border border-[var(--ink-200)] px-4 py-[14px]"
             style={{ background: "var(--paper-warm)" }}
         >
             <div className="text-[12px] text-[var(--ink-500)]">{metric.label}</div>

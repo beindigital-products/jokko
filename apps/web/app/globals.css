@@ -74,7 +74,9 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
-  --radius: 0.625rem;
+  /* Design direction: straight lines, zero radius everywhere — except buttons. */
+  --radius: 0rem;
+  --radius-btn: 0.5rem; /* buttons keep a slight rounding */
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
 
@@ -178,12 +180,14 @@
   --color-whatsapp: var(--whatsapp);
   --color-whatsapp-bubble: var(--whatsapp-bubble);
 
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 10px);
-  --radius-3xl: calc(var(--radius) + 20px);
+  /* All box radii squared — straight-line design direction. */
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-3xl: 0px;
 
   --font-sans: var(--font-body, var(--font-geist-sans));
   --font-display: var(--font-display, var(--font-geist-sans));
@@ -401,4 +405,11 @@ body {
 .shimmer-surface > * {
   position: relative;
   z-index: 1;
+}
+
+/* Straight-line design direction: square the bare `rounded` utility too
+   (Tailwind's fixed 0.25rem isn't driven by --radius). Buttons keep their
+   rounding via --radius-btn; round shapes use rounded-full. */
+.rounded {
+  border-radius: 0px;
 }

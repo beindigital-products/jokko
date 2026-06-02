@@ -44,7 +44,7 @@ export function BannerCta({
     children: React.ReactNode
 }) {
     const base =
-        "inline-flex h-9 items-center justify-center gap-2 px-4 text-[13px] font-medium tracking-tight whitespace-nowrap transition-colors"
+        "inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-btn)] px-4 text-[13px] font-medium tracking-tight whitespace-nowrap transition-colors"
     const byTone: Record<BannerCtaTone, string> = {
         primary: "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]",
         ink: "bg-[var(--ink-900)] text-white hover:brightness-110",

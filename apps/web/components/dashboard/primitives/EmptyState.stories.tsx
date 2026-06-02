@@ -8,7 +8,7 @@ function PrimaryBtn({ children }: { children: React.ReactNode }) {
     return (
         <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 bg-[var(--ink-900)] px-3 text-[13px] font-medium text-white"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-btn)] bg-[var(--ink-900)] px-3 text-[13px] font-medium text-white"
         >
             {children}
         </button>
@@ -18,7 +18,7 @@ function GhostBtn({ children }: { children: React.ReactNode }) {
     return (
         <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 border border-[var(--ink-200)] px-3 text-[13px] font-medium text-[var(--ink-700)]"
+            className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-btn)] border border-[var(--ink-200)] px-3 text-[13px] font-medium text-[var(--ink-700)]"
         >
             {children}
         </button>

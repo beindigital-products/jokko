@@ -22,7 +22,7 @@ export function CreditPackTile({
             onClick={onSelect}
             aria-pressed={isSelected}
             className={cn(
-                "rounded-[10px] border px-2 py-3.5 text-center transition-colors",
+                "border px-2 py-3.5 text-center transition-colors",
                 isSelected
                     ? "border-[var(--accent)] bg-[var(--accent-muted)]"
                     : "border-[var(--ink-200)] bg-[var(--paper-white)] hover:bg-[var(--paper-warm)]",

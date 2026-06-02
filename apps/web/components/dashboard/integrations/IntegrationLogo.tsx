@@ -38,7 +38,7 @@ export function IntegrationLogo({ id, name }: IntegrationLogoProps) {
 
     return (
         <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] font-display text-base font-medium"
+            className="flex h-10 w-10 shrink-0 items-center justify-center font-display text-base font-medium"
             style={{
                 background: s.bg,
                 color: s.fg,
