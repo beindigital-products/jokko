@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 import { cn } from "@/lib/utils"
 
 interface HeaderButtonProps {
@@ -40,9 +42,9 @@ export function HeaderButton({
     }
     if (href) {
         return (
-            <a href={href} className={className} onClick={onClick}>
+            <Link href={href} className={className} onClick={onClick}>
                 {inner}
-            </a>
+            </Link>
         )
     }
     return (

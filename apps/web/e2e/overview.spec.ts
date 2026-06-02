@@ -50,4 +50,22 @@ test.describe("Tableau de bord v3", () => {
             .getByRole("link", { name: /Ajouter des crédits/ })
         await expect(cta).toHaveAttribute("href", /\/dashboard\/billing/)
     })
+
+    test("the header action buttons link to the right pages", async ({ page }) => {
+        await page.goto("/dashboard")
+        await page.waitForLoadState("networkidle")
+        const main = page.locator("#main-content")
+        await expect(main.getByRole("link", { name: /Nouvelle campagne/ })).toHaveAttribute(
+            "href",
+            "/dashboard/campagnes/new",
+        )
+        await expect(main.getByRole("link", { name: /Nouveau modèle/ })).toHaveAttribute(
+            "href",
+            "/dashboard/modeles",
+        )
+        await expect(main.getByRole("link", { name: /Inviter un coéquipier/ })).toHaveAttribute(
+            "href",
+            "/dashboard/team",
+        )
+    })
 })

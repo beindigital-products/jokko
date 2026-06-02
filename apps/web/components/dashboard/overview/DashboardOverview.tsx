@@ -142,9 +142,13 @@ export function DashboardOverview({
                 }
                 actions={
                     <>
-                        <HeaderButton icon={Plus}>Nouvelle campagne</HeaderButton>
-                        <HeaderButton icon={FileText}>Nouveau modèle</HeaderButton>
-                        <HeaderButton icon={Users} variant="primary">
+                        <HeaderButton icon={Plus} href={`${basePath}/campagnes/new`}>
+                            Nouvelle campagne
+                        </HeaderButton>
+                        <HeaderButton icon={FileText} href={`${basePath}/modeles`}>
+                            Nouveau modèle
+                        </HeaderButton>
+                        <HeaderButton icon={Users} variant="primary" href={`${basePath}/team`}>
                             Inviter un coéquipier
                         </HeaderButton>
                     </>
