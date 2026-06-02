@@ -1,7 +1,17 @@
 import type { Metadata } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+// Display typeface (per the Primitives design system): JetBrains Mono 500
+// drives all big titles via --font-display.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -72,10 +82,10 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${GeistSans.variable} ${GeistMono.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${jetbrainsMono.variable}`}
       style={
         {
-          "--font-display": "var(--font-geist-sans)",
+          "--font-display": "var(--font-jetbrains-mono)",
           "--font-body": "var(--font-geist-sans)",
           "--font-mono": "var(--font-geist-mono)",
         } as React.CSSProperties
