@@ -5,6 +5,7 @@ import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTrialStatus } from "@/hooks/usePlans";
 import { Banner } from "@/components/dashboard/primitives/Banner";
+import { trialBannerContent } from "./trial-banner-content";
 
 type TrialBannerProps = {
     variant?: "sidebar" | "page";
@@ -48,89 +49,28 @@ export function TrialBanner({ variant = "page", className }: TrialBannerProps) {
         );
     }
 
-    if (!isTrialing) {
-        return (
-            <Banner
-                variant={variant}
-                className={className}
-                data-state="expired"
-                tone="expired"
-                eyebrow="Essai expiré"
-                left="Envoi suspendu"
-                progress={1}
-                title="Essai terminé"
-                body="Vous voyez encore vos données, mais l'envoi est suspendu. Activez votre abonnement pour reprendre."
-                cta="Activer mon abonnement"
-                ctaTone="danger"
-                ctaHref={billing}
-                secondaryCta="Demander à l'admin"
-                secondaryHref="/dashboard/team"
-            />
-        );
-    }
-
-    const days = Math.max(0, trialDaysLeft);
-    const dayN = Math.min(14, Math.max(1, 14 - days));
-    const eyebrow = `Essai · jour ${dayN} / 14`;
-    const left = `${days} jour${days > 1 ? "s" : ""} restant${days > 1 ? "s" : ""}`;
-    const progress = Math.min(1, Math.max(0, (14 - days) / 14));
-
-    if (days <= 2) {
-        return (
-            <Banner
-                variant={variant}
-                className={className}
-                data-state="urgent"
-                tone="urgent"
-                eyebrow={eyebrow}
-                left={left}
-                progress={progress}
-                title={`Plus que ${days} jour${days > 1 ? "s" : ""}`}
-                body="À l'expiration, l'envoi de nouveaux messages sera bloqué."
-                cta="Activer maintenant"
-                ctaTone="danger"
-                ctaHref={billing}
-            />
-        );
-    }
-
-    if (days <= 9) {
-        return (
-            <Banner
-                variant={variant}
-                className={className}
-                data-state="rappel"
-                tone="reminder"
-                eyebrow={eyebrow}
-                left={left}
-                progress={progress}
-                title={`Plus que ${days} jours d'essai`}
-                body="Activez votre abonnement pour ne pas interrompre l'envoi de messages."
-                cta="Activer mon abonnement"
-                ctaTone="ink"
-                ctaHref={billing}
-                dismissible
-                onDismiss={onDismiss}
-            />
-        );
-    }
+    // Branches expiré → urgent → rappel → neutre : contenu centralisé dans le
+    // helper partagé (même mapping que la bannière de l'Overview).
+    const content = trialBannerContent({ expired: !isTrialing, days: Math.max(0, trialDaysLeft) });
 
     return (
         <Banner
             variant={variant}
             className={className}
-            data-state="neutre"
-            tone="neutral"
-            eyebrow={eyebrow}
-            left={left}
-            progress={progress}
-            title="Bienvenue dans Jokko"
-            body="Aucune limite pendant l'essai. Choisissez un plan quand vous serez prêt."
-            cta="Choisir un plan"
-            ctaTone="primary"
+            data-state={content.dataState}
+            tone={content.tone}
+            eyebrow={content.eyebrow}
+            left={content.left}
+            progress={content.progress}
+            title={content.title}
+            body={content.body}
+            cta={content.cta}
+            ctaTone={content.ctaTone}
             ctaHref={billing}
-            dismissible
-            onDismiss={onDismiss}
+            secondaryCta={content.secondaryCta}
+            secondaryHref={content.secondaryCta ? "/dashboard/team" : undefined}
+            dismissible={content.dismissible}
+            onDismiss={content.dismissible ? onDismiss : undefined}
         />
     );
 }

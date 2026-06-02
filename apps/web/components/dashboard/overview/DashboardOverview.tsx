@@ -1,9 +1,11 @@
 "use client"
 
-import Link from "next/link"
-import { AlertTriangle, FileText, Plus, Users } from "lucide-react"
+import { useState } from "react"
+import { FileText, Plus, Users } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import { Banner } from "../primitives/Banner"
+import { trialBannerContent } from "@/components/billing/trial-banner-content"
 import { PageHeader } from "../shell/PageHeader"
 import { HeaderButton } from "../shell/HeaderButton"
 import { OverviewKpis } from "./OverviewKpis"
@@ -43,43 +45,45 @@ interface DashboardOverviewProps {
     basePath?: string
 }
 
-function TrialBanner({
+/**
+ * The trial / plan-status strip at the top of the cockpit. Renders the shared
+ * Banner primitive (same neutral → reminder → urgent → expired escalation as the
+ * billing TrialBanner, via the shared `trialBannerContent` helper) so the trial
+ * state reads consistently across the app. Driven by the `trial` prop.
+ */
+function OverviewTrialBanner({
     trial,
     basePath,
 }: {
     trial: { state: "active" | "expired"; daysLeft?: number }
     basePath: string
 }) {
-    const expired = trial.state === "expired"
+    const [dismissed, setDismissed] = useState(false)
+    if (dismissed) return null
+
+    const content = trialBannerContent({
+        expired: trial.state === "expired",
+        days: trial.daysLeft ?? 0,
+    })
+
     return (
-        <div
-            className={cn(
-                "mb-4 flex items-center justify-between gap-3 rounded-xl border px-4 py-3",
-                expired
-                    ? "border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)]"
-                    : "border-[var(--status-warn)]/30 bg-[var(--status-warn-soft)]",
-            )}
-        >
-            <div className="flex items-center gap-2.5">
-                <AlertTriangle
-                    className={cn(
-                        "h-4 w-4 shrink-0",
-                        expired ? "text-[var(--status-danger)]" : "text-[var(--status-warn)]",
-                    )}
-                />
-                <p className="text-[13px] text-[var(--ink-900)]">
-                    {expired
-                        ? "Votre période d'essai est terminée. Choisissez un plan pour continuer."
-                        : `Période d'essai · ${trial.daysLeft} jour${(trial.daysLeft ?? 0) > 1 ? "s" : ""} restant${(trial.daysLeft ?? 0) > 1 ? "s" : ""}.`}
-                </p>
-            </div>
-            <Link
-                href={`${basePath}/billing`}
-                className="shrink-0 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-[var(--accent-hover)]"
-            >
-                {expired ? "Choisir un plan" : "Gérer le plan"}
-            </Link>
-        </div>
+        <Banner
+            className="mb-4"
+            data-state={content.dataState}
+            tone={content.tone}
+            eyebrow={content.eyebrow}
+            left={content.left}
+            progress={content.progress}
+            title={content.title}
+            body={content.body}
+            cta={content.cta}
+            ctaTone={content.ctaTone}
+            ctaHref={`${basePath}/billing`}
+            secondaryCta={content.secondaryCta}
+            secondaryHref={content.secondaryCta ? `${basePath}/team` : undefined}
+            dismissible={content.dismissible}
+            onDismiss={content.dismissible ? () => setDismissed(true) : undefined}
+        />
     )
 }
 
@@ -145,7 +149,7 @@ export function DashboardOverview({
             />
 
             <div className="flex-1 overflow-y-auto bg-[var(--paper-warm)]/30 px-7 pb-8 pt-10">
-                {trial ? <TrialBanner trial={trial} basePath={basePath} /> : null}
+                {trial ? <OverviewTrialBanner trial={trial} basePath={basePath} /> : null}
 
                 {loading || !data ? (
                     <OverviewSkeleton />

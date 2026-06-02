@@ -143,10 +143,22 @@ export const CreditLow: Story = {
     },
 }
 
-export const TrialExpired: Story = {
-    args: { data: FULL, trial: { state: "expired" } },
+/** Trial banner — neutral tone (10+ days left). */
+export const TrialNeutral: Story = {
+    args: { data: FULL, trial: { state: "active", daysLeft: 12 } },
 }
 
-export const TrialActive: Story = {
+/** Trial banner — reminder tone (3–9 days left). */
+export const TrialReminder: Story = {
     args: { data: FULL, trial: { state: "active", daysLeft: 7 } },
+}
+
+/** Trial banner — urgent tone (≤2 days left). */
+export const TrialUrgent: Story = {
+    args: { data: FULL, trial: { state: "active", daysLeft: 2 } },
+}
+
+/** Trial banner — expired (envoi suspendu). */
+export const TrialExpired: Story = {
+    args: { data: FULL, trial: { state: "expired" } },
 }
