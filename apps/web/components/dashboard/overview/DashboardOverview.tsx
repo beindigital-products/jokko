@@ -14,12 +14,12 @@ import { TeamActivityCard } from "./TeamActivityCard"
 import { CampaignsCard } from "./CampaignsCard"
 import { FlowsCard } from "./FlowsCard"
 import { OnboardingCard } from "./OnboardingCard"
-import { CreditBalanceCard } from "./CreditBalanceCard"
+import { MarketingCreditBar } from "./MarketingCreditBar"
 import type {
     AttentionRow,
     CampaignRow,
-    CreditBalance,
     FlowRow,
+    MarketingCredit,
     OnboardingStep,
     OverviewKpi,
     TeamActivityRow,
@@ -34,7 +34,7 @@ export interface DashboardOverviewData {
     team: TeamActivityRow[]
     campaigns: { rows: CampaignRow[]; total?: string }
     flows: { items: FlowRow[]; activeLabel?: string; total24h?: string }
-    credit: CreditBalance
+    marketingCredit?: MarketingCredit
     onboarding?: { steps: OnboardingStep[]; progressLabel?: string; headline?: string }
 }
 
@@ -43,6 +43,8 @@ interface DashboardOverviewProps {
     loading?: boolean
     trial?: { state: "active" | "expired"; daysLeft?: number } | null
     basePath?: string
+    /** Opens the recharge dialog from the marketing-credit bar (else links to billing). */
+    onRecharge?: () => void
 }
 
 /**
@@ -123,6 +125,7 @@ export function DashboardOverview({
     loading,
     trial,
     basePath = "/dashboard",
+    onRecharge,
 }: DashboardOverviewProps) {
     return (
         <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--paper-white)]">
@@ -157,6 +160,14 @@ export function DashboardOverview({
                     <div className="space-y-4">
                         <OverviewKpis kpis={data.kpis} />
 
+                        {data.marketingCredit ? (
+                            <MarketingCreditBar
+                                credit={data.marketingCredit}
+                                onRecharge={onRecharge}
+                                rechargeHref={`${basePath}/billing`}
+                            />
+                        ) : null}
+
                         <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
                             <AttentionCard
                                 title={data.attention.title}
@@ -174,19 +185,15 @@ export function DashboardOverview({
                                 activeLabel={data.flows.activeLabel}
                                 total24h={data.flows.total24h}
                             />
-                            <div className="flex flex-col gap-4">
-                                <CreditBalanceCard
-                                    credit={data.credit}
-                                    rechargeHref={`${basePath}/billing`}
+                            {data.onboarding ? (
+                                <OnboardingCard
+                                    steps={data.onboarding.steps}
+                                    progressLabel={data.onboarding.progressLabel}
+                                    headline={data.onboarding.headline}
                                 />
-                                {data.onboarding ? (
-                                    <OnboardingCard
-                                        steps={data.onboarding.steps}
-                                        progressLabel={data.onboarding.progressLabel}
-                                        headline={data.onboarding.headline}
-                                    />
-                                ) : null}
-                            </div>
+                            ) : (
+                                <div />
+                            )}
                         </div>
                     </div>
                 )}

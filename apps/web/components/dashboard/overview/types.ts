@@ -53,6 +53,30 @@ export interface OnboardingStep {
     done: boolean
 }
 
+/** Full-width WhatsApp marketing-credit bar on the cockpit. */
+export interface MarketingCredit {
+    /** Current balance, e.g. "€128.40". */
+    balance: string
+    /** Marketing conversations the balance covers, e.g. "2 040". */
+    conversations: string
+    /** Spent this month, e.g. "€148.72". */
+    spent: string
+    /** Monthly budget, e.g. "€820". */
+    budget: string
+    /** Spent fraction of budget, 0–100. */
+    pct: number
+    /** Runway line when healthy, e.g. "Tient ≈ 9 jours au rythme actuel". */
+    runwayLabel: string
+    /** Optional auto-top-up pill, e.g. "Recharge auto · €100". */
+    autoTopupLabel?: string
+    /** Low-balance treatment (red border + warn meter + lowLabel). */
+    low?: boolean
+    /** Message shown when low, e.g. "Solde bas — rechargez…". */
+    lowLabel?: string
+    /** CTA label, default "Ajouter des crédits". */
+    ctaLabel?: string
+}
+
 /** Compact marketing-campaign credit balance shown on the overview cockpit. */
 export interface CreditBalance {
     /** Current balance, e.g. "€38.20". */

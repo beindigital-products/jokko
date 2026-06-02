@@ -1,11 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
 import { DashboardOverview, type DashboardOverviewData } from "./DashboardOverview"
+import { DashboardSidebar } from "../shell/DashboardSidebar"
 
 const KPIS: DashboardOverviewData["kpis"] = [
     { label: "Conversations reçues", value: "142", delta: "+22", deltaTone: "good", sub: "vs hier 120" },
     { label: "Réponses envoyées", value: "128", delta: "+18", deltaTone: "good", sub: "par 6 agents" },
     { label: "Temps moyen 1re rép.", value: "2m 14s", delta: "−18s", deltaTone: "good", sub: "cible 3m" },
+    { label: "Agents en ligne", value: "6 / 8", deltaTone: "mute", sub: "2 en pause déjeuner" },
     { label: "Non résolues", value: "14", delta: "−3", deltaTone: "warn", sub: "dont 2 > 24h" },
 ]
 
@@ -50,10 +52,14 @@ const FLOWS: DashboardOverviewData["flows"] = {
     ],
 }
 
-const CREDIT: DashboardOverviewData["credit"] = {
-    balance: "€38.20",
-    estimate: "≈ 1 200 conv. Meta restantes",
-    ctaLabel: "Recharger",
+const MARKETING_CREDIT: DashboardOverviewData["marketingCredit"] = {
+    balance: "€128.40",
+    conversations: "2 040",
+    spent: "€148.72",
+    budget: "€820",
+    pct: 18,
+    runwayLabel: "Tient ≈ 9 jours au rythme actuel",
+    autoTopupLabel: "Recharge auto · €100",
 }
 
 const ONBOARDING: DashboardOverviewData["onboarding"] = {
@@ -77,7 +83,7 @@ const FULL: DashboardOverviewData = {
     team: TEAM,
     campaigns: CAMPAIGNS,
     flows: FLOWS,
-    credit: CREDIT,
+    marketingCredit: MARKETING_CREDIT,
     onboarding: ONBOARDING,
 }
 
@@ -114,16 +120,20 @@ export const Empty: Story = {
                 { label: "Conversations reçues", value: "0", deltaTone: "mute", sub: "—" },
                 { label: "Réponses envoyées", value: "0", deltaTone: "mute", sub: "—" },
                 { label: "Temps moyen 1re rép.", value: "—", deltaTone: "mute", sub: "cible 3m" },
+                { label: "Agents en ligne", value: "0 / 8", deltaTone: "mute", sub: "personne en ligne" },
                 { label: "Non résolues", value: "0", deltaTone: "mute", sub: "tout est à jour" },
             ],
             attention: { title: "Tout est à jour", rows: [] },
             team: [],
             campaigns: { total: "0 / 0", rows: [] },
             flows: { activeLabel: "0 actif", total24h: "0 exécution", items: [] },
-            credit: {
+            marketingCredit: {
                 balance: "€0.00",
-                estimate: "Rechargez pour lancer votre première campagne.",
-                ctaLabel: "Recharger",
+                conversations: "0",
+                spent: "€0.00",
+                budget: "€0",
+                pct: 0,
+                runwayLabel: "Rechargez pour lancer votre première campagne.",
             },
         },
     },
@@ -133,11 +143,13 @@ export const CreditLow: Story = {
     args: {
         data: {
             ...FULL,
-            credit: {
-                balance: "€4.84",
-                estimate: "Solde insuffisant — campagne « Réactivation 90j » bloquée.",
+            marketingCredit: {
+                ...MARKETING_CREDIT,
+                balance: "€18.40",
+                conversations: "294",
+                pct: 92,
                 low: true,
-                ctaLabel: "Recharger",
+                lowLabel: "Solde bas — rechargez avant la prochaine campagne",
             },
         },
     },
@@ -161,4 +173,34 @@ export const TrialUrgent: Story = {
 /** Trial banner — expired (envoi suspendu). */
 export const TrialExpired: Story = {
     args: { data: FULL, trial: { state: "expired" } },
+}
+
+/**
+ * Cockpit complet — la nouvelle Overview à l'intérieur du shell, avec le menu
+ * groupé (Pilotage / Inbox / Données / Automatisation / Équipe & insights /
+ * Compte). C'est la vue d'ensemble "à quoi ressemble le menu".
+ */
+export const Cockpit: Story = {
+    name: "Cockpit (avec menu)",
+    render: () => (
+        <div className="flex h-full w-full bg-[var(--paper-white)]">
+            <DashboardSidebar
+                org={{ name: "Atelier Bracquet", initial: "a", plan: "PRO", seats: "8 SIÈGES" }}
+                user={{
+                    name: "Sophie Br…",
+                    initials: "SB",
+                    color: "emerald",
+                    role: "OWNER",
+                    roleTone: "dark",
+                    subtitle: "Propriétaire",
+                    online: true,
+                }}
+                active="tableau-de-bord"
+                badges={{ "tableau-de-bord": 5, conversations: 142, mentions: 1, assignations: 14 }}
+            />
+            <div className="min-w-0 flex-1 border-l border-[var(--ink-200)]">
+                <DashboardOverview data={FULL} />
+            </div>
+        </div>
+    ),
 }

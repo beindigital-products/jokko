@@ -8,10 +8,10 @@ const DELTA_COLOR: Record<DeltaTone, string> = {
     mute: "text-[var(--ink-soft)]",
 }
 
-/** Top KPI row — 4 metrics (value + delta + sub) in a responsive grid. */
+/** Top KPI row — metrics (value + delta + sub) in a responsive grid. */
 export function OverviewKpis({ kpis }: { kpis: OverviewKpi[] }) {
     return (
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
             {kpis.map((k) => (
                 <Card key={k.label} className="px-4 py-3.5">
                     <Eyebrow className="text-[9.5px]">{k.label}</Eyebrow>
