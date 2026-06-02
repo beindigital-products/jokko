@@ -44,7 +44,7 @@ export function BannerCta({
     children: React.ReactNode
 }) {
     const base =
-        "inline-flex h-9 items-center justify-center gap-2 rounded-lg px-4 text-[13px] font-medium tracking-tight whitespace-nowrap transition-colors"
+        "inline-flex h-9 items-center justify-center gap-2 px-4 text-[13px] font-medium tracking-tight whitespace-nowrap transition-colors"
     const byTone: Record<BannerCtaTone, string> = {
         primary: "bg-[var(--accent)] text-white hover:bg-[var(--accent-hover)]",
         ink: "bg-[var(--ink-900)] text-white hover:brightness-110",
@@ -125,7 +125,7 @@ export function Banner({
             <div
                 data-testid="banner"
                 data-state={stateAttr}
-                className={cn("relative overflow-hidden rounded-lg border px-3 py-2.5", className)}
+                className={cn("relative border px-3 py-2.5", className)}
                 style={{ background: t.bg, borderColor: t.border }}
             >
                 <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: t.fg }} />
@@ -160,7 +160,7 @@ export function Banner({
             data-testid="banner"
             data-state={stateAttr}
             className={cn(
-                "relative flex flex-col gap-3 overflow-hidden rounded-xl border py-3.5 pl-7 pr-4 sm:flex-row sm:items-center sm:gap-7",
+                "relative flex flex-col gap-3 border py-3.5 pl-7 pr-4 sm:flex-row sm:items-center sm:gap-7",
                 className,
             )}
             style={{ background: t.bg, borderColor: t.border }}
@@ -177,11 +177,11 @@ export function Banner({
                     </span>
                     {progress != null ? (
                         <span
-                            className="hidden h-[3px] w-[100px] overflow-hidden rounded-full sm:block"
+                            className="hidden h-[3px] w-[100px] overflow-hidden sm:block"
                             style={{ background: "rgba(10,10,10,0.08)" }}
                         >
                             <span
-                                className="block h-full rounded-full"
+                                className="block h-full"
                                 style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%`, background: t.fg }}
                             />
                         </span>

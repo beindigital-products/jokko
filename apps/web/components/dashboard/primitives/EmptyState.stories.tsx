@@ -8,7 +8,7 @@ function PrimaryBtn({ children }: { children: React.ReactNode }) {
     return (
         <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-[var(--ink-900)] px-3 text-[13px] font-medium text-white"
+            className="inline-flex h-8 items-center gap-1.5 bg-[var(--ink-900)] px-3 text-[13px] font-medium text-white"
         >
             {children}
         </button>
@@ -18,7 +18,7 @@ function GhostBtn({ children }: { children: React.ReactNode }) {
     return (
         <button
             type="button"
-            className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[var(--ink-200)] px-3 text-[13px] font-medium text-[var(--ink-700)]"
+            className="inline-flex h-8 items-center gap-1.5 border border-[var(--ink-200)] px-3 text-[13px] font-medium text-[var(--ink-700)]"
         >
             {children}
         </button>
@@ -138,7 +138,7 @@ export const Illustrations: Story = {
             {ALL_ILLUS.map((name) => (
                 <div
                     key={name}
-                    className="flex flex-col items-center gap-2 rounded-xl border border-[var(--ink-100)] bg-[var(--paper-warm)] py-5"
+                    className="flex flex-col items-center gap-2 border border-[var(--ink-100)] bg-[var(--paper-warm)] py-5"
                 >
                     <StateIllustration name={name} size={56} />
                     <span className="font-mono text-[9px] uppercase tracking-[0.1em] text-[var(--ink-soft)]">

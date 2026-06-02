@@ -33,10 +33,7 @@ export function InlineAlert({ tone = "mute", icon: Icon, title, code, body, acti
     const t = TONE[tone]
     return (
         <div
-            className={cn(
-                "relative flex items-start gap-3 overflow-hidden rounded-[6px] py-3 pl-[18px] pr-3.5",
-                className,
-            )}
+            className={cn("relative flex items-start gap-3 py-3 pl-[18px] pr-3.5", className)}
             style={{ background: t.bg }}
             role="alert"
         >
