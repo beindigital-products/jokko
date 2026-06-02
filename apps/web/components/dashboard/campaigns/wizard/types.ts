@@ -1,17 +1,18 @@
-// Types for the v3 campaign-creation wizard (Nom → Modèle → Audience →
-// Variables → Envoi → Récap). Presentational fixtures; the real flow maps
-// onto convex `broadcasts.create` (name, templateId, audienceConfig,
-// variable mapping, scheduledAt).
+// Types for the v3 campaign-creation wizard (Objectif → Modèle → Audience →
+// Variables → Envoi → Récap). Presentational fixtures; the real flow maps onto
+// convex `broadcasts.create` (name, templateId, audienceConfig, variable
+// mapping, scheduledAt). Mirrors the design's `CampaignWizard` data model.
 
 export type WizardStepId = 1 | 2 | 3 | 4 | 5 | 6
 
 export interface WizardStep {
     id: WizardStepId
+    /** Short label used in the stepper. */
     label: string
 }
 
 export const CAMPAIGN_STEPS: WizardStep[] = [
-    { id: 1, label: "Nom" },
+    { id: 1, label: "Objectif" },
     { id: 2, label: "Modèle" },
     { id: 3, label: "Audience" },
     { id: 4, label: "Variables" },
@@ -19,70 +20,84 @@ export const CAMPAIGN_STEPS: WizardStep[] = [
     { id: 6, label: "Récap" },
 ]
 
-export type TemplateCategory = "Marketing" | "Utility" | "Authentification"
-export type TemplateStatus = "approved" | "pending" | "rejected"
+/** Meta template category — drives template list and per-conversation pricing. */
+export type TemplateCategory = "Marketing" | "Utility"
+
+/** Source a template variable resolves from (contact field or fixed value). */
+export type VariableSourceId = "first" | "last" | "company" | "city" | "fixed"
+
+export interface VariableSource {
+    id: VariableSourceId
+    label: string
+    /** Example rendered value for the preview. */
+    eg: string
+}
+
+/** A single template variable binding ({{N}} → a source, optional fixed value). */
+export interface TemplateVar {
+    token: string
+    src: VariableSourceId
+    fixed?: string
+}
+
+export interface TemplateHeader {
+    type: "doc" | "image"
+    /** May contain {{N}} tokens (doc filename), resolved in the preview. */
+    label: string
+}
 
 export interface WizardTemplate {
     id: string
     name: string
-    category: TemplateCategory
+    cat: TemplateCategory
     lang: string
-    status: TemplateStatus
-    /** Body with {{1}} {{2}} placeholders. */
+    header: TemplateHeader | null
+    /** Body with {{N}} placeholders. */
     body: string
-    /** Optional header line (e.g. document name). */
-    header?: string
-    footer?: string
+    footer: string | null
     /** Quick-reply / CTA button labels shown under the bubble. */
-    buttons?: string[]
+    buttons: string[]
+    vars: TemplateVar[]
 }
 
-export type AudienceType = "all" | "segment" | "country"
-
-export interface AudienceOption {
-    type: AudienceType
-    label: string
-    sub: string
-}
-
-export interface VariableMapping {
-    /** e.g. "{{1}}" */
-    token: string
-    /** "Contact · Prénom" | "Valeur fixe" | … */
-    source: string
-    /** preview value, e.g. "Margaux" */
-    example: string
+export interface WizardSegment {
+    id: string
+    /** French label. */
+    fr: string
+    total: number
+    excluded: number
+    /** French description. */
+    desc: string
 }
 
 export interface SendingNumber {
     id: string
-    city: string
-    number: string
-    pole: string
+    label: string
+    num: string
+    /** Quality rating (French). */
+    quality: string
 }
 
-export interface CampaignDraft {
-    name: string
-    description: string
-    templateId: string | null
-    audienceType: AudienceType
-    /** selected segment/country chips */
-    audienceTags: string[]
-    audienceCount: number
-    audienceExcluded: number
-    variables: VariableMapping[]
-    sendingNumberId: string
-    schedule: "now" | "scheduled"
-    /** human label for the scheduled slot, e.g. "Samedi 13 juin 2026 · 10:00" */
-    scheduleLabel: string
-}
+export type SendMode = "now" | "scheduled"
 
 export interface CampaignWizardData {
-    draft: CampaignDraft
     templates: WizardTemplate[]
-    audienceOptions: AudienceOption[]
-    /** chips available when audienceType !== "all" */
-    audiencePool: string[]
-    sendingNumbers: SendingNumber[]
-    cost: { amount: string; detail: string; balanceAfter: string; ok: boolean }
+    segments: WizardSegment[]
+    numbers: SendingNumber[]
+    /** Per-conversation price by category. */
+    price: Record<TemplateCategory, number>
+    /** Wallet balance available for this campaign (EUR). */
+    balance: number
+    /** Initial draft values. */
+    initial: {
+        name: string
+        desc: string
+        cat: TemplateCategory
+        tplId: string
+        segId: string
+        mode: SendMode
+        date: string
+        time: string
+        numId: string
+    }
 }

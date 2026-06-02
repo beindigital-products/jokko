@@ -1,70 +1,101 @@
+"use client"
+
+import { useState } from "react"
+
 import { Icon } from "@/components/dashboard/primitives/Icon"
-import type { CampaignWizardData } from "./types"
+import { CwInput, CwLabel, type WizardState } from "./_shared"
+import { cwResolve, cwSources } from "./wizard-data"
+import type { VariableSourceId } from "./types"
 
 /**
- * StepVariables — Étape 4 of the v3 campaign wizard. Map each {{N}} placeholder
- * of the chosen template to a data source, with a live example value.
- * Presentational: the mapping comes from the fixture draft.
+ * StepVariables — Étape 4 (Variables). One card per template variable: token
+ * chip, live rendered example, a source dropdown (contact field / fixed value)
+ * and, when "Valeur fixe", a text input for the literal. Controlled by the shell
+ * (the dropdown open-state is local). Recreates the design's step 4.
  */
-export function StepVariables({ data }: { data: CampaignWizardData }) {
-    const { variables } = data.draft
+export function StepVariables({ data, tplId, vars, setVar }: WizardState) {
+    const [openVar, setOpenVar] = useState(-1)
+    const sources = cwSources()
+    const tpl = data.templates.find((t) => t.id === tplId) ?? data.templates[0]
 
     return (
-        <div className="space-y-6 px-8 py-8">
-            <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-                    Étape 4 · Variables
-                </div>
-                <h2 className="mt-1 font-display text-[20px] tracking-[-0.01em] text-[var(--ink-900)]">
-                    Personnaliser les variables
-                </h2>
-                <p className="mt-1 text-[13px] text-[var(--ink-500)]">
-                    Reliez chaque variable du modèle à une donnée de contact ou à
-                    une valeur fixe. L&apos;exemple montre le rendu pour un contact.
-                </p>
-            </div>
+        <div className="flex flex-col gap-2">
+            <CwLabel hint={tpl.name}>Variables du modèle</CwLabel>
 
-            <div className="rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)] px-[22px] py-[18px]">
-                <div className="font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--ink-soft)]">
-                    Variables du modèle
-                </div>
+            {vars.length === 0 ? (
+                <p className="text-[12.5px] text-[var(--ink-soft)]">Ce modèle ne contient aucune variable.</p>
+            ) : null}
 
-                {variables.length === 0 ? (
-                    <p className="mt-3 text-[12.5px] text-[var(--ink-soft)]">
-                        Ce modèle ne contient aucune variable.
-                    </p>
-                ) : (
-                    <div className="mt-[14px] flex flex-col gap-2">
-                        {variables.map((v) => (
-                            <div
-                                key={v.token}
-                                className="flex items-center gap-3 rounded-[10px] border border-[var(--ink-200)] bg-[var(--paper-warm)] px-3 py-2.5"
-                            >
-                                {/* Token chip */}
-                                <span className="shrink-0 rounded-md bg-[var(--accent-muted)] px-2 py-1 font-mono text-[11px] font-medium text-[var(--accent)]">
-                                    {v.token}
-                                </span>
+            {vars.map((v, i) => {
+                const isFixed = v.src === "fixed"
+                const current = sources.find((s) => s.id === v.src) ?? sources[0]
+                return (
+                    <div
+                        key={v.token}
+                        className="rounded-[10px] border border-[var(--ink-200)] bg-[var(--paper-white)] px-3.5 py-3"
+                    >
+                        <div className="mb-2.5 flex items-center gap-2.5">
+                            <span className="rounded-md bg-[var(--accent-muted)] px-2 py-0.5 font-mono text-[13px] font-semibold tabular-nums text-[var(--accent)]">
+                                {v.token}
+                            </span>
+                            <span className="text-[12px] text-[var(--ink-soft)]">
+                                exemple rendu : <b className="text-[var(--ink-700)]">{cwResolve(v)}</b>
+                            </span>
+                        </div>
 
-                                {/* Source — select-like field */}
-                                <div className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-lg border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-2">
-                                    <span className="truncate text-[13px] text-[var(--ink-900)]">
-                                        {v.source}
-                                    </span>
-                                    <Icon name="chevron-down" size={16} color="var(--ink-500)" />
-                                </div>
+                        <div className={isFixed ? "grid grid-cols-2 gap-2" : "grid grid-cols-1"}>
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setOpenVar(openVar === i ? -1 : i)}
+                                    className="flex h-9 w-full items-center justify-between gap-2 rounded-[9px] border bg-[var(--paper-warm)] px-3 text-[13px] tracking-[-0.005em] text-[var(--ink-900)]"
+                                    style={{ borderColor: openVar === i ? "var(--accent)" : "var(--ink-200)" }}
+                                >
+                                    <span className="min-w-0 truncate whitespace-nowrap">{current.label}</span>
+                                    <Icon name="chevron-down" size={14} color="var(--ink-soft)" />
+                                </button>
 
-                                {/* Example pill */}
-                                <span className="shrink-0 rounded-md bg-[var(--paper-white)] px-2 py-1 font-mono text-[11px] text-[var(--ink-soft)]">
-                                    {v.example}
-                                </span>
+                                {openVar === i ? (
+                                    <div className="absolute left-0 right-0 top-10 z-10 overflow-hidden rounded-[10px] border border-[var(--ink-200)] bg-[var(--paper-white)] p-1 shadow-[0_12px_30px_-8px_rgba(10,10,10,0.22)]">
+                                        {sources.map((s) => {
+                                            const on = s.id === v.src
+                                            return (
+                                                <button
+                                                    key={s.id}
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setVar(i, { src: s.id as VariableSourceId })
+                                                        setOpenVar(-1)
+                                                    }}
+                                                    className="flex w-full items-center justify-between gap-2 rounded-[7px] px-2.5 py-2 text-left text-[13px] text-[var(--ink-900)]"
+                                                    style={{ background: on ? "rgba(105,56,239,0.05)" : "transparent" }}
+                                                >
+                                                    {s.label}
+                                                    {on ? (
+                                                        <Icon name="check" size={13} color="var(--accent)" strokeWidth={2.4} />
+                                                    ) : null}
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                ) : null}
                             </div>
-                        ))}
-                    </div>
-                )}
 
-                <p className="mt-3 text-[11.5px] text-[var(--ink-soft)]">
-                    Les variables proviennent du modèle sélectionné à l&apos;étape 2.
-                </p>
+                            {isFixed ? (
+                                <CwInput
+                                    value={v.fixed || ""}
+                                    onChange={(val) => setVar(i, { fixed: val })}
+                                    placeholder="Valeur à insérer"
+                                />
+                            ) : null}
+                        </div>
+                    </div>
+                )
+            })}
+
+            <div className="flex items-center gap-[7px] text-[11.5px] text-[var(--ink-soft)]">
+                <Icon name="help-circle" size={13} color="var(--ink-soft)" />
+                Les champs contact sont remplis individuellement pour chaque destinataire.
             </div>
         </div>
     )

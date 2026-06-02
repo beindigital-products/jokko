@@ -3,22 +3,26 @@ import { CAMPAIGN_STEPS, type WizardStepId } from "./types"
 
 interface WizardStepperProps {
     current: WizardStepId
-    /** Click a completed/visited step to jump back. */
+    /** Highest step reached — steps up to this are clickable. */
+    maxStep?: WizardStepId
+    /** Jump to a reachable step. */
     onStepClick?: (id: WizardStepId) => void
 }
 
 /**
  * WizardStepper — the 6-step progress header for the campaign wizard.
  * Done steps show a green ✓, the current step is ink, future steps are muted.
- * Recreates the `CampaignWizard` stepper from the design.
+ * Steps up to `maxStep` (the furthest reached) are clickable. Recreates the
+ * design's `CwStepper`.
  */
-export function WizardStepper({ current, onStepClick }: WizardStepperProps) {
+export function WizardStepper({ current, maxStep = current, onStepClick }: WizardStepperProps) {
     return (
-        <div className="flex items-center gap-2 border-b border-[var(--ink-200)] px-8 py-3.5">
+        <div className="flex items-center gap-1.5 border-b border-[var(--ink-200)] px-6 py-3.5">
             {CAMPAIGN_STEPS.map((s, i) => {
                 const done = s.id < current
                 const active = s.id === current
-                const clickable = onStepClick && s.id <= current
+                const reachable = s.id <= maxStep
+                const clickable = Boolean(onStepClick) && reachable
                 return (
                     <div key={s.id} className="flex flex-1 items-center gap-1.5">
                         <button
@@ -43,9 +47,9 @@ export function WizardStepper({ current, onStepClick }: WizardStepperProps) {
                             <span
                                 className={cn(
                                     "whitespace-nowrap text-[11.5px]",
-                                    active
-                                        ? "font-semibold text-[var(--ink-900)]"
-                                        : "font-medium text-[var(--ink-500)]",
+                                    active && "font-semibold text-[var(--ink-900)]",
+                                    !active && reachable && "font-medium text-[var(--ink-500)]",
+                                    !active && !reachable && "font-medium text-[var(--ink-soft)]",
                                 )}
                             >
                                 {s.label}

@@ -1,52 +1,83 @@
-import { Input } from "@/components/ui/input"
-import type { CampaignWizardData } from "./types"
+import { Icon, type IconName } from "@/components/dashboard/primitives/Icon"
+import { CwInput, CwLabel, type WizardState } from "./_shared"
+import type { TemplateCategory } from "./types"
+
+interface CatOption {
+    id: TemplateCategory | "Auth"
+    icon: IconName
+    title: string
+    desc: string
+    price: string
+    disabled?: boolean
+}
+
+const CATS: CatOption[] = [
+    { id: "Marketing", icon: "flag", title: "Marketing", desc: "Promos, nouveautés, réactivation", price: "€0.032" },
+    { id: "Utility", icon: "doc", title: "Utility", desc: "Confirmations, rappels, suivi", price: "€0.011" },
+    {
+        id: "Auth",
+        icon: "lock",
+        title: "Authentification",
+        desc: "Codes OTP — non éligible ici",
+        price: "—",
+        disabled: true,
+    },
+]
 
 /**
- * StepName — Étape 1 of the v3 campaign wizard. Names the campaign and gives it
- * an optional internal description. Presentational: values come from the fixture
- * draft, no real handlers.
+ * StepName — Étape 1 (Objectif). Internal name + optional description + the Meta
+ * category cards. The category drives the template list and per-conversation
+ * pricing. Controlled by the shell. Recreates the design's step 1.
  */
-export function StepName({ data }: { data: CampaignWizardData }) {
-    const { draft } = data
-
+export function StepName({ name, desc, cat, setName, setDesc, selectCat }: WizardState) {
     return (
-        <div className="space-y-6 px-8 py-8">
+        <div className="flex flex-col gap-[18px]">
             <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-                    Étape 1 · Nom
-                </div>
-                <h2 className="mt-1 font-display text-[20px] tracking-[-0.01em] text-[var(--ink-900)]">
-                    Nommer la campagne
-                </h2>
-                <p className="mt-1 text-[13px] text-[var(--ink-500)]">
-                    Un nom interne pour retrouver cette campagne dans vos rapports.
-                    Vos contacts ne le verront jamais.
-                </p>
+                <CwLabel hint="non visible par le client">Nom de la campagne</CwLabel>
+                <CwInput value={name} onChange={setName} placeholder="ex. Promo Fête des Pères" />
             </div>
 
-            <div className="max-w-xl space-y-5">
-                <div>
-                    <label className="mb-1.5 block text-[12px] font-medium text-[var(--ink-700)]">
-                        Nom de la campagne
-                    </label>
-                    <Input defaultValue={draft.name} placeholder="Relance soldes d'été" />
-                    <p className="mt-1.5 text-[11.5px] text-[var(--ink-soft)]">
-                        Visible uniquement par votre équipe.
-                    </p>
-                </div>
+            <div>
+                <CwLabel hint="optionnel">Description</CwLabel>
+                <CwInput value={desc} onChange={setDesc} placeholder="Objectif, offre, contexte…" />
+            </div>
 
-                <div>
-                    <label className="mb-1.5 block text-[12px] font-medium text-[var(--ink-700)]">
-                        Description (optionnel)
-                    </label>
-                    <textarea
-                        defaultValue={draft.description}
-                        placeholder="Objectif, audience visée, offre…"
-                        className="min-h-20 w-full rounded-lg border border-[var(--ink-200)] bg-[var(--paper-warm)] px-3 py-2 text-[13px] text-[var(--ink-900)] placeholder:text-[var(--ink-500)] transition-all focus:border-[var(--accent)] focus:bg-[var(--paper-white)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent-ring)]"
-                    />
-                    <p className="mt-1.5 text-[11.5px] text-[var(--ink-soft)]">
-                        Une note rapide pour le contexte. Aucun impact sur l&apos;envoi.
-                    </p>
+            <div>
+                <CwLabel>Catégorie Meta</CwLabel>
+                <div className="grid grid-cols-3 gap-2">
+                    {CATS.map((c) => {
+                        const on = cat === c.id
+                        return (
+                            <button
+                                key={c.id}
+                                type="button"
+                                disabled={c.disabled}
+                                onClick={() => !c.disabled && selectCat(c.id as TemplateCategory)}
+                                className="rounded-[10px] border px-[13px] py-3 text-left transition-colors"
+                                style={{
+                                    cursor: c.disabled ? "not-allowed" : "pointer",
+                                    borderColor: on ? "var(--accent)" : "var(--ink-200)",
+                                    background: on ? "rgba(105,56,239,0.05)" : "var(--paper-white)",
+                                    opacity: c.disabled ? 0.5 : 1,
+                                }}
+                            >
+                                <Icon name={c.icon} size={16} color={on ? "var(--accent)" : "var(--ink-500)"} />
+                                <div className="mt-2 text-[13px] font-semibold tracking-[-0.005em] text-[var(--ink-900)]">
+                                    {c.title}
+                                </div>
+                                <div className="mt-[3px] text-[11.5px] leading-[1.35] text-[var(--ink-soft)]">
+                                    {c.desc}
+                                </div>
+                                <div
+                                    className="mt-[7px] font-mono text-[10.5px] tabular-nums"
+                                    style={{ color: on ? "var(--accent)" : "var(--ink-soft)" }}
+                                >
+                                    {c.price}
+                                    {c.price !== "—" ? " / conv." : ""}
+                                </div>
+                            </button>
+                        )
+                    })}
                 </div>
             </div>
         </div>

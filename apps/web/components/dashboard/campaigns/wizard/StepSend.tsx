@@ -1,132 +1,116 @@
-import { Chip } from "@/components/dashboard/primitives/Chip"
-import { Icon } from "@/components/dashboard/primitives/Icon"
-import type { CampaignWizardData } from "./types"
+import { Icon, type IconName } from "@/components/dashboard/primitives/Icon"
+import { CwInput, CwLabel, type WizardState } from "./_shared"
+import type { SendMode } from "./types"
+
+const MODES: { id: SendMode; icon: IconName; title: string; desc: string }[] = [
+    { id: "now", icon: "bolt", title: "Envoyer maintenant", desc: "Mise en file immédiate" },
+    { id: "scheduled", icon: "clock", title: "Planifier", desc: "Choisir date et heure" },
+]
 
 /**
- * StepSend — Étape 5 of the v3 campaign wizard. Pick the WhatsApp number that
- * sends the broadcast and choose between immediate and scheduled delivery.
- * Presentational: selection comes from the fixture draft.
+ * StepSend — Étape 5 (Envoi). Sending-number cards (Owner-only choice), the
+ * send-moment cards (now / scheduled), the native date+time inputs when
+ * scheduled, and a 24h marketing-window warning. Controlled by the shell.
  */
-export function StepSend({ data }: { data: CampaignWizardData }) {
-    const { draft, sendingNumbers } = data
-
+export function StepSend({
+    data,
+    role,
+    numId,
+    setNumId,
+    mode,
+    setMode,
+    date,
+    setDate,
+    time,
+    setTime,
+}: WizardState) {
     return (
-        <div className="space-y-6 px-8 py-8">
+        <div className="flex flex-col gap-[18px]">
             <div>
-                <div className="font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-                    Étape 5 · Envoi
-                </div>
-                <h2 className="mt-1 font-display text-[20px] tracking-[-0.01em] text-[var(--ink-900)]">
-                    Numéro et planification
-                </h2>
-                <p className="mt-1 text-[13px] text-[var(--ink-500)]">
-                    Choisissez le numéro expéditeur, puis envoyez immédiatement ou
-                    planifiez la diffusion.
-                </p>
-            </div>
-
-            {/* Sending number */}
-            <div>
-                <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-                    Numéro d&apos;envoi
-                </div>
-                <div className="flex flex-col gap-2">
-                    {sendingNumbers.map((n) => {
-                        const isSel = n.id === draft.sendingNumberId
+                <CwLabel>Numéro émetteur</CwLabel>
+                <div className="grid grid-cols-2 gap-2">
+                    {data.numbers.map((n) => {
+                        const on = n.id === numId
+                        const locked = role !== "OWNER" && n.id !== data.numbers[0].id
                         return (
-                            <div
+                            <button
                                 key={n.id}
-                                className="flex cursor-pointer items-center gap-3 rounded-xl border px-[14px] py-3 transition-colors"
+                                type="button"
+                                disabled={locked}
+                                onClick={() => !locked && setNumId(n.id)}
+                                className="rounded-[10px] border px-[13px] py-[11px] text-left transition-colors"
                                 style={{
-                                    background: isSel ? "rgba(105,56,239,0.05)" : "transparent",
-                                    borderColor: isSel ? "var(--accent)" : "var(--ink-200)",
+                                    cursor: locked ? "not-allowed" : "pointer",
+                                    borderColor: on ? "var(--accent)" : "var(--ink-200)",
+                                    background: on ? "rgba(105,56,239,0.05)" : "var(--paper-white)",
+                                    opacity: locked ? 0.5 : 1,
                                 }}
                             >
-                                <span
-                                    className="flex shrink-0 items-center justify-center"
-                                    style={{
-                                        width: 16,
-                                        height: 16,
-                                        borderRadius: 8,
-                                        border: `1.5px solid ${isSel ? "var(--accent)" : "var(--ink-300)"}`,
-                                        background: isSel ? "var(--accent)" : "transparent",
-                                    }}
-                                >
-                                    {isSel && (
-                                        <span
-                                            style={{
-                                                width: 6,
-                                                height: 6,
-                                                borderRadius: 3,
-                                                background: "#fff",
-                                                display: "block",
-                                            }}
-                                        />
-                                    )}
-                                </span>
-                                <div className="flex-1">
-                                    <div className="font-display text-[13.5px] tracking-[-0.005em] text-[var(--ink-900)]">
-                                        {n.city}
-                                    </div>
-                                    <div className="mt-0.5 font-mono text-[11.5px] text-[var(--ink-soft)]">
-                                        {n.number}
-                                    </div>
+                                <div className="flex items-center gap-[7px]">
+                                    <Icon name="whatsapp" size={14} color="var(--status-good)" />
+                                    <span className="text-[13px] font-semibold text-[var(--ink-900)]">{n.label}</span>
                                 </div>
-                                <Chip tone="neutral">{n.pole}</Chip>
-                            </div>
+                                <div className="mt-[5px] font-mono text-[11.5px] tabular-nums text-[var(--ink-500)]">
+                                    {n.num}
+                                </div>
+                                <div className="mt-1 text-[11px] text-[var(--ink-soft)]">Qualité : {n.quality}</div>
+                            </button>
                         )
                     })}
                 </div>
-            </div>
-
-            {/* Schedule */}
-            <div>
-                <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">
-                    Planification
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                    {(
-                        [
-                            { value: "now", icon: "send", label: "Envoyer maintenant", sub: "Diffusion dès la validation" },
-                            { value: "scheduled", icon: "clock", label: "Planifier", sub: "Choisir une date et une heure" },
-                        ] as const
-                    ).map((opt) => {
-                        const isSel = draft.schedule === opt.value
-                        return (
-                            <div
-                                key={opt.value}
-                                className="flex cursor-pointer items-start gap-3 rounded-xl border px-[14px] py-3 transition-colors"
-                                style={{
-                                    background: isSel ? "rgba(105,56,239,0.05)" : "transparent",
-                                    borderColor: isSel ? "var(--accent)" : "var(--ink-200)",
-                                }}
-                            >
-                                <Icon
-                                    name={opt.icon}
-                                    size={18}
-                                    color={isSel ? "var(--accent)" : "var(--ink-500)"}
-                                />
-                                <div className="flex-1">
-                                    <div className="text-[13.5px] font-medium tracking-[-0.005em] text-[var(--ink-900)]">
-                                        {opt.label}
-                                    </div>
-                                    <div className="mt-0.5 text-[12px] text-[var(--ink-soft)]">
-                                        {opt.sub}
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-
-                {draft.schedule === "scheduled" ? (
-                    <div className="mt-2 flex max-w-sm items-center gap-2 rounded-lg border border-[var(--ink-200)] bg-[var(--paper-warm)] px-3 py-2.5">
-                        <Icon name="clock" size={16} color="var(--ink-500)" />
-                        <span className="text-[13px] text-[var(--ink-900)]">
-                            {draft.scheduleLabel}
-                        </span>
+                {role !== "OWNER" ? (
+                    <div className="mt-[7px] flex items-center gap-[5px] text-[11px] text-[var(--status-warn)]">
+                        <Icon name="lock" size={11} color="var(--status-warn)" />
+                        Le choix du numéro est réservé aux Owners.
                     </div>
                 ) : null}
+            </div>
+
+            <div>
+                <CwLabel>Moment de diffusion</CwLabel>
+                <div className="grid grid-cols-2 gap-2">
+                    {MODES.map((m) => {
+                        const on = mode === m.id
+                        return (
+                            <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setMode(m.id)}
+                                className="rounded-[10px] border px-[13px] py-[11px] text-left transition-colors"
+                                style={{
+                                    cursor: "pointer",
+                                    borderColor: on ? "var(--accent)" : "var(--ink-200)",
+                                    background: on ? "rgba(105,56,239,0.05)" : "var(--paper-white)",
+                                }}
+                            >
+                                <Icon name={m.icon} size={16} color={on ? "var(--accent)" : "var(--ink-500)"} />
+                                <div className="mt-[7px] text-[13px] font-semibold text-[var(--ink-900)]">{m.title}</div>
+                                <div className="mt-0.5 text-[11.5px] text-[var(--ink-soft)]">{m.desc}</div>
+                            </button>
+                        )
+                    })}
+                </div>
+            </div>
+
+            {mode === "scheduled" ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                        <CwLabel>Date</CwLabel>
+                        <CwInput value={date} onChange={setDate} type="date" mono />
+                    </div>
+                    <div>
+                        <CwLabel>Heure · Europe/Paris</CwLabel>
+                        <CwInput value={time} onChange={setTime} type="time" mono />
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="flex gap-[9px] rounded-[9px] border border-[var(--status-warn)]/25 bg-[var(--status-warn)]/[0.07] px-3.5 py-[11px] text-[12px] text-[var(--ink-700)]">
+                <Icon name="clock" size={14} color="var(--status-warn)" />
+                <div>
+                    Fenêtre marketing 24h : chaque destinataire ne recevra qu&apos;un seul message facturé sur 24h, même
+                    en cas de relance.
+                </div>
             </div>
         </div>
     )
