@@ -1,10 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
-import { TrialBannerView, type TrialBannerViewProps } from "./trial-banner"
+import { Banner, type BannerProps } from "./Banner"
 
 const meta = {
-    title: "Billing/TrialBanner",
-    component: TrialBannerView,
+    title: "Primitives/Banner",
+    component: Banner,
     parameters: { layout: "fullscreen" },
     decorators: [
         (Story) => (
@@ -13,12 +13,12 @@ const meta = {
             </div>
         ),
     ],
-} satisfies Meta<typeof TrialBannerView>
+} satisfies Meta<typeof Banner>
 
 export default meta
 type Story = StoryObj<typeof meta>
 
-const NEUTRAL: TrialBannerViewProps = {
+const NEUTRAL: BannerProps = {
     tone: "neutral",
     eyebrow: "Essai · jour 1 / 14",
     left: "13 jours restants",
@@ -30,7 +30,7 @@ const NEUTRAL: TrialBannerViewProps = {
     dismissible: true,
 }
 
-const REMINDER: TrialBannerViewProps = {
+const REMINDER: BannerProps = {
     tone: "reminder",
     eyebrow: "Essai · jour 8 / 14",
     left: "6 jours restants",
@@ -42,7 +42,7 @@ const REMINDER: TrialBannerViewProps = {
     dismissible: true,
 }
 
-const URGENT: TrialBannerViewProps = {
+const URGENT: BannerProps = {
     tone: "urgent",
     eyebrow: "Essai · jour 12 / 14",
     left: "2 jours restants",
@@ -53,7 +53,7 @@ const URGENT: TrialBannerViewProps = {
     ctaTone: "danger",
 }
 
-const EXPIRED: TrialBannerViewProps = {
+const EXPIRED: BannerProps = {
     tone: "expired",
     eyebrow: "Essai expiré",
     left: "Envoi suspendu",
@@ -65,25 +65,45 @@ const EXPIRED: TrialBannerViewProps = {
     secondaryCta: "Demander à l'admin",
 }
 
+const WARN: BannerProps = {
+    tone: "warn",
+    eyebrow: "Plan · Pro",
+    left: "9 / 10 sièges",
+    title: "Vous atteignez la limite de sièges",
+    body: "Pour inviter plus de coéquipiers, passez au plan Business.",
+    cta: "Comparer les plans",
+    ctaTone: "ink",
+    dismissible: true,
+}
+
+const GOOD: BannerProps = {
+    tone: "good",
+    eyebrow: "Numéro · Paris",
+    title: "Numéro WhatsApp reconnecté",
+    body: "Tout est revenu en ligne. Les messages entrants sont de nouveau délivrés.",
+    cta: "Voir l'inbox",
+    ctaTone: "primary",
+    dismissible: true,
+}
+
 export const Neutral: Story = { args: NEUTRAL }
 export const Reminder: Story = { args: REMINDER }
 export const Urgent: Story = { args: URGENT }
 export const Expired: Story = { args: EXPIRED }
+export const Warn: Story = { args: WARN }
+export const Good: Story = { args: GOOD }
 
-/** All four states stacked — the escalation, top to bottom. */
 export const AllStates: Story = {
     args: NEUTRAL,
     render: () => (
         <div className="flex flex-col gap-3">
-            <TrialBannerView {...NEUTRAL} />
-            <TrialBannerView {...REMINDER} />
-            <TrialBannerView {...URGENT} />
-            <TrialBannerView {...EXPIRED} />
+            {[NEUTRAL, REMINDER, URGENT, EXPIRED, WARN, GOOD].map((b) => (
+                <Banner key={b.tone} {...b} />
+            ))}
         </div>
     ),
 }
 
-/** Compact sidebar variant. */
 export const Sidebar: Story = {
     args: { ...REMINDER, variant: "sidebar" },
     decorators: [
