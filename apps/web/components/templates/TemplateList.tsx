@@ -10,7 +10,7 @@ import { Skeleton } from '../ui/skeleton';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { TEMPLATE_TYPE_CONFIGS, TemplateType } from '@/convex/lib/templateTypes';
-import { Edit, Trash2, FileStack, MoreHorizontal, Plus, RefreshCcw } from 'lucide-react';
+import { Edit, Trash2, MoreHorizontal, Plus, RefreshCcw } from 'lucide-react';
 import {
     Table,
     TableBody,
@@ -26,13 +26,7 @@ import {
     DropdownMenuLabel,
     DropdownMenuTrigger,
 } from "../ui/dropdown-menu";
-import {
-    Empty,
-    EmptyHeader,
-    EmptyTitle,
-    EmptyDescription,
-    EmptyMedia
-} from '../ui/empty';
+import { EmptyState } from '@/components/dashboard/primitives/EmptyState';
 
 interface TemplateListProps {
     onCreate: () => void;
@@ -75,25 +69,20 @@ export const TemplateList: React.FC<TemplateListProps> = ({ onCreate, onEdit, on
 
     if (templates?.length === 0 && !searchTerm) {
         return (
-            <Empty>
-                <EmptyMedia variant="icon">
-                    <FileStack className="size-6" />
-                </EmptyMedia>
-                <EmptyHeader>
-                    <EmptyTitle>Aucun modele trouve</EmptyTitle>
-                    <EmptyDescription>
-                        Vous n&apos;avez pas encore cree de modeles de messages.
-                        Commencez par en creer un nouveau pour engager vos clients.
-                    </EmptyDescription>
-                </EmptyHeader>
-                <Button
-                    onClick={onCreate}
-                    className="mt-4 bg-gradient-to-r from-[#14532d] to-[#059669] hover:from-[#14532d] hover:to-[#047857] text-white shadow-sm"
-                >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Creer un modele
-                </Button>
-            </Empty>
+            <EmptyState
+                illustration="templates"
+                title="Créez votre premier modèle"
+                body="Les modèles sont soumis à Meta pour approbation. Ils permettent de relancer un client hors de la fenêtre 24h."
+                primary={
+                    <Button
+                        onClick={onCreate}
+                        className="bg-gradient-to-r from-[#14532d] to-[#059669] hover:from-[#14532d] hover:to-[#047857] text-white shadow-sm"
+                    >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Creer un modele
+                    </Button>
+                }
+            />
         );
     }
 

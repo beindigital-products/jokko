@@ -62,6 +62,7 @@ import {
     InputGroupAddon,
     InputGroupInput,
 } from '@/components/ui/input-group'
+import { EmptyState } from '@/components/dashboard/primitives/EmptyState'
 import { ContactCard, Contact, getInitials } from './ContactCard'
 import { ContactListSkeleton } from './ContactCardSkeleton'
 import { SegmentSelector, type SegmentFilters } from './SegmentSelector'
@@ -856,31 +857,40 @@ export function ContactList({
                 )
             ) : paginatedContacts.length === 0 && filteredContacts.length === 0 ? (
                 <Card className="bg-white border-gray-100 shadow-sm">
-                    <CardContent className="flex flex-col items-center justify-center py-16">
-                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] flex items-center justify-center shadow-lg shadow-green-900/20 mb-4">
-                            <Users className="h-7 w-7 text-white" />
-                        </div>
-                        <CardTitle className="text-base font-semibold text-gray-900 mb-1.5">
-                            Aucun contact
-                        </CardTitle>
-                        <CardDescription className="text-center max-w-md text-sm text-gray-500">
-                            {activeFilterCount > 0
-                                ? 'Aucun contact ne correspond à vos critères de recherche.'
-                                : 'Commencez par ajouter vos premiers contacts ou importez-les depuis un fichier.'}
-                        </CardDescription>
-                        {activeFilterCount === 0 && (
-                            <div className="flex items-center gap-2 mt-6">
-                                <Button onClick={onAddNew} size="sm" className="h-8 gap-1.5 text-xs rounded-full cursor-pointer">
-                                    <Plus className="h-3.5 w-3.5" />
-                                    Ajouter un contact
-                                </Button>
-                                <Button variant="outline" onClick={onImport} size="sm" className="h-8 gap-1.5 text-xs rounded-full cursor-pointer">
-                                    <Upload className="h-3.5 w-3.5" />
-                                    Importer
-                                </Button>
+                    {activeFilterCount > 0 ? (
+                        <CardContent className="flex flex-col items-center justify-center py-16">
+                            <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] flex items-center justify-center shadow-lg shadow-green-900/20 mb-4">
+                                <Users className="h-7 w-7 text-white" />
                             </div>
-                        )}
-                    </CardContent>
+                            <CardTitle className="text-base font-semibold text-gray-900 mb-1.5">
+                                Aucun contact
+                            </CardTitle>
+                            <CardDescription className="text-center max-w-md text-sm text-gray-500">
+                                Aucun contact ne correspond à vos critères de recherche.
+                            </CardDescription>
+                        </CardContent>
+                    ) : (
+                        <CardContent className="p-0">
+                            <EmptyState
+                                dense
+                                illustration="contacts"
+                                title="Votre annuaire est vide."
+                                body="Importez vos contacts depuis HubSpot, Pipedrive ou un fichier CSV — ou laissez-les se créer tout seuls au fil des conversations."
+                                primary={
+                                    <Button onClick={onAddNew} size="sm" className="h-8 gap-1.5 text-xs rounded-full cursor-pointer">
+                                        <Plus className="h-3.5 w-3.5" />
+                                        Ajouter un contact
+                                    </Button>
+                                }
+                                secondary={
+                                    <Button variant="outline" onClick={onImport} size="sm" className="h-8 gap-1.5 text-xs rounded-full cursor-pointer">
+                                        <Upload className="h-3.5 w-3.5" />
+                                        Importer
+                                    </Button>
+                                }
+                            />
+                        </CardContent>
+                    )}
                 </Card>
             ) : (
                 <>

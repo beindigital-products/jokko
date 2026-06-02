@@ -5,7 +5,7 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useRouter } from 'next/navigation';
-import { Plus, MoreVertical, Play, Pause, Trash2, Edit, Workflow, ChevronLeft, AlertCircle, Sparkles } from 'lucide-react';
+import { Plus, MoreVertical, Play, Pause, Trash2, Edit, ChevronLeft, AlertCircle, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from '@/components/ui/button';
 import { SearchInput } from '@/components/ui/search-input';
@@ -18,14 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import {
-    Empty,
-    EmptyContent,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from '@/components/ui/empty';
+import { EmptyState } from '@/components/dashboard/primitives/EmptyState';
 import { FeatureGate } from '@/components/plan/FeatureGate';
 import { usePlanFeature } from '@/hooks/use-plan-feature';
 
@@ -144,23 +137,17 @@ export function FlowsPageClient() {
                 </div>
             ) : filteredFlows.length === 0 ? (
                 <div className="flex items-center justify-center py-12">
-                    <Empty>
-                        <EmptyHeader>
-                            <EmptyMedia variant="icon" className="bg-indigo-100 text-indigo-600 rounded-full p-4 mb-4">
-                                <Workflow className="w-8 h-8" />
-                            </EmptyMedia>
-                            <EmptyTitle className="text-xl font-bold text-gray-900">Aucun flux trouvé</EmptyTitle>
-                            <EmptyDescription className="text-gray-500 max-w-sm mx-auto mt-2">
-                                Commencez par créer votre premier flux d&apos;automatisation pour répondre automatiquement à vos clients.
-                            </EmptyDescription>
-                        </EmptyHeader>
-                        <EmptyContent className="mt-6">
+                    <EmptyState
+                        illustration="flow"
+                        title="Automatisez vos réponses"
+                        body="Créez des flows pour répondre 24/7, qualifier les leads, ou router les conversations vers le bon pôle."
+                        primary={
                             <Button className="bg-indigo-600 hover:bg-indigo-700 text-white gap-2 rounded-xl" onClick={() => router.push('/dashboard/flows/new')}>
                                 <Sparkles className="w-4 h-4" />
-                                Créer avec l&apos;IA
+                                Nouveau flow
                             </Button>
-                        </EmptyContent>
-                    </Empty>
+                        }
+                    />
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">

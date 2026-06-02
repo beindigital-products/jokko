@@ -50,6 +50,8 @@ import {
     type Pole,
 } from '@/components/team'
 
+import { EmptyState } from '@/components/dashboard/primitives/EmptyState'
+
 import { api } from "@/convex/_generated/api"
 import { type Role } from '@/lib/team/roles'
 
@@ -378,6 +380,8 @@ export default function TeamPage() {
         return result
     }, [members, searchQuery, roleFilter, statusFilter, poleFilter])
 
+    const hasActiveFilters = Boolean(searchQuery) || roleFilter !== 'all' || statusFilter !== 'all' || poleFilter !== 'all'
+
     if (role === undefined || membersData === undefined) {
         return <TeamPageSkeleton />
     }
@@ -617,13 +621,32 @@ export default function TeamPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="animate-in fade-in duration-300">
-                                <MemberList
-                                    members={filteredMembers}
-                                    currentUserRole={currentUserRole}
-                                    poles={poles}
+                            {nonOwnerCount === 0 && !hasActiveFilters ? (
+                                <EmptyState
+                                    dense
+                                    illustration="team"
+                                    title="Invitez votre équipe"
+                                    body="Jokko est pensé pour la collaboration : assignations, mentions internes, brouillons partagés."
+                                    primary={
+                                        <Button
+                                            size="sm"
+                                            onClick={() => setInviteModalOpen(true)}
+                                            className="h-8 gap-1.5 text-xs rounded-full bg-gradient-to-r from-[#14532d] to-[#059669] hover:from-[#14532d] hover:to-[#047857] text-white shadow-sm cursor-pointer"
+                                        >
+                                            <UserPlus className="h-3.5 w-3.5" />
+                                            Inviter un membre
+                                        </Button>
+                                    }
                                 />
-                            </div>
+                            ) : (
+                                <div className="animate-in fade-in duration-300">
+                                    <MemberList
+                                        members={filteredMembers}
+                                        currentUserRole={currentUserRole}
+                                        poles={poles}
+                                    />
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>

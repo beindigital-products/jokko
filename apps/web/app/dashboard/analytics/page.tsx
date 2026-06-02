@@ -36,7 +36,6 @@ import {
     ArrowDownRight,
     Download,
     AlertCircle,
-    BarChart3,
     Mail,
     Send,
     CalendarIcon,
@@ -44,6 +43,7 @@ import {
     MessagesSquare,
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { EmptyState } from "@/components/dashboard/primitives/EmptyState";
 import { cn } from "@/lib/utils";
 import { FeatureGate } from "@/components/billing/feature-gate";
 import { PlanTierBadge } from "@/components/billing/plan-tier-badge";
@@ -633,14 +633,13 @@ export default function AnalyticsPage() {
                                 </ResponsiveContainer>
                             </div>
                         ) : (
-                            <div className="h-[200px] sm:h-[260px] flex flex-col items-center justify-center text-gray-400">
-                                <BarChart3 className="h-12 w-12 mb-3 text-gray-300" />
-                                <p className="text-sm font-medium">
-                                    Aucune activit&eacute; sur cette p&eacute;riode
-                                </p>
-                                <p className="text-xs mt-1">
-                                    S&eacute;lectionnez une autre plage de dates
-                                </p>
+                            <div className="h-[200px] sm:h-[260px] flex">
+                                <EmptyState
+                                    dense
+                                    illustration="chart"
+                                    title="Pas encore de données"
+                                    body="Les statistiques apparaîtront dès que vous aurez reçu vos premières conversations."
+                                />
                             </div>
                         )}
 
