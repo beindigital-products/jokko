@@ -48,21 +48,23 @@ export function AttentionCard({
                         <div
                             key={c.id}
                             className={cn(
-                                "grid items-center gap-3 px-[18px] py-3",
+                                "flex flex-col gap-2.5 px-[18px] py-3 sm:grid sm:items-center sm:gap-3",
                                 i < rows.length - 1 && "border-b border-[var(--ink-100)]",
                             )}
-                            style={{ gridTemplateColumns: "32px 1.4fr 1fr 1fr auto" }}
+                            style={{ gridTemplateColumns: "minmax(0,1.6fr) 1fr 1fr auto" }}
                         >
-                            <Avatar
-                                initials={initialsFromName(c.who)}
-                                color={avatarColorFromString(c.who)}
-                                size="md"
-                            />
-                            <div className="min-w-0">
-                                <div className="truncate text-[13px] font-medium tracking-tight text-[var(--ink-900)]">
-                                    {c.who}
+                            <div className="flex min-w-0 items-center gap-3">
+                                <Avatar
+                                    initials={initialsFromName(c.who)}
+                                    color={avatarColorFromString(c.who)}
+                                    size="md"
+                                />
+                                <div className="min-w-0">
+                                    <div className="truncate text-[13px] font-medium tracking-tight text-[var(--ink-900)]">
+                                        {c.who}
+                                    </div>
+                                    <div className="truncate text-[12px] text-[var(--ink-soft)]">{c.last}</div>
                                 </div>
-                                <div className="truncate text-[12px] text-[var(--ink-soft)]">{c.last}</div>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <Chip tone="neutral">{c.channel}</Chip>

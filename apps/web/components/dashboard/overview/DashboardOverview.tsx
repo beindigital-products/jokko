@@ -151,7 +151,7 @@ export function DashboardOverview({
                 }
             />
 
-            <div className="flex-1 overflow-y-auto bg-[var(--paper-warm)]/30 px-7 pb-8 pt-10">
+            <div className="flex-1 overflow-y-auto bg-[var(--paper-warm)]/30 px-4 pb-8 pt-6 sm:px-7 sm:pt-10">
                 {trial ? <OverviewTrialBanner trial={trial} basePath={basePath} /> : null}
 
                 {loading || !data ? (
