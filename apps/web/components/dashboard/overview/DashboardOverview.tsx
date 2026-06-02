@@ -90,7 +90,7 @@ function OverviewTrialBanner({
 }
 
 function Skel({ className }: { className?: string }) {
-    return <div className={cn("animate-pulse rounded-xl bg-[var(--ink-100)]", className)} />
+    return <div className={cn("animate-pulse rounded-xl bg-[var(--ink-200)]", className)} />
 }
 
 function OverviewSkeleton() {
