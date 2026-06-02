@@ -262,7 +262,7 @@ export function mapAttention(
         title:
             rows.length === 0
                 ? "Tout est à jour"
-                : `${rows.length} conversation${rows.length > 1 ? "s" : ""} sans assignation ou en attente`,
+                : `${rows.length} conversation${rows.length > 1 ? "s" : ""} à traiter`,
         slaLabel: "SLA 3m",
         rows,
     }

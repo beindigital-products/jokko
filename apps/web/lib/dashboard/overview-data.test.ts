@@ -221,7 +221,7 @@ describe("mapAttention", () => {
         const section = mapAttention(rows, NOW)
 
         expect(section.slaLabel).toBe("SLA 3m")
-        expect(section.title).toBe("3 conversations sans assignation ou en attente")
+        expect(section.title).toBe("3 conversations à traiter")
         expect(section.rows).toHaveLength(3)
 
         expect(section.rows[0]).toMatchObject({ id: "fresh", who: "Awa Diop", channel: "WhatsApp", wait: "5 min", state: "unassigned" })
@@ -247,7 +247,7 @@ describe("mapAttention", () => {
 
     it("singularises the title for a single row", () => {
         const section = mapAttention([conv()], NOW)
-        expect(section.title).toBe("1 conversation sans assignation ou en attente")
+        expect(section.title).toBe("1 conversation à traiter")
     })
 
     it("caps at the limit (default 5)", () => {

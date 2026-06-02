@@ -13,7 +13,7 @@ const KPIS: DashboardOverviewData["kpis"] = [
 ]
 
 const ATTENTION: DashboardOverviewData["attention"] = {
-    title: "5 conversations sans assignation ou en attente",
+    title: "5 conversations à traiter",
     slaLabel: "SLA 3m",
     rows: [
         { id: "1", who: "Mehdi Sané", last: "Vous livrez à Dakar le mardi 3 ?", channel: "Dakar", tags: ["prospect"], wait: "8 min", state: "unassigned" },
