@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { DashboardSidebar, type DashboardNavKey } from "./DashboardSidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
 
 const meta = {
     title: "Shell/DashboardSidebar",
@@ -36,12 +37,12 @@ const BADGES = {
 
 function ShellPreview({ active }: { active: DashboardNavKey }) {
     return (
-        <div className="flex min-h-screen bg-[var(--paper-white)]">
+        <SidebarProvider className="min-h-screen bg-[var(--paper-white)]">
             <DashboardSidebar org={ORG} user={OWNER_USER} active={active} badges={BADGES} />
             <div className="flex-1 border-l border-[var(--ink-200)] p-8 text-[var(--ink-soft)]">
                 Main area placeholder
             </div>
-        </div>
+        </SidebarProvider>
     )
 }
 
@@ -64,7 +65,7 @@ export const ActiveAnalytics: Story = {
 export const AdminUser: Story = {
     name: "Admin user (vs Owner)",
     render: () => (
-        <div className="flex min-h-screen bg-[var(--paper-white)]">
+        <SidebarProvider className="min-h-screen bg-[var(--paper-white)]">
             <DashboardSidebar
                 org={ORG}
                 user={{
@@ -82,6 +83,6 @@ export const AdminUser: Story = {
             <div className="flex-1 border-l border-[var(--ink-200)] p-8 text-[var(--ink-soft)]">
                 Main area placeholder
             </div>
-        </div>
+        </SidebarProvider>
     ),
 }

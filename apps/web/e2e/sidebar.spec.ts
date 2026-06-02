@@ -12,7 +12,7 @@ test.describe("Sidebar v3", () => {
     })
 
     test("renders the 6 grouped sections + search + org card", async ({ page }) => {
-        const nav = page.locator('nav[aria-label="Navigation principale"]')
+        const nav = page.getByTestId("app-sidebar")
         for (const label of [
             "PILOTAGE",
             "INBOX",
@@ -31,7 +31,7 @@ test.describe("Sidebar v3", () => {
     })
 
     test("navigates via a nav item and reflects the active route", async ({ page }) => {
-        const nav = page.locator('nav[aria-label="Navigation principale"]')
+        const nav = page.getByTestId("app-sidebar")
         await nav.getByRole("link", { name: "Contacts", exact: true }).click()
         await expect(page).toHaveURL(/\/dashboard\/contacts/)
 
@@ -40,7 +40,7 @@ test.describe("Sidebar v3", () => {
     })
 
     test("user card opens the account menu with sign out", async ({ page }) => {
-        const nav = page.locator('nav[aria-label="Navigation principale"]')
+        const nav = page.getByTestId("app-sidebar")
         await nav
             .getByRole("button")
             .filter({ hasText: /Propriétaire|Administrateur|Agent/ })

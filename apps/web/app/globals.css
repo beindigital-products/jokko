@@ -96,15 +96,16 @@
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
 
-  /* Sidebar (dashboard) */
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Sidebar (dashboard) — mapped to the "Cobalt × paper × ink" palette so the
+     shadcn Sidebar primitive inherits the v3 look (paper bg, ink text, accent). */
+  --sidebar: var(--paper-warm);
+  --sidebar-foreground: var(--ink-700);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--paper-white);
+  --sidebar-accent: var(--accent-soft);
+  --sidebar-accent-foreground: var(--ink-900);
+  --sidebar-border: var(--ink-200);
+  --sidebar-ring: var(--accent-ring);
 
   /* Motion tokens */
   --ease-quart: cubic-bezier(0.22, 1, 0.36, 1);

@@ -1,10 +1,24 @@
 "use client"
 
+import Link from "next/link"
 import { Search } from "lucide-react"
 
+import {
+    Sidebar,
+    SidebarContent,
+    SidebarFooter,
+    SidebarGroup,
+    SidebarGroupContent,
+    SidebarGroupLabel,
+    SidebarHeader,
+    SidebarMenu,
+    SidebarMenuBadge,
+    SidebarMenuButton,
+    SidebarMenuItem,
+    SidebarRail,
+} from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 import { OrgSwitcher } from "./OrgSwitcher"
-import { SidebarSection } from "./SidebarSection"
-import { SidebarItem } from "./SidebarItem"
 import { UserMenu } from "./UserMenu"
 import type { AvatarColor } from "../primitives/Avatar"
 import type { ChipTone } from "../primitives/Chip"
@@ -128,10 +142,20 @@ const SECTIONS: { label: string; items: NavEntry[] }[] = [
     },
 ]
 
+/** Shared active/hover styling for a nav row — matches the v3 design exactly. */
+const ITEM_CLASS = cn(
+    "h-auto gap-2 rounded-md px-2 py-1.5 text-[13px] text-[var(--ink-700)]",
+    "hover:bg-[var(--paper-white)] hover:text-[var(--ink-900)]",
+    "data-[active=true]:border data-[active=true]:border-[var(--ink-200)] data-[active=true]:bg-[var(--paper-white)] data-[active=true]:font-semibold data-[active=true]:text-[var(--ink-900)] data-[active=true]:shadow-sm",
+)
+
 /**
- * DashboardSidebar — v3 cockpit sidebar. Composes OrgSwitcher / search /
- * 6 nav sections / UserMenu. Pure presentational — wire it with hooks
- * from the page (badges from Convex, active item from pathname).
+ * DashboardSidebar — v3 cockpit sidebar, now built on the shadcn `Sidebar`
+ * primitive (provider state, mobile off-canvas sheet, ⌘B toggle, rail) while
+ * keeping the exact "Cobalt × paper × ink" look: paper bg, org card, ⌘K search,
+ * 6 mono-labelled groups, accent-on-paper active rows + badges, user card.
+ * Pure presentational — wired from the page (badges/active/role gating).
+ * Requires a `SidebarProvider` ancestor (added in the dashboard layout).
  */
 export function DashboardSidebar({
     org,
@@ -149,9 +173,14 @@ export function DashboardSidebar({
     const hidden = new Set(hiddenKeys)
 
     return (
-        <aside className="flex h-full w-[260px] shrink-0 flex-col bg-[#FCFAF6]">
-            {/* Org card */}
-            <div className="px-3 pt-4 pb-3">
+        <Sidebar
+            collapsible="offcanvas"
+            data-testid="app-sidebar"
+            aria-label="Navigation principale"
+            className="[&_[data-sidebar=sidebar]]:bg-[#FCFAF6]"
+        >
+            {/* Org card + search */}
+            <SidebarHeader className="gap-2 p-3">
                 <OrgSwitcher
                     name={org.name}
                     initial={org.initial}
@@ -160,47 +189,57 @@ export function DashboardSidebar({
                     onClick={onOrgClick}
                     menu={orgMenu}
                 />
-            </div>
-
-            {/* Search */}
-            <div className="px-3 pb-3">
                 <button
                     type="button"
                     onClick={onSearchClick}
-                    className="flex w-full items-center gap-2 rounded-md border border-[var(--ink-200)] bg-[var(--paper-warm)] px-2.5 py-1.5 hover:bg-[var(--paper-white)] transition-colors"
+                    className="flex w-full items-center gap-2 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 py-1.5 transition-colors hover:bg-[var(--paper-warm)]"
                 >
                     <Search className="h-3.5 w-3.5 text-[var(--ink-400)]" />
-                    <span className="flex-1 text-left text-[12px] text-[var(--ink-400)]">
-                        Rechercher
-                    </span>
+                    <span className="flex-1 text-left text-[12px] text-[var(--ink-400)]">Rechercher</span>
                     <span className="font-mono text-[10px] text-[var(--ink-400)]">⌘K</span>
                 </button>
-            </div>
+            </SidebarHeader>
 
-            {/* Nav */}
-            <nav className="flex-1 space-y-4 overflow-y-auto px-3 pb-3">
+            {/* Grouped nav */}
+            <SidebarContent className="px-1.5">
                 {SECTIONS.map((section) => {
                     const items = section.items.filter((it) => !hidden.has(it.key))
                     if (items.length === 0) return null
                     return (
-                        <SidebarSection key={section.label} label={section.label}>
-                            {items.map((it) => (
-                                <SidebarItem
-                                    key={it.key}
-                                    href={`${basePath}${it.path}`}
-                                    icon={it.icon}
-                                    label={it.label}
-                                    badge={badges[it.key]}
-                                    active={active === it.key}
-                                />
-                            ))}
-                        </SidebarSection>
+                        <SidebarGroup key={section.label} className="py-1">
+                            <SidebarGroupLabel className="px-2 font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                                {section.label}
+                            </SidebarGroupLabel>
+                            <SidebarGroupContent>
+                                <SidebarMenu>
+                                    {items.map((it) => (
+                                        <SidebarMenuItem key={it.key}>
+                                            <SidebarMenuButton
+                                                asChild
+                                                isActive={active === it.key}
+                                                className={ITEM_CLASS}
+                                            >
+                                                <Link href={`${basePath}${it.path}`}>
+                                                    <it.icon className="text-[var(--ink-500)]" />
+                                                    <span>{it.label}</span>
+                                                </Link>
+                                            </SidebarMenuButton>
+                                            {badges[it.key] != null ? (
+                                                <SidebarMenuBadge className="font-mono text-[10px] font-medium text-[var(--ink-soft)]">
+                                                    {badges[it.key]}
+                                                </SidebarMenuBadge>
+                                            ) : null}
+                                        </SidebarMenuItem>
+                                    ))}
+                                </SidebarMenu>
+                            </SidebarGroupContent>
+                        </SidebarGroup>
                     )
                 })}
-            </nav>
+            </SidebarContent>
 
             {/* User card */}
-            <div className="border-t border-[var(--ink-200)] px-3 pb-4 pt-3">
+            <SidebarFooter className="p-3">
                 <UserMenu
                     name={user.name}
                     initials={user.initials}
@@ -212,7 +251,9 @@ export function DashboardSidebar({
                     onClick={onUserClick}
                     menu={userMenu}
                 />
-            </div>
-        </aside>
+            </SidebarFooter>
+
+            <SidebarRail />
+        </Sidebar>
     )
 }

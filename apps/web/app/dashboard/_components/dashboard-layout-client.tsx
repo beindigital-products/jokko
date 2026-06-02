@@ -2,6 +2,7 @@
 
 import { DashboardHeader } from '@/components/dashboard'
 import { AppSidebar } from '@/components/dashboard/app-sidebar'
+import { SidebarProvider } from '@/components/ui/sidebar'
 import { BrowserNotifications } from '@/components/browser-notifications'
 import { NotificationBanner } from '@/components/dashboard/notification-banner'
 import { TrialBanner } from '@/components/billing/trial-banner'
@@ -39,14 +40,12 @@ export function DashboardLayoutClient({
     usePresence(currentOrg?._id as Id<"organizations"> | undefined)
 
     return (
-        <div className="flex h-screen bg-gray-50/50">
-            {/* Desktop Sidebar (v3) */}
-            <nav className="hidden lg:block" aria-label="Navigation principale">
-                <AppSidebar basePath={basePath} />
-            </nav>
+        <SidebarProvider className="h-screen bg-gray-50/50">
+            {/* Desktop sidebar (v3 on shadcn) + mobile off-canvas sheet */}
+            <AppSidebar basePath={basePath} />
 
             {/* Main Content Area */}
-            <div className="flex flex-1 flex-col overflow-hidden">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 <NotificationBanner />
                 <BrowserNotifications />
                 <CallNotificationProvider />
@@ -70,6 +69,6 @@ export function DashboardLayoutClient({
                     </div>
                 </main>
             </div>
-        </div>
+        </SidebarProvider>
     )
 }
