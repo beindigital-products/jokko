@@ -16,7 +16,7 @@ export function StrategyCard({ strategies }: StrategyCardProps) {
                 {strategies.map((s) => (
                     <div
                         key={s.id}
-                        className="flex cursor-pointer items-start gap-3 border px-[14px] py-3 transition-colors"
+                        className="flex cursor-pointer items-start gap-3 rounded-[10px] border px-[14px] py-3 transition-colors"
                         style={{
                             background: s.selected
                                 ? "rgba(105,56,239,0.06)"

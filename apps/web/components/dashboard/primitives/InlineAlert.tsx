@@ -33,11 +33,15 @@ export function InlineAlert({ tone = "mute", icon: Icon, title, code, body, acti
     const t = TONE[tone]
     return (
         <div
-            className={cn("relative flex items-start gap-3 py-3 pl-[18px] pr-3.5", className)}
+            className={cn("relative flex items-start gap-3 rounded-[10px] py-3 pl-[18px] pr-3.5", className)}
             style={{ background: t.bg }}
             role="alert"
         >
-            <span aria-hidden className="absolute inset-y-0 left-0 w-[3px]" style={{ background: t.bar }} />
+            <span
+                aria-hidden
+                className="absolute bottom-2 left-0 top-2 w-0.5 rounded-full"
+                style={{ background: t.bar }}
+            />
             {Icon ? <Icon className="mt-px h-4 w-4 shrink-0" style={{ color: t.fg }} /> : null}
             <div className="min-w-0 flex-1">
                 {title || code ? (

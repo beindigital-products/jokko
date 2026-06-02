@@ -7,7 +7,7 @@ function MiniBtn({ children }: { children: React.ReactNode }) {
     return (
         <button
             type="button"
-            className="inline-flex h-7 items-center rounded-[var(--radius-btn)] border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 text-[12px] font-medium text-[var(--ink-700)]"
+            className="inline-flex h-7 items-center rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 text-[12px] font-medium text-[var(--ink-700)]"
         >
             {children}
         </button>

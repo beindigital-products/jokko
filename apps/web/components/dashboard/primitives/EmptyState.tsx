@@ -44,7 +44,7 @@ export function EmptyState({
                 <div
                     className={cn(
                         "flex items-center justify-center border border-[var(--ink-100)] bg-[var(--paper-warm)]",
-                        dense ? "mb-1.5 h-[92px] w-[92px]" : "mb-2.5 h-[124px] w-[124px]",
+                        dense ? "mb-1.5 h-[92px] w-[92px] rounded-[22px]" : "mb-2.5 h-[124px] w-[124px] rounded-[28px]",
                     )}
                 >
                     <StateIllustration name={illustration} size={dense ? 64 : 84} />
