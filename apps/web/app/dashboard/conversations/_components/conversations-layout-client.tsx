@@ -81,7 +81,7 @@ export function ConversationsLayoutClient() {
         <TooltipProvider delayDuration={0}>
             {/* Negative margins to escape parent padding (p-4 lg:p-6) */}
             {/* Height compensates for the padding we're escaping */}
-            <div className="-m-4 lg:-m-6 h-[calc(100vh-4rem)]">
+            <div className="-m-4 lg:-m-6 h-screen">
                 <ConversationLayout
                     organizationId={currentOrg._id}
                     basePath="/dashboard/conversations"

@@ -1,8 +1,7 @@
 'use client'
 
-import { DashboardHeader } from '@/components/dashboard'
 import { AppSidebar } from '@/components/dashboard/app-sidebar'
-import { SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { BrowserNotifications } from '@/components/browser-notifications'
 import { NotificationBanner } from '@/components/dashboard/notification-banner'
 import { TrialBanner } from '@/components/billing/trial-banner'
@@ -25,11 +24,7 @@ interface DashboardLayoutClientProps {
     organizationId?: string
 }
 
-export function DashboardLayoutClient({
-    children,
-    user,
-    organizationName,
-}: DashboardLayoutClientProps) {
+export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) {
     const basePath = '/dashboard'
     const { currentOrg } = useCurrentOrg()
     const { isTrialing, hasSelectedPlan, isLoading: trialLoading } = useTrialStatus()
@@ -46,16 +41,13 @@ export function DashboardLayoutClient({
 
             {/* Main Content Area */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                {/* Mobile-only trigger to open the nav (no desktop topbar) */}
+                <div className="flex items-center px-3 py-2 md:hidden">
+                    <SidebarTrigger className="text-[var(--ink-700)]" />
+                </div>
                 <NotificationBanner />
                 <BrowserNotifications />
                 <CallNotificationProvider />
-                {/* Header with mobile sidebar */}
-                <DashboardHeader
-                    basePath={basePath}
-                    user={user}
-                    organizationName={organizationName}
-                    showSearch={true}
-                />
 
                 {/* Page Content */}
                 <main id="main-content" className="flex-1 overflow-y-auto" role="main">
