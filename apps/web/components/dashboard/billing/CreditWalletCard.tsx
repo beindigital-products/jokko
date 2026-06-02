@@ -1,4 +1,4 @@
-import { ArrowRight, Lock, Wallet } from "lucide-react"
+import { ArrowRight, Loader2, Lock, Wallet } from "lucide-react"
 
 import { CreditBalanceHero } from "./CreditBalanceHero"
 import { CreditPackTile } from "./CreditPackTile"
@@ -7,15 +7,29 @@ import type { CreditWallet } from "./types"
 
 interface CreditWalletCardProps {
     wallet: CreditWallet
+    /** Index of the selected pack — overrides each pack's own `selected`. */
+    selectedIndex?: number
+    /** Called when a pack tile is clicked. */
+    onSelectPack?: (index: number) => void
+    /** Called when the primary recharge CTA is clicked. */
+    onRecharge?: () => void
+    /** Disables the CTA + shows a spinner while a payment session is created. */
+    loading?: boolean
 }
 
 /**
  * CreditWalletCard — pay-as-you-go credit for marketing/utility campaigns.
  * Composes the balance hero, top-up packs, auto top-up toggle and the
  * secure-payment footer. Recreates the `RechargeDialog` design as an in-page
- * card. Pure presentational.
+ * card. Presentational — selection + recharge are driven by callbacks.
  */
-export function CreditWalletCard({ wallet }: CreditWalletCardProps) {
+export function CreditWalletCard({
+    wallet,
+    selectedIndex,
+    onSelectPack,
+    onRecharge,
+    loading,
+}: CreditWalletCardProps) {
     return (
         <div className="overflow-hidden rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)]">
             {/* Header */}
@@ -49,14 +63,27 @@ export function CreditWalletCard({ wallet }: CreditWalletCardProps) {
                     <div className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--ink-soft)]">
                         Montant à recharger
                     </div>
-                    <div className="grid grid-cols-4 gap-2">
-                        {wallet.packs.map((p) => (
-                            <CreditPackTile key={p.amount} pack={p} />
+                    <div
+                        className="grid gap-2"
+                        style={{ gridTemplateColumns: "repeat(auto-fit, minmax(116px, 1fr))" }}
+                    >
+                        {wallet.packs.map((p, i) => (
+                            <CreditPackTile
+                                key={p.amount}
+                                pack={p}
+                                selected={selectedIndex !== undefined ? i === selectedIndex : undefined}
+                                onSelect={onSelectPack ? () => onSelectPack(i) : undefined}
+                            />
                         ))}
                     </div>
                 </div>
 
-                <CreditAutoTopUp description={wallet.autoTopUp} enabled={wallet.autoTopUpEnabled} />
+                {wallet.autoTopUp ? (
+                    <CreditAutoTopUp
+                        description={wallet.autoTopUp}
+                        enabled={wallet.autoTopUpEnabled ?? false}
+                    />
+                ) : null}
             </div>
 
             {/* Footer */}
@@ -67,10 +94,13 @@ export function CreditWalletCard({ wallet }: CreditWalletCardProps) {
                 </span>
                 <button
                     type="button"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)]"
+                    onClick={onRecharge}
+                    disabled={loading}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--accent-hover)] disabled:opacity-60"
                 >
+                    {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
                     {wallet.ctaLabel}
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    {loading ? null : <ArrowRight className="h-3.5 w-3.5" />}
                 </button>
             </div>
         </div>

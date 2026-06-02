@@ -10,7 +10,6 @@ import {
     Crown,
     Loader2,
     ExternalLink,
-    Wallet,
     ArrowUpRight,
     ArrowRightLeft,
     Sparkles,
@@ -43,7 +42,7 @@ import { cn } from "@/lib/utils";
 import { formatLimit, isUnlimited, type PlanKey } from "@/lib/plan-utils";
 import { usePlans, usePlanLimits, useTrialStatus } from "@/hooks/usePlans";
 import { Progress } from "@/components/ui/progress";
-import { RechargeDialog } from "./_components/recharge-dialog";
+import { CreditWalletCardConnected } from "./_components/credit-wallet-card-connected";
 import { TrialBanner } from "@/components/billing/trial-banner";
 
 type PlanDefinition = ReturnType<typeof usePlans>['plans'][number];
@@ -164,7 +163,6 @@ export default function BillingPage() {
     const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
     const [loadingPortal, setLoadingPortal] = useState(false);
     const [billingInterval, setBillingInterval] = useState<"month" | "year">("month");
-    const [rechargeOpen, setRechargeOpen] = useState(false);
 
     const handleUpgrade = async (planKey: "STARTER" | "BUSINESS" | "PRO") => {
         setLoadingPlan(planKey);
@@ -254,38 +252,11 @@ export default function BillingPage() {
                 )}
             </div>
 
-            {/* ==================== OVERVIEW CARDS ==================== */}
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                {/* Solde Marketing */}
-                <Card className="bg-white border-gray-100 shadow-sm hover:shadow-md transition-shadow">
-                    <CardContent className="p-4 sm:p-5">
-                        <div className="flex items-center justify-between mb-3 sm:mb-4">
-                            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] flex items-center justify-center shadow-lg shadow-green-900/20">
-                                <Wallet className="h-[18px] w-[18px] sm:h-5 sm:w-5 text-white" />
-                            </div>
-                            <Badge variant="secondary" className="text-[10px] bg-green-50 text-green-700 font-medium">
-                                Pay-As-You-Go
-                            </Badge>
-                        </div>
-                        <p className="text-xs sm:text-sm font-medium text-gray-500 mb-0.5">Solde Marketing</p>
-                        <span className="text-xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-                            {formatCurrency(creditBalance || 0)}
-                        </span>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
-                            ~ {Math.floor((creditBalance || 0) / 60)} messages marketing estim&eacute;s
-                        </p>
-                        <Button
-                            size="sm"
-                            className="w-full mt-4 h-8 gap-1.5 text-xs bg-gradient-to-r from-[#14532d] to-[#059669] hover:from-[#14532d]/90 hover:to-[#059669]/90 cursor-pointer"
-                            onClick={() => setRechargeOpen(true)}
-                        >
-                            <Plus className="h-3.5 w-3.5" />
-                            Recharger
-                        </Button>
-                        <RechargeDialog open={rechargeOpen} onOpenChange={setRechargeOpen} />
-                    </CardContent>
-                </Card>
+            {/* ==================== CRÉDIT MARKETING (v3, câblé) ==================== */}
+            <CreditWalletCardConnected />
 
+            {/* ==================== OVERVIEW CARDS ==================== */}
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
                 {/* Abonnement */}
                 <Card className="bg-white border-gray-100 shadow-sm hover:shadow-md transition-shadow">
                     <CardContent className="p-4 sm:p-5">

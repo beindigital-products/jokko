@@ -8,7 +8,6 @@ import {
     Send,
     ArrowUpRight,
     ArrowDownRight,
-    CreditCard,
     MessageCircle,
     UserPlus,
     Radio,
@@ -23,9 +22,9 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { useCurrentOrg } from '@/hooks/use-current-org'
+import { CreditBalanceCard } from '@/components/dashboard/overview/CreditBalanceCard'
 import {
     BarChart,
     Bar,
@@ -218,21 +217,19 @@ export default function DashboardPage() {
                     </div>
 
                     {currentOrg && (
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200">
-                                <span className="text-xs font-semibold text-gray-700">
-                                    Cr&eacute;dit Marketing
-                                </span>
-                                <span className="text-xs text-gray-500 font-medium tabular-nums">
-                                    {creditBalance != null ? formatCurrency(creditBalance) : '...'}
-                                </span>
-                            </div>
-                            <Link href="/dashboard/billing">
-                                <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs rounded-full cursor-pointer">
-                                    <CreditCard className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Recharger</span>
-                                </Button>
-                            </Link>
+                        <div className="w-full sm:w-72 shrink-0">
+                            <CreditBalanceCard
+                                credit={{
+                                    balance: creditBalance != null ? formatCurrency(creditBalance) : "…",
+                                    estimate:
+                                        creditBalance != null
+                                            ? `≈ ${Math.floor(creditBalance / 60).toLocaleString("fr-FR")} messages marketing`
+                                            : "Chargement du solde…",
+                                    low: creditBalance != null && creditBalance < 1000,
+                                    ctaLabel: "Recharger",
+                                }}
+                                rechargeHref="/dashboard/billing"
+                            />
                         </div>
                     )}
                 </div>

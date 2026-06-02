@@ -43,10 +43,10 @@ export interface CreditWallet {
     alert?: string
     /** Pre-set top-up amounts. */
     packs: CreditPack[]
-    /** Auto top-up description shown next to the toggle. */
-    autoTopUp: string
+    /** Auto top-up description shown next to the toggle. Omit to hide the row. */
+    autoTopUp?: string
     /** Whether auto top-up is enabled (visual toggle). */
-    autoTopUpEnabled: boolean
+    autoTopUpEnabled?: boolean
     /** Footer payment hint, e.g. "Paiement sécurisé · Stripe · VISA •••• 4842". */
     paymentHint: string
     /** Primary CTA label, e.g. "Recharger €100". */

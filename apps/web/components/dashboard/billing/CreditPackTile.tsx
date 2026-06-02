@@ -3,16 +3,27 @@ import type { CreditPack } from "./types"
 
 /**
  * CreditPackTile — one pre-set top-up amount (e.g. €100 ≈ 3 100 conv.).
- * Selected state matches the design's accent-bordered highlight.
+ * Selected state matches the design's accent-bordered highlight. `selected`
+ * (when provided) overrides `pack.selected`, so a parent can drive selection.
  */
-export function CreditPackTile({ pack }: { pack: CreditPack }) {
+export function CreditPackTile({
+    pack,
+    selected,
+    onSelect,
+}: {
+    pack: CreditPack
+    selected?: boolean
+    onSelect?: () => void
+}) {
+    const isSelected = selected ?? pack.selected
     return (
         <button
             type="button"
-            aria-pressed={pack.selected}
+            onClick={onSelect}
+            aria-pressed={isSelected}
             className={cn(
                 "rounded-[10px] border px-2 py-3.5 text-center transition-colors",
-                pack.selected
+                isSelected
                     ? "border-[var(--accent)] bg-[var(--accent-muted)]"
                     : "border-[var(--ink-200)] bg-[var(--paper-white)] hover:bg-[var(--paper-warm)]",
             )}
