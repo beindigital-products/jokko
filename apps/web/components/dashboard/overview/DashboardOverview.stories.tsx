@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
 import { DashboardOverview, type DashboardOverviewData } from "./DashboardOverview"
 import { DashboardSidebar } from "../shell/DashboardSidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
 
 const KPIS: DashboardOverviewData["kpis"] = [
     { label: "Conversations reçues", value: "142", delta: "+22", deltaTone: "good", sub: "vs hier 120" },
@@ -183,7 +184,7 @@ export const TrialExpired: Story = {
 export const Cockpit: Story = {
     name: "Cockpit (avec menu)",
     render: () => (
-        <div className="flex h-full w-full bg-[var(--paper-white)]">
+        <SidebarProvider className="h-full min-h-0 bg-[var(--paper-white)]">
             <DashboardSidebar
                 org={{ name: "Atelier Bracquet", initial: "a", plan: "PRO", seats: "8 SIÈGES" }}
                 user={{
@@ -201,6 +202,6 @@ export const Cockpit: Story = {
             <div className="min-w-0 flex-1 border-l border-[var(--ink-200)]">
                 <DashboardOverview data={FULL} />
             </div>
-        </div>
+        </SidebarProvider>
     ),
 }
