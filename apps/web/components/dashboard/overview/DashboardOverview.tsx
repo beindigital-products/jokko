@@ -12,9 +12,11 @@ import { TeamActivityCard } from "./TeamActivityCard"
 import { CampaignsCard } from "./CampaignsCard"
 import { FlowsCard } from "./FlowsCard"
 import { OnboardingCard } from "./OnboardingCard"
+import { CreditBalanceCard } from "./CreditBalanceCard"
 import type {
     AttentionRow,
     CampaignRow,
+    CreditBalance,
     FlowRow,
     OnboardingStep,
     OverviewKpi,
@@ -30,6 +32,7 @@ export interface DashboardOverviewData {
     team: TeamActivityRow[]
     campaigns: { rows: CampaignRow[]; total?: string }
     flows: { items: FlowRow[]; activeLabel?: string; total24h?: string }
+    credit: CreditBalance
     onboarding?: { steps: OnboardingStep[]; progressLabel?: string; headline?: string }
 }
 
@@ -167,13 +170,19 @@ export function DashboardOverview({
                                 activeLabel={data.flows.activeLabel}
                                 total24h={data.flows.total24h}
                             />
-                            {data.onboarding ? (
-                                <OnboardingCard
-                                    steps={data.onboarding.steps}
-                                    progressLabel={data.onboarding.progressLabel}
-                                    headline={data.onboarding.headline}
+                            <div className="flex flex-col gap-4">
+                                <CreditBalanceCard
+                                    credit={data.credit}
+                                    rechargeHref={`${basePath}/billing`}
                                 />
-                            ) : null}
+                                {data.onboarding ? (
+                                    <OnboardingCard
+                                        steps={data.onboarding.steps}
+                                        progressLabel={data.onboarding.progressLabel}
+                                        headline={data.onboarding.headline}
+                                    />
+                                ) : null}
+                            </div>
                         </div>
                     </div>
                 )}

@@ -6,6 +6,7 @@ import { PageHeader } from "../shell/PageHeader"
 import { HeaderButton } from "../shell/HeaderButton"
 import { PlanCard } from "./PlanCard"
 import { UsageStrip } from "./UsageStrip"
+import { CreditWalletCard } from "./CreditWalletCard"
 import { InvoicesTable } from "./InvoicesTable"
 import type { BillingData } from "./types"
 
@@ -33,6 +34,7 @@ export function BillingScreen({ data }: BillingScreenProps) {
             <div className="flex-1 space-y-5 overflow-y-auto px-8 pb-8 pt-10">
                 <PlanCard plan={data.plan} />
                 <UsageStrip usage={data.usage} />
+                <CreditWalletCard wallet={data.credit} />
                 <InvoicesTable
                     invoices={data.invoices}
                     title={

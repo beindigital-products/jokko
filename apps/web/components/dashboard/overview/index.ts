@@ -5,6 +5,7 @@ export { TeamActivityCard } from "./TeamActivityCard"
 export { CampaignsCard } from "./CampaignsCard"
 export { FlowsCard } from "./FlowsCard"
 export { OnboardingCard } from "./OnboardingCard"
+export { CreditBalanceCard } from "./CreditBalanceCard"
 export { Card, Eyebrow, CardTitle, MiniBtn } from "./OverviewCard"
 export type {
     DeltaTone,
@@ -17,4 +18,5 @@ export type {
     CampaignRow,
     FlowRow,
     OnboardingStep,
+    CreditBalance,
 } from "./types"

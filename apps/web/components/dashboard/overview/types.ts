@@ -52,3 +52,15 @@ export interface OnboardingStep {
     label: string
     done: boolean
 }
+
+/** Compact marketing-campaign credit balance shown on the overview cockpit. */
+export interface CreditBalance {
+    /** Current balance, e.g. "€38.20". */
+    balance: string
+    /** Status line, e.g. "≈ 1 200 conv. Meta restantes". */
+    estimate: string
+    /** When true, render the low-balance warning treatment. */
+    low?: boolean
+    /** CTA label, e.g. "Recharger". */
+    ctaLabel: string
+}

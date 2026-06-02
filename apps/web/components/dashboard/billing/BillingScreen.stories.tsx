@@ -1,7 +1,46 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
 import { BillingScreen } from "./BillingScreen"
-import type { BillingData } from "./types"
+import type { BillingData, CreditWallet } from "./types"
+
+const PACKS = [
+    { amount: "€50", note: "≈ 1 550 conv." },
+    { amount: "€100", note: "≈ 3 100 conv.", selected: true },
+    { amount: "€250", note: "≈ 7 750 conv." },
+    { amount: "€500", note: "≈ 15 500 conv." },
+]
+
+const CREDIT_OK: CreditWallet = {
+    balance: "€38.20",
+    estimate: "≈ 1 200 conv. Utility · 480 Marketing",
+    packs: PACKS,
+    autoTopUp: "Recharger automatiquement de €100 quand le solde passe sous €10.",
+    autoTopUpEnabled: true,
+    paymentHint: "Paiement sécurisé · Stripe · VISA •••• 4842",
+    ctaLabel: "Recharger €100",
+}
+
+const CREDIT_LOW: CreditWallet = {
+    balance: "€4.84",
+    estimate: "≈ 150 conv. restantes",
+    low: true,
+    alert: "Campagne « Réactivation 90j » bloquée — 696 conv. · besoin €22.30.",
+    packs: PACKS,
+    autoTopUp: "Recharger automatiquement de €100 quand le solde passe sous €10.",
+    autoTopUpEnabled: false,
+    paymentHint: "Paiement sécurisé · Stripe · VISA •••• 4842",
+    ctaLabel: "Recharger €100",
+}
+
+const CREDIT_EMPTY: CreditWallet = {
+    balance: "€0.00",
+    estimate: "Rechargez pour lancer votre première campagne marketing.",
+    packs: PACKS,
+    autoTopUp: "Recharger automatiquement de €100 quand le solde passe sous €10.",
+    autoTopUpEnabled: false,
+    paymentHint: "Paiement sécurisé · Stripe · VISA •••• 4842",
+    ctaLabel: "Recharger €100",
+}
 
 const DEFAULT_DATA: BillingData = {
     eyebrow: "Compte · Pro · facture mensuelle",
@@ -36,6 +75,7 @@ const DEFAULT_DATA: BillingData = {
             cost: "inclus",
         },
     ],
+    credit: CREDIT_OK,
     invoices: [
         {
             id: "inv-1",
@@ -88,7 +128,7 @@ const meta = {
     parameters: { layout: "fullscreen" },
     decorators: [
         (Story) => (
-            <div style={{ width: "100%", height: 880 }}>
+            <div style={{ width: "100%", height: 1180 }}>
                 <Story />
             </div>
         ),
@@ -137,7 +177,12 @@ export const Empty: Story = {
                     cost: "inclus",
                 },
             ],
+            credit: CREDIT_EMPTY,
             invoices: [],
         },
     },
+}
+
+export const CreditInsufficient: Story = {
+    args: { data: { ...DEFAULT_DATA, credit: CREDIT_LOW } },
 }

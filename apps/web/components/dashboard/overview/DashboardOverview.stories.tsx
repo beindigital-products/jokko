@@ -50,6 +50,12 @@ const FLOWS: DashboardOverviewData["flows"] = {
     ],
 }
 
+const CREDIT: DashboardOverviewData["credit"] = {
+    balance: "€38.20",
+    estimate: "≈ 1 200 conv. Meta restantes",
+    ctaLabel: "Recharger",
+}
+
 const ONBOARDING: DashboardOverviewData["onboarding"] = {
     progressLabel: "4 / 6",
     headline: "Encore deux étapes.",
@@ -71,6 +77,7 @@ const FULL: DashboardOverviewData = {
     team: TEAM,
     campaigns: CAMPAIGNS,
     flows: FLOWS,
+    credit: CREDIT,
     onboarding: ONBOARDING,
 }
 
@@ -113,6 +120,25 @@ export const Empty: Story = {
             team: [],
             campaigns: { total: "0 / 0", rows: [] },
             flows: { activeLabel: "0 actif", total24h: "0 exécution", items: [] },
+            credit: {
+                balance: "€0.00",
+                estimate: "Rechargez pour lancer votre première campagne.",
+                ctaLabel: "Recharger",
+            },
+        },
+    },
+}
+
+export const CreditLow: Story = {
+    args: {
+        data: {
+            ...FULL,
+            credit: {
+                balance: "€4.84",
+                estimate: "Solde insuffisant — campagne « Réactivation 90j » bloquée.",
+                low: true,
+                ctaLabel: "Recharger",
+            },
         },
     },
 }
