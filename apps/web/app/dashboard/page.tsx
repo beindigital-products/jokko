@@ -71,7 +71,7 @@ export default function DashboardPage() {
         // Full-bleed: escape the layout's `p-3 sm:p-4 lg:p-6` padding and own the
         // viewport height so the cockpit's internal header + scroll fill the area
         // (mirrors the conversations / flow-builder full-bleed technique).
-        <div className="-m-3 h-screen sm:-m-4 lg:-m-6">
+        <div className="-m-3 h-[calc(100vh-3rem)] sm:-m-4 lg:-m-6">
             <DashboardOverview data={data} loading={loading} basePath="/dashboard" />
         </div>
     )

@@ -149,7 +149,7 @@ export function FlowChatBuilder({ initialFlowId, initialNodes = [], initialEdges
     };
 
     return (
-        <div className="flex flex-col h-screen bg-white">
+        <div className="flex flex-col h-[calc(100vh-3rem)] bg-white">
             {/* Header */}
             <header className="shrink-0 flex items-center justify-between py-3 px-6 border-b border-gray-200 bg-white">
                 <div className="flex items-center gap-3">

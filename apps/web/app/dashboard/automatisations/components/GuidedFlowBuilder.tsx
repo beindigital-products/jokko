@@ -262,7 +262,7 @@ export function GuidedFlowBuilder({ flowId }: GuidedFlowBuilderProps) {
     };
 
     return (
-        <div className="-m-3 sm:-m-4 lg:-m-6 flex h-screen bg-white">
+        <div className="-m-3 sm:-m-4 lg:-m-6 flex h-[calc(100vh-3rem)] bg-white">
             {/* Left Panel - Wizard */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header with progress */}

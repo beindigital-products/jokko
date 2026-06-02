@@ -41,9 +41,12 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
 
             {/* Main Content Area */}
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                {/* Mobile-only trigger to open the nav (no desktop topbar) */}
-                <div className="flex items-center px-3 py-2 md:hidden">
-                    <SidebarTrigger className="text-[var(--ink-700)]" />
+                {/* Sidebar collapse / open — in the content column (not the sidebar) */}
+                <div className="flex h-12 shrink-0 items-center px-3">
+                    <SidebarTrigger
+                        aria-label="Replier le menu"
+                        className="size-8 text-[var(--ink-500)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-900)]"
+                    />
                 </div>
                 <NotificationBanner />
                 <BrowserNotifications />

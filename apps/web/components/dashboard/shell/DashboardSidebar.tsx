@@ -16,7 +16,6 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
     SidebarRail,
-    SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { OrgSwitcher } from "./OrgSwitcher"
@@ -180,24 +179,16 @@ export function DashboardSidebar({
             aria-label="Navigation principale"
             className="[&_[data-sidebar=sidebar]]:bg-[#FCFAF6]"
         >
-            {/* Org card + collapse toggle + search */}
+            {/* Org card + search */}
             <SidebarHeader className="gap-2 p-3 group-data-[collapsible=icon]:p-2">
-                <div className="flex items-center gap-1 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
-                    <div className="min-w-0 flex-1 group-data-[collapsible=icon]:flex-none">
-                        <OrgSwitcher
-                            name={org.name}
-                            initial={org.initial}
-                            plan={org.plan}
-                            seats={org.seats}
-                            onClick={onOrgClick}
-                            menu={orgMenu}
-                        />
-                    </div>
-                    <SidebarTrigger
-                        aria-label="Replier le menu"
-                        className="size-8 shrink-0 text-[var(--ink-500)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-900)]"
-                    />
-                </div>
+                <OrgSwitcher
+                    name={org.name}
+                    initial={org.initial}
+                    plan={org.plan}
+                    seats={org.seats}
+                    onClick={onOrgClick}
+                    menu={orgMenu}
+                />
                 <button
                     type="button"
                     onClick={onSearchClick}
