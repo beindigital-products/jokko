@@ -87,6 +87,7 @@ import type * as lib_templateTypes from "../lib/templateTypes.js";
 import type * as lib_templateValidation from "../lib/templateValidation.js";
 import type * as lib_templateValidators from "../lib/templateValidators.js";
 import type * as lib_visibility from "../lib/visibility.js";
+import type * as mentions from "../mentions.js";
 import type * as messages from "../messages.js";
 import type * as migration from "../migration.js";
 import type * as notifications from "../notifications.js";
@@ -205,6 +206,7 @@ declare const fullApi: ApiFromModules<{
   "lib/templateValidation": typeof lib_templateValidation;
   "lib/templateValidators": typeof lib_templateValidators;
   "lib/visibility": typeof lib_visibility;
+  mentions: typeof mentions;
   messages: typeof messages;
   migration: typeof migration;
   notifications: typeof notifications;

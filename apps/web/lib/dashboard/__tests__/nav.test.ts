@@ -22,7 +22,11 @@ describe("navKeyFromPathname", () => {
         expect(navKeyFromPathname("/dashboard/billing")).toBe("facturation")
     })
 
-    it("maps the notifications page to mentions (no dedicated mentions route)", () => {
+    it("maps the dedicated mentions page to mentions", () => {
+        expect(navKeyFromPathname("/dashboard/mentions")).toBe("mentions")
+    })
+
+    it("keeps the notifications history under the mentions key", () => {
         expect(navKeyFromPathname("/dashboard/notifications")).toBe("mentions")
     })
 

@@ -2,8 +2,9 @@ import type { DashboardNavKey } from "@/components/dashboard/shell"
 
 /**
  * Maps the current pathname to the active sidebar nav key. Order matters —
- * more specific prefixes are checked first. Mentions live on the
- * notifications page (no dedicated /conversations/mentions route exists).
+ * more specific prefixes are checked first. The dedicated Mentions page lives
+ * at /mentions; the generic notifications history (/notifications, reached via
+ * the bell) is mention-adjacent so it keeps the same key.
  */
 export function navKeyFromPathname(
     pathname: string,
@@ -11,6 +12,7 @@ export function navKeyFromPathname(
 ): DashboardNavKey {
     const rel = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : pathname
 
+    if (rel.startsWith("/mentions")) return "mentions"
     if (rel.startsWith("/notifications")) return "mentions"
     if (rel.startsWith("/conversations")) return "conversations"
     if (rel.startsWith("/assignments")) return "assignations"

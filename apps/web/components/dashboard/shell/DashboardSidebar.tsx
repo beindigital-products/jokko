@@ -107,7 +107,7 @@ const SECTIONS: { label: string; items: NavEntry[] }[] = [
         label: "INBOX",
         items: [
             { key: "conversations", icon: MessageSquare, label: "Conversations", path: "/conversations" },
-            { key: "mentions", icon: AtSign, label: "Mentions", path: "/notifications" },
+            { key: "mentions", icon: AtSign, label: "Mentions", path: "/mentions" },
             { key: "assignations", icon: Repeat, label: "Assignations", path: "/assignments" },
         ],
     },
