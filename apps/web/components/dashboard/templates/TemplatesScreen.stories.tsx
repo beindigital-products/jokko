@@ -21,6 +21,7 @@ const DATA: TemplatesData = {
             sent: "1 240",
             open: "78%",
             preview: "Bonjour {{1}}, voici votre devis personnalisé pour {{2}}. Il est valable 14 jours.",
+            media: { kind: "document", filename: "Devis_AB-2042.pdf", pages: 2, size: "248 ko" },
         },
         {
             id: "2",
@@ -61,6 +62,7 @@ const DATA: TemplatesData = {
             sent: "142",
             open: "92%",
             preview: "Votre rendez-vous est confirmé le {{1}} à {{2}}.",
+            media: { kind: "location", name: "Atelier Bracquet", address: "18 rue de Sévigné, 75004 Paris" },
         },
         {
             id: "6",
@@ -71,6 +73,7 @@ const DATA: TemplatesData = {
             sent: "88",
             open: "64%",
             preview: "Welcome {{1}}! Reply STOP to unsubscribe.",
+            media: { kind: "video", duration: "0:24" },
         },
         {
             id: "7",
@@ -81,6 +84,7 @@ const DATA: TemplatesData = {
             sent: "—",
             open: "—",
             preview: "Profitez de -30% pendant 48h sur {{1}}…",
+            media: { kind: "image" },
         },
     ],
     selectedId: "1",

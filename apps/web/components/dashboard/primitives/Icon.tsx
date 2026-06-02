@@ -72,6 +72,8 @@ export const ICON_PATHS = {
     rotate: "M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5",
     building: "M3 21h18M5 21V5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v16M9 8h.01M9 12h.01M9 16h.01M15 8h.01M15 12h.01M15 16h.01",
     "help-circle": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01",
+    "map-pin": "M12 21s-7-5.6-7-11a7 7 0 0 1 14 0c0 5.4-7 11-7 11ZM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+    download: "M12 3v11M8 11l4 4 4-4M5 20h14",
 } as const
 
 export type IconName = keyof typeof ICON_PATHS

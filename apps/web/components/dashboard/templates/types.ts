@@ -1,3 +1,5 @@
+import type { WaButton, WaMedia } from "../primitives/WhatsAppBubble"
+
 export type TemplateStatus = "approved" | "pending" | "rejected"
 export type TemplateCategory = "Marketing" | "Utility" | "Authentication"
 
@@ -10,6 +12,12 @@ export interface TemplateRow {
     sent: string
     open: string
     preview: string
+    /** Header attachment (document / image / video / location) for the preview. */
+    media?: WaMedia | null
+    /** Optional footer line shown under the body. */
+    footer?: string
+    /** Optional CTA / quick-reply buttons. */
+    buttons?: WaButton[]
 }
 
 /** Category filter pill shape. */

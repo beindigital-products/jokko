@@ -41,9 +41,16 @@ export interface TemplateVar {
 }
 
 export interface TemplateHeader {
-    type: "doc" | "image"
-    /** May contain {{N}} tokens (doc filename), resolved in the preview. */
+    type: "doc" | "image" | "video" | "location"
+    /** May contain {{N}} tokens (doc filename / location name), resolved in the preview. */
     label: string
+    /** Document: page count + human-readable size (e.g. "248 ko"). */
+    pages?: number
+    size?: string
+    /** Video: duration label (e.g. "0:24"). */
+    duration?: string
+    /** Location: address line shown under the place name. */
+    address?: string
 }
 
 export interface WizardTemplate {

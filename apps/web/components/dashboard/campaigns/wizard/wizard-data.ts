@@ -19,7 +19,7 @@ export const CW_TEMPLATES: WizardTemplate[] = [
         name: "Devis envoyé",
         cat: "Marketing",
         lang: "FR",
-        header: { type: "doc", label: "Devis_{{2}}.pdf" },
+        header: { type: "doc", label: "Devis_{{2}}.pdf", pages: 2, size: "248 ko" },
         body: "Bonjour {{1}}, voici votre devis personnalisé pour {{2}}. Il est valable 14 jours.",
         footer: "— L'équipe Atelier Bracquet",
         buttons: ["Voir la boutique"],

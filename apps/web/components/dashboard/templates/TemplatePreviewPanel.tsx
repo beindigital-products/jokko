@@ -1,29 +1,20 @@
 import { TemplateStatusPill } from "./TemplateStatusPill"
 import { Chip } from "../primitives/Chip"
 import { HeaderButton } from "../shell/HeaderButton"
+import {
+    WaChatFrame,
+    WhatsAppBubble,
+    highlightBody,
+    type WaButton,
+} from "../primitives/WhatsAppBubble"
 import { Pencil, Send } from "lucide-react"
 import type { TemplateRow } from "./types"
 
-/**
- * Preview variables highlighted in WhatsApp message body.
- * {{N}} placeholders become bold cobalt spans.
- */
-function HighlightedBody({ text }: { text: string }) {
-    const parts = text.split(/({{[^}]+}})/)
-    return (
-        <>
-            {parts.map((part, i) =>
-                /^{{[^}]+}}$/.test(part) ? (
-                    <b key={i} className="font-semibold text-[var(--accent)]">
-                        {part}
-                    </b>
-                ) : (
-                    <span key={i}>{part}</span>
-                ),
-            )}
-        </>
-    )
-}
+/** Fallback CTA buttons when a template doesn't define its own. */
+const DEFAULT_BUTTONS: WaButton[] = [
+    { label: "Nous appeler", kind: "phone" },
+    { label: "Voir la boutique", kind: "url" },
+]
 
 interface TemplatePreviewPanelProps {
     template: TemplateRow | null
@@ -31,15 +22,14 @@ interface TemplatePreviewPanelProps {
 }
 
 /**
- * TemplatePreviewPanel — right pane showing a WhatsApp-style bubble for
- * the selected template plus header meta (name, status, category, lang)
- * and action buttons. Displays a placeholder when no template is selected.
+ * TemplatePreviewPanel — right pane showing the selected template exactly as it
+ * lands in WhatsApp via the shared {@link WhatsAppBubble} (so the file / media
+ * header matches the campaign wizard), plus header meta (name, status, category,
+ * lang) and action buttons. Placeholder when no template is selected.
  */
 export function TemplatePreviewPanel({ template, canEdit = true }: TemplatePreviewPanelProps) {
     return (
-        <div
-            className="flex w-[360px] shrink-0 flex-col border-l border-[var(--ink-200)] bg-[var(--paper-warm)]"
-        >
+        <div className="flex w-[360px] shrink-0 flex-col border-l border-[var(--ink-200)] bg-[var(--paper-warm)]">
             {/* Header */}
             <div className="border-b border-[var(--ink-200)] px-[22px] pb-3.5 pt-5">
                 <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
@@ -57,58 +47,22 @@ export function TemplatePreviewPanel({ template, canEdit = true }: TemplatePrevi
                         </div>
                     </>
                 ) : (
-                    <p className="mt-2 text-[13.5px] text-[var(--ink-soft)]">
-                        Sélectionnez un modèle
-                    </p>
+                    <p className="mt-2 text-[13.5px] text-[var(--ink-soft)]">Sélectionnez un modèle</p>
                 )}
             </div>
 
             {/* WhatsApp-style bubble */}
             <div className="flex-1 overflow-y-auto p-[22px]">
                 {template ? (
-                    <div
-                        className="rounded-xl p-4"
-                        style={{
-                            background: "#E3DDD0",
-                            backgroundImage: "radial-gradient(rgba(10,10,10,0.04) 1px, transparent 1px)",
-                            backgroundSize: "8px 8px",
-                        }}
-                    >
-                        <div
-                            className="max-w-[95%] rounded-[8px_8px_8px_2px] bg-white p-[8px_10px] text-[13.5px] leading-[1.45] tracking-[-0.005em]"
-                            style={{ boxShadow: "0 1px 1px rgba(10,10,10,0.08)" }}
-                        >
-                            {/* Attachment hint for templates that look like docs */}
-                            {template.name.toLowerCase().includes("devis") && (
-                                <div className="mb-1 text-[12px] text-[var(--ink-soft)]">
-                                    📄 Devis_{"{{"}{2}{"}}"}.pdf
-                                </div>
-                            )}
-                            <div>
-                                <HighlightedBody text={template.preview} />
-                            </div>
-                            {/* Footer */}
-                            <div className="mt-1.5 text-[11.5px] italic text-[var(--ink-soft)]">
-                                — L'équipe Atelier Bracquet
-                            </div>
-                            {/* Time stamp */}
-                            <div className="mt-2 flex items-center justify-between border-t border-[#eee] pt-1.5">
-                                <span />
-                                <span className="font-mono text-[10px] tabular-nums text-[var(--ink-soft)]">
-                                    11:32 ✓✓
-                                </span>
-                            </div>
-                            {/* CTA buttons */}
-                            <div className="mt-1.5 flex flex-col gap-1 border-t border-[#eee] pt-1.5">
-                                <div className="py-1 text-center text-[13px] text-[#0084FF]">
-                                    📞 Nous appeler
-                                </div>
-                                <div className="py-1 text-center text-[13px] text-[#0084FF]">
-                                    🔗 Voir la boutique
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                    <WaChatFrame>
+                        <WhatsAppBubble
+                            media={template.media ?? null}
+                            body={highlightBody(template.preview)}
+                            footer={template.footer ?? "— L'équipe Atelier Bracquet"}
+                            buttons={template.buttons ?? DEFAULT_BUTTONS}
+                            time="11:32"
+                        />
+                    </WaChatFrame>
                 ) : (
                     <div className="flex h-full items-center justify-center text-[12px] text-[var(--ink-soft)]">
                         Aucun modèle sélectionné
@@ -118,9 +72,7 @@ export function TemplatePreviewPanel({ template, canEdit = true }: TemplatePrevi
 
             {/* Action footer */}
             <div className="flex items-center gap-1.5 border-t border-[var(--ink-200)] px-[22px] py-3.5">
-                {canEdit && (
-                    <HeaderButton icon={Pencil}>Éditer</HeaderButton>
-                )}
+                {canEdit && <HeaderButton icon={Pencil}>Éditer</HeaderButton>}
                 <HeaderButton icon={Send}>Envoyer test</HeaderButton>
                 <div className="flex-1" />
                 <HeaderButton variant="primary">Utiliser</HeaderButton>
