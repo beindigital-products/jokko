@@ -45,7 +45,7 @@ export const FullView: Story = {
     render: () => {
         const [active, setActive] = useState("canaux")
         return (
-            <div className="grid min-h-[600px] grid-cols-[220px_1fr] rounded-lg border border-[var(--ink-200)] bg-[var(--paper-white)]">
+            <div className="grid min-h-[600px] grid-cols-1 rounded-lg border border-[var(--ink-200)] bg-[var(--paper-white)] lg:grid-cols-[220px_1fr]">
                 <SettingsTabsNav tabs={SETTINGS_TABS} activeKey={active} onChange={setActive} />
                 <div className="px-7 py-5">
                     <p className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[var(--ink-soft)]">

@@ -35,7 +35,8 @@ export function ContactsTable({
     onRowMore,
 }: ContactsTableProps) {
     return (
-        <table className="w-full">
+        <div className="overflow-x-auto">
+        <table className="w-full min-w-[680px]">
             <thead>
                 <tr className="border-y border-[var(--ink-200)]">
                     {COLUMNS.map((h) => (
@@ -70,5 +71,6 @@ export function ContactsTable({
                 ))}
             </tbody>
         </table>
+        </div>
     )
 }

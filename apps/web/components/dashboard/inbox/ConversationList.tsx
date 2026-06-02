@@ -65,7 +65,7 @@ export function ConversationList({
     return (
         <div
             className={cn(
-                "flex h-full w-[340px] shrink-0 flex-col border-r border-[var(--ink-200)]",
+                "flex h-full w-full flex-col border-r border-[var(--ink-200)] lg:w-[340px] lg:shrink-0",
                 className,
             )}
         >

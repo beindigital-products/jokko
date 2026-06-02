@@ -29,7 +29,7 @@ interface TemplatePreviewPanelProps {
  */
 export function TemplatePreviewPanel({ template, canEdit = true }: TemplatePreviewPanelProps) {
     return (
-        <div className="flex w-[360px] shrink-0 flex-col border-l border-[var(--ink-200)] bg-[var(--paper-warm)]">
+        <div className="hidden w-[360px] shrink-0 flex-col border-l border-[var(--ink-200)] bg-[var(--paper-warm)] lg:flex">
             {/* Header */}
             <div className="border-b border-[var(--ink-200)] px-[22px] pb-3.5 pt-5">
                 <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">

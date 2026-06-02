@@ -29,11 +29,14 @@ export function AgentLoadCard({ agents }: AgentLoadCardProps) {
                 <HeaderButton icon={Users}>Redistribuer en masse</HeaderButton>
             </div>
 
-            {/* Rows */}
-            <div className="flex flex-col gap-2.5 px-[22px] py-[18px]">
-                {agents.map((a) => (
-                    <AgentLoadRow key={a.id} agent={a} />
-                ))}
+            {/* Rows — scroll horizontally on mobile so the load grid keeps a
+                legible width instead of cramping. */}
+            <div className="overflow-x-auto">
+                <div className="flex min-w-[560px] flex-col gap-2.5 px-[22px] py-[18px]">
+                    {agents.map((a) => (
+                        <AgentLoadRow key={a.id} agent={a} />
+                    ))}
+                </div>
             </div>
         </div>
     )

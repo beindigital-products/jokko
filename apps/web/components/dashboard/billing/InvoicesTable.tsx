@@ -38,26 +38,32 @@ export function InvoicesTable({
                 </button>
             </div>
 
-            {/* Table header */}
-            <div
-                className="grid items-center gap-x-5 border-b border-[var(--ink-200)] bg-[var(--paper-warm)] px-6 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--ink-soft)]"
-                style={{ gridTemplateColumns: INVOICE_COLS, height: 36 }}
-            >
-                <div>Date</div>
-                <div>Référence</div>
-                <div>Montant</div>
-                <div>Statut</div>
-                <div />
-            </div>
+            {/* Scrollable table area (header + rows share one min-w so columns
+                stay legible and aligned on mobile instead of cramping). */}
+            <div className="overflow-x-auto">
+                <div className="min-w-[600px]">
+                    {/* Table header */}
+                    <div
+                        className="grid items-center gap-x-5 border-b border-[var(--ink-200)] bg-[var(--paper-warm)] px-6 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-[var(--ink-soft)]"
+                        style={{ gridTemplateColumns: INVOICE_COLS, height: 36 }}
+                    >
+                        <div>Date</div>
+                        <div>Référence</div>
+                        <div>Montant</div>
+                        <div>Statut</div>
+                        <div />
+                    </div>
 
-            {/* Rows */}
-            {invoices.length === 0 ? (
-                <div className="px-6 py-10 text-center text-[13px] text-[var(--ink-soft)]">
-                    Aucune facture pour le moment.
+                    {/* Rows */}
+                    {invoices.length === 0 ? (
+                        <div className="px-6 py-10 text-center text-[13px] text-[var(--ink-soft)]">
+                            Aucune facture pour le moment.
+                        </div>
+                    ) : (
+                        invoices.map((inv) => <InvoiceRow key={inv.id} invoice={inv} />)
+                    )}
                 </div>
-            ) : (
-                invoices.map((inv) => <InvoiceRow key={inv.id} invoice={inv} />)
-            )}
+            </div>
         </div>
     )
 }

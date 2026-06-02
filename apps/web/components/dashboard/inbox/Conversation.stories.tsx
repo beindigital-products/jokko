@@ -127,19 +127,23 @@ export const FullView: Story = {
                     activeEntryId={activeId}
                     onEntryClick={setActiveId}
                 />
-                <ConversationThread
-                    header={
-                        <ConversationHeader
-                            name="Mehdi Sané"
-                            initials="MS"
-                            color="violet"
-                            phone="+221 77 614 02 11"
-                            chips={HEADER_CHIPS}
-                        />
-                    }
-                    groups={THREAD}
-                    composer={<MessageComposer />}
-                />
+                {/* On mobile only the list shows full-width; thread + copilot
+                    appear from lg. (Real mobile inbox = list-first drill-down.) */}
+                <div className="hidden min-w-0 flex-1 lg:flex">
+                    <ConversationThread
+                        header={
+                            <ConversationHeader
+                                name="Mehdi Sané"
+                                initials="MS"
+                                color="violet"
+                                phone="+221 77 614 02 11"
+                                chips={HEADER_CHIPS}
+                            />
+                        }
+                        groups={THREAD}
+                        composer={<MessageComposer />}
+                    />
+                </div>
                 <CopilotPanel
                     contactName="Mehdi Sané"
                     initials="MS"

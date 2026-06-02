@@ -59,7 +59,7 @@ export function CopilotPanel({
     return (
         <aside
             className={cn(
-                "w-[300px] shrink-0 overflow-y-auto border-l border-[var(--ink-200)]",
+                "hidden w-[300px] shrink-0 overflow-y-auto border-l border-[var(--ink-200)] lg:block",
                 className,
             )}
         >
