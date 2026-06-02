@@ -87,7 +87,7 @@ const DATA: TemplatesData = {
 }
 
 const meta = {
-    title: "Dashboard/Templates",
+    title: "Screens/Templates",
     component: TemplatesScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

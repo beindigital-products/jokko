@@ -3,7 +3,7 @@ import { OnboardingProgress } from "./OnboardingProgress"
 import { ONBOARDING_STEPS } from "@/lib/onboarding/steps"
 
 const meta = {
-  title: "Onboarding/OnboardingProgress",
+  title: "Flows/Onboarding/Progress",
   component: OnboardingProgress,
   parameters: {
     layout: "padded",

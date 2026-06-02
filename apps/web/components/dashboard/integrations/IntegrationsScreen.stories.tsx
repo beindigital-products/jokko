@@ -118,7 +118,7 @@ const INTEGRATIONS_DATA: IntegrationsData = {
 }
 
 const meta = {
-    title: "Dashboard/Integrations",
+    title: "Screens/Integrations",
     component: IntegrationsScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 
 const meta = {
-    title: "Primitives/Foundations",
+    title: "Foundations/Colors, Type & Radius",
     parameters: { layout: "fullscreen" },
     decorators: [
         (Story) => (

@@ -4,7 +4,7 @@ import { PageHeader } from "./PageHeader"
 import { HeaderButton } from "./HeaderButton"
 
 const meta = {
-    title: "Dashboard/Shell/PageHeader",
+    title: "Shell/PageHeader",
     parameters: { layout: "fullscreen" },
     tags: ["autodocs"],
 } satisfies Meta

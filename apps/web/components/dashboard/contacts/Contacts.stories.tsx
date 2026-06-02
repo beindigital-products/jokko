@@ -17,7 +17,7 @@ const ENTRIES: ContactsTableEntry[] = [
 ]
 
 const meta = {
-    title: "Dashboard/Contacts/Table",
+    title: "Screens/Contacts/Table",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

@@ -82,7 +82,7 @@ const FULL: DashboardOverviewData = {
 }
 
 const meta = {
-    title: "Dashboard/Overview",
+    title: "Screens/Overview",
     component: DashboardOverview,
     parameters: { layout: "fullscreen" },
     decorators: [

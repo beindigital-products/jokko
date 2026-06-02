@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { DashboardSidebar, type DashboardNavKey } from "./DashboardSidebar"
 
 const meta = {
-    title: "Dashboard/Shell/DashboardSidebar",
+    title: "Shell/DashboardSidebar",
     parameters: { layout: "fullscreen" },
     tags: ["autodocs"],
 } satisfies Meta

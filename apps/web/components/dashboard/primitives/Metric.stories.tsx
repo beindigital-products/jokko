@@ -4,7 +4,7 @@ import { UsageCard } from "./UsageCard"
 import { Pagination } from "./Pagination"
 
 const meta = {
-    title: "Dashboard/Primitives/Metric",
+    title: "Primitives/Metric",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

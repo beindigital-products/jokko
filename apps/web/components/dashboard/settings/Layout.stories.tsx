@@ -8,7 +8,7 @@ import { WebhookBox } from "./WebhookBox"
 import { HeaderButton } from "../shell/HeaderButton"
 
 const meta = {
-    title: "Dashboard/Settings/Layout",
+    title: "Screens/Settings/Layout",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

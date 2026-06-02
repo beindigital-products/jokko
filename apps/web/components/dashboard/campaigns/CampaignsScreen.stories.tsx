@@ -22,7 +22,7 @@ const DATA: CampaignsData = {
 }
 
 const meta = {
-    title: "Dashboard/Campaigns",
+    title: "Screens/Campaigns",
     component: CampaignsScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

@@ -24,7 +24,7 @@ const DATA: TeamData = {
 }
 
 const meta = {
-    title: "Dashboard/Team",
+    title: "Screens/Team",
     component: TeamScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

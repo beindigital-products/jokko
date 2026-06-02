@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { CopilotPanel } from "./CopilotPanel"
 
 const meta = {
-    title: "Dashboard/Inbox/Copilot",
+    title: "Screens/Inbox/Copilot",
     parameters: { layout: "fullscreen" },
     tags: ["autodocs"],
 } satisfies Meta

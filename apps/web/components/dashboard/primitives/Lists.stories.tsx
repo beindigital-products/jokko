@@ -4,7 +4,7 @@ import { Chip } from "./Chip"
 import { Icon } from "./Icon"
 
 const meta = {
-    title: "Primitives/Lists",
+    title: "Components/Lists",
     parameters: { layout: "fullscreen" },
     decorators: [
         (Story) => (

@@ -5,7 +5,7 @@ import { MessageBubble } from "./MessageBubble"
 import { MessageComposer } from "./MessageComposer"
 
 const meta = {
-    title: "Dashboard/Inbox/Message",
+    title: "Screens/Inbox/Message",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

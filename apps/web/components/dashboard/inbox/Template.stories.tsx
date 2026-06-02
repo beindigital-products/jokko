@@ -6,7 +6,7 @@ import type { TemplateEntry } from "./TemplatePicker"
 import { TemplateVariableForm } from "./TemplateVariableForm"
 
 const meta = {
-    title: "Dashboard/Inbox/Template",
+    title: "Screens/Inbox/Template",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

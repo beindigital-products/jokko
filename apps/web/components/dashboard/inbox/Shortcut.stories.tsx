@@ -6,7 +6,7 @@ import { ShortcutPicker } from "./ShortcutPicker"
 import type { ShortcutEntry } from "./ShortcutPicker"
 
 const meta = {
-    title: "Dashboard/Inbox/Shortcut",
+    title: "Screens/Inbox/Shortcut",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

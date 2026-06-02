@@ -7,7 +7,7 @@ import type { MentionMember } from "./MentionPicker"
 import { MessageComposer } from "./MessageComposer"
 
 const meta = {
-    title: "Dashboard/Inbox/Mention",
+    title: "Screens/Inbox/Mention",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

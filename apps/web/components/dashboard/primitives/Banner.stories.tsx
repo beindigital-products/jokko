@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { Banner, type BannerProps } from "./Banner"
 
 const meta = {
-    title: "Primitives/Banner",
+    title: "Components/Banner",
     component: Banner,
     parameters: { layout: "fullscreen" },
     decorators: [

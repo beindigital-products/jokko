@@ -4,7 +4,7 @@ import { ChannelCard } from "./ChannelCard"
 import { WebhookBox } from "./WebhookBox"
 
 const meta = {
-    title: "Dashboard/Settings/Channels",
+    title: "Screens/Settings/Channels",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

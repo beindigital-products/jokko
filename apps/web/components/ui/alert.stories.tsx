@@ -3,7 +3,7 @@ import { AlertCircle, CheckCircle2, Info, TriangleAlert } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "./alert"
 
 const meta = {
-  title: "Primitives/Alert",
+  title: "Components/Alert",
   component: Alert,
   parameters: {
     layout: "padded",

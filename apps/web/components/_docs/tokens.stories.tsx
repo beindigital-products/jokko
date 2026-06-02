@@ -75,7 +75,7 @@ function TypographyPanel() {
 // ─── Stories ────────────────────────────────────────────────────────────────
 
 const meta = {
-  title: "Tokens",
+  title: "Foundations/Tokens",
   parameters: {
     layout: "padded",
   },

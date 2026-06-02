@@ -58,7 +58,7 @@ const DATA: AnalyticsData = {
 }
 
 const meta = {
-    title: "Dashboard/Analytics",
+    title: "Screens/Analytics",
     component: AnalyticsScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

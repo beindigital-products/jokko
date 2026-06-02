@@ -10,7 +10,7 @@ import { CopilotPanel } from "./CopilotPanel"
 import { MessageComposer } from "./MessageComposer"
 
 const meta = {
-    title: "Dashboard/Inbox/Conversation",
+    title: "Screens/Inbox/Conversation",
     parameters: { layout: "fullscreen" },
     tags: ["autodocs"],
 } satisfies Meta

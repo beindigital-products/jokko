@@ -3,7 +3,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { Icon, ICON_PATHS, type IconName } from "./Icon"
 
 const meta = {
-    title: "Primitives/Icons",
+    title: "Foundations/Icons",
     component: Icon,
     parameters: { layout: "fullscreen" },
     decorators: [

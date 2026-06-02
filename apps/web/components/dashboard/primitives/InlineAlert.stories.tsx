@@ -15,7 +15,7 @@ function MiniBtn({ children }: { children: React.ReactNode }) {
 }
 
 const meta = {
-    title: "Primitives/InlineAlert",
+    title: "Components/InlineAlert",
     component: InlineAlert,
     parameters: { layout: "padded" },
     decorators: [

@@ -33,7 +33,7 @@ const DATA: MentionsData = {
 }
 
 const meta = {
-    title: "Dashboard/Mentions",
+    title: "Screens/Mentions",
     component: MentionsScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

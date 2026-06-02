@@ -19,7 +19,7 @@ const WALLET: CreditWallet = {
 }
 
 const meta = {
-    title: "Primitives/Credit",
+    title: "Components/Credit",
     component: CreditWalletCard,
     parameters: { layout: "fullscreen" },
     decorators: [

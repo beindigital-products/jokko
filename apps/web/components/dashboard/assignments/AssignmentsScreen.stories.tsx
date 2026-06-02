@@ -156,7 +156,7 @@ const EMPTY_DATA: AssignmentsData = {
 }
 
 const meta = {
-    title: "Dashboard/Assignments",
+    title: "Screens/Assignments",
     component: AssignmentsScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

@@ -6,7 +6,7 @@ const TONES: ChipTone[] = ["neutral", "accent", "good", "warn", "danger", "dark"
 const STATUS_TONES: StatusDotTone[] = ["good", "warn", "danger", "neutral"]
 
 const meta = {
-    title: "Dashboard/Primitives/Chip",
+    title: "Primitives/Chip",
     parameters: { layout: "padded" },
     tags: ["autodocs"],
 } satisfies Meta

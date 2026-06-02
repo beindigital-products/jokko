@@ -123,7 +123,7 @@ const DEFAULT_DATA: BillingData = {
 }
 
 const meta = {
-    title: "Dashboard/Billing",
+    title: "Screens/Billing",
     component: BillingScreen,
     parameters: { layout: "fullscreen" },
     decorators: [

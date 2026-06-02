@@ -33,7 +33,7 @@ function LinkBtn({ children }: { children: React.ReactNode }) {
 }
 
 const meta = {
-    title: "Primitives/EmptyState",
+    title: "Components/EmptyState",
     component: EmptyState,
     parameters: { layout: "fullscreen" },
     decorators: [

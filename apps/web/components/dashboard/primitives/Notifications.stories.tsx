@@ -5,7 +5,7 @@ import { Icon } from "./Icon"
 import { Toast } from "./Toast"
 
 const meta = {
-    title: "Primitives/Notifications",
+    title: "Components/Notifications",
     parameters: { layout: "fullscreen" },
     decorators: [
         (Story) => (

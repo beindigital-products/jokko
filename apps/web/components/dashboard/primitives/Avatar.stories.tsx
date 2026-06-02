@@ -13,7 +13,7 @@ const COLORS: AvatarColor[] = [
 ]
 
 const meta = {
-    title: "Dashboard/Primitives/Avatar",
+    title: "Primitives/Avatar",
     parameters: { layout: "centered" },
     tags: ["autodocs"],
 } satisfies Meta

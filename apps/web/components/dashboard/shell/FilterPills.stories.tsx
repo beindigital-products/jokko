@@ -4,7 +4,7 @@ import { Search } from "lucide-react"
 import { FilterPills, type FilterPillItem } from "./FilterPills"
 
 const meta = {
-    title: "Dashboard/Shell/FilterPills",
+    title: "Shell/FilterPills",
     parameters: { layout: "fullscreen" },
     tags: ["autodocs"],
 } satisfies Meta

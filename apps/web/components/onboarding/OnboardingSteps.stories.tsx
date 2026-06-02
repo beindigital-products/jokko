@@ -657,7 +657,7 @@ function ChecklistRow({ title, subtitle }: { title: string; subtitle?: string })
 // ── Stories ─────────────────────────────────────────────────────────────
 
 const meta = {
-  title: "Onboarding/Steps",
+  title: "Flows/Onboarding/Steps",
   parameters: {
     layout: "fullscreen",
     docs: {
