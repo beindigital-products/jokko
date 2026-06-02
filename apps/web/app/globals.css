@@ -287,11 +287,12 @@ body {
     letter-spacing: -0.03em;
   }
 
-  /* Editorial italic moments — Geist Sans Italic per Decision #9.
-     Used SPARINGLY for greetings and section accents (e.g. "Bonjour, _Inès_."). */
+  /* Display titles — JetBrains Mono (non-italic) per the Primitives design.
+     Kept as a separate class for the card/banner/section titles; same family
+     as .font-display, slightly looser tracking. (Was italic editorial pre-redesign.) */
   .font-editorial {
-    font-family: var(--font-display), var(--font-sans), serif;
-    font-style: italic;
+    font-family: var(--font-display), var(--font-sans), sans-serif;
+    font-style: normal;
     letter-spacing: -0.015em;
   }
 
