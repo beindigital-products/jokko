@@ -56,6 +56,7 @@ import type * as crm_registry from "../crm/registry.js";
 import type * as crm_seed from "../crm/seed.js";
 import type * as crm_webhooks from "../crm/webhooks.js";
 import type * as crons from "../crons.js";
+import type * as dashboard from "../dashboard.js";
 import type * as debug from "../debug.js";
 import type * as demo from "../demo.js";
 import type * as diagAuth from "../diagAuth.js";
@@ -173,6 +174,7 @@ declare const fullApi: ApiFromModules<{
   "crm/seed": typeof crm_seed;
   "crm/webhooks": typeof crm_webhooks;
   crons: typeof crons;
+  dashboard: typeof dashboard;
   debug: typeof debug;
   demo: typeof demo;
   diagAuth: typeof diagAuth;
