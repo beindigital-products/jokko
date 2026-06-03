@@ -660,18 +660,35 @@ export function ContactsPageClient() {
             />
 
             <AlertDialog open={!!contactToDelete} onOpenChange={(open) => !open && setContactToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="font-editorial text-[18px] font-normal text-[var(--ink-900)]">Êtes-vous sûr ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Cette action est irréversible. Cela supprimera définitivement le contact
-                            {contactToDelete?.name ? <strong> {contactToDelete.name} </strong> : " sélectionné "}
-                            et toutes les données associées.
+                <AlertDialogContent className="gap-0 overflow-hidden rounded-xl border-[var(--ink-200)] bg-[var(--paper-white)] p-0 sm:max-w-[420px]">
+                    <AlertDialogHeader className="space-y-0 px-6 pb-4 pt-6 text-left">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--status-danger-soft)]">
+                            <Trash2 className="h-5 w-5 text-[var(--status-danger)]" />
+                        </div>
+                        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                            Annuaire · suppression
+                        </p>
+                        <AlertDialogTitle className="mt-1 font-editorial text-[20px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                            Supprimer ce contact ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="mt-1.5 text-[13px] leading-snug text-[var(--ink-500)]">
+                            Cette action est irréversible. Le contact
+                            {contactToDelete?.name ? (
+                                <span className="font-medium text-[var(--ink-700)]"> {contactToDelete.name} </span>
+                            ) : (
+                                " sélectionné "
+                            )}
+                            et toutes ses données seront supprimés définitivement.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogFooter className="flex-row justify-end gap-2 border-t border-[var(--ink-200)] bg-[var(--paper-warm)]/40 px-6 py-3.5">
+                        <AlertDialogCancel className="mt-0 h-auto rounded-md border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-700)] hover:bg-[var(--paper-warm)]">
+                            Annuler
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="h-auto rounded-md bg-[var(--status-danger)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--status-danger)]/90"
+                        >
                             Supprimer
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -680,17 +697,30 @@ export function ContactsPageClient() {
 
             {/* Bulk delete confirmation */}
             <AlertDialog open={!!bulkDeleteIds} onOpenChange={(open) => !open && setBulkDeleteIds(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle className="font-editorial text-[18px] font-normal text-[var(--ink-900)]">Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''} ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Cette action est irréversible. Cela supprimera définitivement les {bulkDeleteIds?.length} contacts
-                            sélectionnés et toutes les données associées.
+                <AlertDialogContent className="gap-0 overflow-hidden rounded-xl border-[var(--ink-200)] bg-[var(--paper-white)] p-0 sm:max-w-[420px]">
+                    <AlertDialogHeader className="space-y-0 px-6 pb-4 pt-6 text-left">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--status-danger-soft)]">
+                            <Trash2 className="h-5 w-5 text-[var(--status-danger)]" />
+                        </div>
+                        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                            Annuaire · suppression
+                        </p>
+                        <AlertDialogTitle className="mt-1 font-editorial text-[20px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                            Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''} ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="mt-1.5 text-[13px] leading-snug text-[var(--ink-500)]">
+                            Cette action est irréversible. Les {bulkDeleteIds?.length} contacts sélectionnés et
+                            toutes leurs données seront supprimés définitivement.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogFooter className="flex-row justify-end gap-2 border-t border-[var(--ink-200)] bg-[var(--paper-warm)]/40 px-6 py-3.5">
+                        <AlertDialogCancel className="mt-0 h-auto rounded-md border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-700)] hover:bg-[var(--paper-warm)]">
+                            Annuler
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmBulkDelete}
+                            className="h-auto rounded-md bg-[var(--status-danger)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--status-danger)]/90"
+                        >
                             Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''}
                         </AlertDialogAction>
                     </AlertDialogFooter>
