@@ -104,7 +104,7 @@ export function ImageViewer({
             {/* Thumbnail */}
             <div className="space-y-1">
                 <div
-                    className="relative rounded-xl overflow-hidden w-[280px] max-h-[300px] cursor-pointer group"
+                    className="relative rounded-xl overflow-hidden w-[240px] max-h-[280px] cursor-pointer group border border-[var(--ink-200)] bg-[var(--paper-warm)]"
                     onClick={() => setIsOpen(true)}
                 >
                     {isLoading && (
@@ -118,10 +118,10 @@ export function ImageViewer({
                     <Image
                         src={displaySrc}
                         alt={alt}
-                        width={280}
-                        height={300}
+                        width={240}
+                        height={280}
                         className={cn(
-                            'w-[280px] h-auto max-h-[300px] object-cover transition-transform duration-200 group-hover:scale-105',
+                            'w-[240px] h-auto max-h-[280px] object-cover transition-transform duration-200 group-hover:scale-105',
                             !src && thumbnailSrc && 'blur-sm',
                             isLoading && 'opacity-0'
                         )}

@@ -68,10 +68,9 @@ export default function DashboardPage() {
     })
 
     return (
-        // Full-bleed: escape the layout's `p-3 sm:p-4 lg:p-6` padding and own the
-        // viewport height so the cockpit's internal header + scroll fill the area
-        // (mirrors the conversations / flow-builder full-bleed technique).
-        <div className="-m-3 h-[calc(100vh-3rem)] sm:-m-4 lg:-m-6">
+        // Full-bleed route (see isFullBleedRoute in the dashboard layout): rendered
+        // straight into #main-content, so `h-full` fills the box exactly.
+        <div className="h-full">
             <DashboardOverview data={data} loading={loading} basePath="/dashboard" />
         </div>
     )

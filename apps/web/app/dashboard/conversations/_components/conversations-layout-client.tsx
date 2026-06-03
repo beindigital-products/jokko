@@ -32,7 +32,7 @@ export function ConversationsLayoutClient() {
 
     if (isLoading) {
         return (
-            <div className="flex h-full -m-4 lg:-m-6 gap-0">
+            <div className="flex h-full gap-0">
                 {/* Contact List Skeleton */}
                 <div className="hidden md:flex w-80 md:w-96 lg:w-[420px] flex-col border-r border-gray-200/80 bg-white p-4 gap-4">
                     <div className="space-y-3">
@@ -79,9 +79,10 @@ export function ConversationsLayoutClient() {
 
     return (
         <TooltipProvider delayDuration={0}>
-            {/* Negative margins to escape parent padding (p-4 lg:p-6) */}
-            {/* Height compensates for the padding we're escaping */}
-            <div className="-m-4 lg:-m-6 h-[calc(100vh-3rem)]">
+            {/* Full-bleed route: the layout renders us straight into #main-content
+                (no padding wrapper), so a plain `h-full` fills the box exactly —
+                banner-independent, no 100vh calc. */}
+            <div className="h-full">
                 <ConversationLayout
                     organizationId={currentOrg._id}
                     basePath="/dashboard/conversations"

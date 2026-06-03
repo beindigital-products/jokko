@@ -62,7 +62,7 @@ export function InboxCopilot({ conversationId, onClose }: InboxCopilotProps) {
 
     if (!conversation) {
         return (
-            <aside className="w-full overflow-y-auto border-l border-[var(--ink-200)] p-4">
+            <aside className="h-full w-full overflow-y-auto border-l border-[var(--ink-200)] p-4">
                 <div className="h-14 w-14 animate-pulse rounded-full bg-[var(--ink-100)]" />
             </aside>
         )
@@ -70,7 +70,7 @@ export function InboxCopilot({ conversationId, onClose }: InboxCopilotProps) {
 
     return (
         <CopilotPanel
-            className="w-full"
+            className="h-full w-full"
             contactName={name}
             initials={initialsFromName(contact?.name ?? conversation.contact?.name, phone)}
             color={avatarColorFromString(name)}

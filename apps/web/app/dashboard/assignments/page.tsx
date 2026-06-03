@@ -7,10 +7,10 @@ export const metadata: Metadata = {
 }
 
 export default function AssignmentsPage() {
-    // Full-bleed: escape the layout padding + own the viewport height so the v3
-    // screen's internal header + scroll fill the area (mirrors overview / mentions).
+    // Full-bleed route: rendered straight into #main-content by the dashboard
+    // layout, so `h-full` fills the box exactly (banner-independent).
     return (
-        <div className="-m-3 h-[calc(100vh-3rem)] sm:-m-4 lg:-m-6">
+        <div className="h-full">
             <AssignmentsV3Client />
         </div>
     )

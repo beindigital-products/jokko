@@ -38,10 +38,9 @@ export default function MentionsPage() {
     }
 
     return (
-        // Full-bleed: escape the layout's `p-3 sm:p-4 lg:p-6` padding and own the
-        // viewport height so the screen's internal header + scroll fill the area
-        // (mirrors the overview / conversations full-bleed technique).
-        <div className="-m-3 h-[calc(100vh-3rem)] sm:-m-4 lg:-m-6">
+        // Full-bleed route: rendered straight into #main-content, so `h-full`
+        // fills the box exactly (banner-independent).
+        <div className="h-full">
             <MentionsScreen data={data} loading={loading} onOpen={handleOpen} />
         </div>
     )
