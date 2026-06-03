@@ -6,7 +6,6 @@ import {
     Download,
     LayoutGrid,
     Loader2,
-    Merge,
     Plus,
     Search,
     Table2,
@@ -64,13 +63,11 @@ export interface ContactsViewProps {
     onContactClick?: (contact: Contact) => void
     onAddNew?: () => void
     onImport?: () => void
-    onExport?: () => void
     onExportSelected?: (contacts: Contact[]) => void
     onBulkDelete?: (contactIds: string[]) => void
     onBulkAddTag?: (contactIds: string[], tagName: string) => void
     canDelete?: boolean
     canExport?: boolean
-    onDuplicates?: () => void
 }
 
 /**
@@ -121,13 +118,11 @@ export function ContactsView({
     onContactClick,
     onAddNew,
     onImport,
-    onExport,
     onExportSelected,
     onBulkDelete,
     onBulkAddTag,
     canDelete,
     canExport,
-    onDuplicates,
 }: ContactsViewProps) {
     const [search, setSearch] = useState("")
     const [view, setView] = useState<ViewMode>("table")
@@ -268,26 +263,6 @@ export function ContactsView({
                             </button>
                         ))}
                     </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-wrap items-center gap-2">
-                    {onDuplicates ? (
-                        <HeaderButton icon={Merge} onClick={onDuplicates}>
-                            Doublons
-                        </HeaderButton>
-                    ) : null}
-                    {canExport ? (
-                        <HeaderButton icon={Download} onClick={onExport}>
-                            Exporter
-                        </HeaderButton>
-                    ) : null}
-                    <HeaderButton icon={Upload} onClick={onImport}>
-                        Importer
-                    </HeaderButton>
-                    <HeaderButton icon={Plus} variant="primary" onClick={onAddNew}>
-                        Nouveau
-                    </HeaderButton>
                 </div>
             </div>
 

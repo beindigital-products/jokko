@@ -36,6 +36,10 @@ import {
     ArrowUpRight,
     Clock,
     ExternalLink,
+    Merge,
+    Download,
+    Upload,
+    Plus,
 } from 'lucide-react';
 import { useCrmLink } from '@/hooks/use-crm-link';
 import {
@@ -49,7 +53,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { formatPhoneDisplay } from '@/lib/contacts/validation';
-import { PageHeader } from '@/components/dashboard/shell';
+import { PageHeader, HeaderButton } from '@/components/dashboard/shell';
 
 type RawContactTag = string | {
     id?: string;
@@ -588,6 +592,24 @@ export function ContactsPageClient() {
                     eyebrow={`DONNÉES · ${contacts.length} CONTACT${contacts.length > 1 ? "S" : ""}`}
                     title="Contacts"
                     description="Annuaire unifié — synchro WhatsApp, attributs, segments. Import CSV, déduplication, export RGPD."
+                    actions={
+                        <>
+                            <HeaderButton icon={Merge} onClick={() => setIsDuplicatesDialogOpen(true)}>
+                                Doublons
+                            </HeaderButton>
+                            {canExport ? (
+                                <HeaderButton icon={Download} onClick={handleExport}>
+                                    Exporter
+                                </HeaderButton>
+                            ) : null}
+                            <HeaderButton icon={Upload} onClick={() => setIsImportDialogOpen(true)}>
+                                Importer
+                            </HeaderButton>
+                            <HeaderButton icon={Plus} variant="primary" onClick={() => setIsCreateDialogOpen(true)}>
+                                Nouveau
+                            </HeaderButton>
+                        </>
+                    }
                 />
             </div>
             <ContactsView
@@ -601,7 +623,6 @@ export function ContactsPageClient() {
                 onFilterByTag={setTagFilter}
                 onAddNew={() => setIsCreateDialogOpen(true)}
                 onImport={() => setIsImportDialogOpen(true)}
-                onExport={handleExport}
                 onEdit={(c) => setEditingContact(c)}
                 onDelete={handleDeleteClick}
                 onMessage={handleMessage}
@@ -611,7 +632,6 @@ export function ContactsPageClient() {
                 onBulkAddTag={handleBulkAddTag}
                 canDelete={canDelete}
                 canExport={canExport}
-                onDuplicates={() => setIsDuplicatesDialogOpen(true)}
             />
 
             {/* Contact Detail Drawer (Sheet) */}
