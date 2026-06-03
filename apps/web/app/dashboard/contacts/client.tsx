@@ -581,10 +581,9 @@ export function ContactsPageClient() {
 
     return (
         <div>
-            {/* v3 dashboard chrome — Phase C(a). ContactList conserve sa toolbar
-                interne (Importer/Exporter/Nouveau) ; le PageHeader ajoute juste
-                l'eyebrow + titre + breadcrumb section. */}
-            <div className="-mx-4 lg:-mx-6 mb-4">
+            {/* Full-bleed header band: negate the layout padding (incl. top) so the
+                PageHeader sits flush at the top like the full-bleed pages. */}
+            <div className="-mx-3 -mt-3 mb-4 sm:-mx-4 sm:-mt-4 lg:-mx-6 lg:-mt-6">
                 <PageHeader
                     eyebrow={`DONNÉES · ${contacts.length} CONTACT${contacts.length > 1 ? "S" : ""}`}
                     title="Contacts"

@@ -49,21 +49,9 @@ export function ContactCard({
                     : "border-[var(--ink-200)] hover:bg-[var(--paper-warm)]/60",
             )}
         >
-            {/* more button — top-right */}
-            <button
-                type="button"
-                aria-label="Plus d'actions"
-                onClick={(e) => {
-                    e.stopPropagation()
-                    onMore?.()
-                }}
-                className="absolute right-2 top-2 rounded p-1 text-[var(--ink-400)] opacity-0 transition hover:bg-[var(--paper-warm)] group-hover:opacity-100"
-            >
-                <MoreHorizontal className="h-3.5 w-3.5" />
-            </button>
-
-            <div className="flex items-center gap-3 pr-5">
-                {/* selection checkbox — leading column, reveals on hover or when selected */}
+            {/* Top-right controls (out of flow → the avatar/name header stays
+                aligned with the email / tags / footer below). Select + more. */}
+            <div className="absolute right-2 top-2 flex items-center gap-1">
                 <button
                     type="button"
                     aria-label={selected ? "Désélectionner" : "Sélectionner"}
@@ -73,7 +61,7 @@ export function ContactCard({
                         onToggleSelect?.(!selected)
                     }}
                     className={cn(
-                        "flex h-4 w-4 shrink-0 items-center justify-center rounded border transition",
+                        "flex h-4 w-4 items-center justify-center rounded border transition",
                         selected
                             ? "border-[var(--accent)] bg-[var(--accent)] text-white opacity-100"
                             : "border-[var(--ink-300)] bg-[var(--paper-white)] text-transparent opacity-0 group-hover:opacity-100",
@@ -81,6 +69,20 @@ export function ContactCard({
                 >
                     {selected ? <Check className="h-3 w-3" strokeWidth={3} /> : null}
                 </button>
+                <button
+                    type="button"
+                    aria-label="Plus d'actions"
+                    onClick={(e) => {
+                        e.stopPropagation()
+                        onMore?.()
+                    }}
+                    className="rounded p-1 text-[var(--ink-400)] opacity-0 transition hover:bg-[var(--paper-warm)] group-hover:opacity-100"
+                >
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                </button>
+            </div>
+
+            <div className="flex items-center gap-3 pr-12">
                 <Avatar initials={initials} color={color} size="lg" />
                 <div className="min-w-0">
                     <div className="truncate text-[14px] font-semibold text-[var(--ink-900)]">
