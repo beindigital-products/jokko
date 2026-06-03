@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { Metric } from "./Metric"
 import { UsageCard } from "./UsageCard"
-import { Pagination } from "./Pagination"
 
 const meta = {
     title: "Primitives/Metric",
@@ -49,12 +48,5 @@ export const UsageCards: Story = {
             <UsageCard label="CONTACTS" value="2 408" total="5 000" sub="Ce mois · inclus" tone="good" />
             <UsageCard label="SIÈGES" value="8" total="10" sub="Ce mois · inclus" tone="warn" />
         </div>
-    ),
-}
-
-export const PaginationExample: Story = {
-    name: "Pagination — bottom of tables",
-    render: () => (
-        <Pagination summary="12 sur 2 408 · 0 sélectionné" page="1 / 201" />
     ),
 }

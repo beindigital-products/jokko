@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils"
 
 import { Avatar } from "@/components/dashboard/primitives/Avatar"
 import { Chip } from "@/components/dashboard/primitives/Chip"
+import { Pagination } from "@/components/dashboard/primitives"
 import { StickyNote } from "lucide-react"
 import { HeaderButton } from "@/components/dashboard/shell"
 import { MessageBubble } from "@/components/dashboard/inbox"
@@ -490,18 +491,15 @@ export function InboxThread({
             ) : null}
 
             <div className="flex-1 space-y-3 overflow-y-auto bg-[var(--paper-warm)]/40 px-5 py-4">
-                {hasNextPage ? (
-                    <div className="flex justify-center">
-                        <button
-                            type="button"
-                            onClick={loadMore}
-                            disabled={isFetchingNextPage}
-                            className="rounded-full border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1 text-[11px] text-[var(--ink-soft)] hover:bg-[var(--paper-warm)] disabled:opacity-50"
-                        >
-                            {isFetchingNextPage ? "Chargement…" : "Charger plus"}
-                        </button>
-                    </div>
-                ) : null}
+                <Pagination
+                    mode="loadMore"
+                    size="sm"
+                    hasMore={hasNextPage}
+                    loading={isFetchingNextPage}
+                    onLoadMore={loadMore}
+                    label="Charger plus"
+                    loadingLabel="Chargement…"
+                />
 
                 {isLoading ? (
                     <div className="space-y-3">

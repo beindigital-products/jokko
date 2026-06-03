@@ -5,7 +5,6 @@ import {
     ArrowUpDown,
     Download,
     LayoutGrid,
-    Loader2,
     Plus,
     Search,
     Table2,
@@ -18,6 +17,7 @@ import {
 
 import { cn } from "@/lib/utils"
 import { ContactsGrid, ContactsTable, type ContactsTableEntry } from "@/components/dashboard/contacts"
+import { Pagination } from "@/components/dashboard/primitives"
 import { HeaderButton } from "@/components/dashboard/shell/HeaderButton"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -330,18 +330,15 @@ export function ContactsView({
             )}
 
             {/* Load more */}
-            {hasMore && !showEmpty ? (
-                <div className="flex justify-center pt-1">
-                    <button
-                        type="button"
-                        onClick={onLoadMore}
-                        disabled={isLoading}
-                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ink-700)] hover:bg-[var(--paper-warm)] disabled:opacity-50"
-                    >
-                        {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-                        Charger plus de contacts
-                    </button>
-                </div>
+            {!showEmpty ? (
+                <Pagination
+                    mode="loadMore"
+                    hasMore={hasMore}
+                    loading={isLoading}
+                    onLoadMore={onLoadMore}
+                    label="Charger plus de contacts"
+                    className="pt-1"
+                />
             ) : null}
 
             {/* Bulk action bar */}
