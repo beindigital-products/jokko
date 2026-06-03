@@ -1,6 +1,6 @@
 import type { WaButton, WaMedia } from "../primitives/WhatsAppBubble"
 
-export type TemplateStatus = "approved" | "pending" | "rejected"
+export type TemplateStatus = "approved" | "pending" | "rejected" | "draft"
 export type TemplateCategory = "Marketing" | "Utility" | "Authentication"
 
 export interface TemplateRow {

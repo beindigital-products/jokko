@@ -24,7 +24,8 @@ function isFullBleedRoute(pathname: string): boolean {
         pathname === '/dashboard' ||
         pathname.startsWith('/dashboard/conversations') ||
         pathname.startsWith('/dashboard/mentions') ||
-        pathname.startsWith('/dashboard/assignments')
+        pathname.startsWith('/dashboard/assignments') ||
+        pathname.startsWith('/dashboard/modeles')
     )
 }
 

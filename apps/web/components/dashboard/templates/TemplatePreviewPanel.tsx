@@ -7,7 +7,7 @@ import {
     highlightBody,
     type WaButton,
 } from "../primitives/WhatsAppBubble"
-import { Pencil, Send } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import type { TemplateRow } from "./types"
 
 /** Fallback CTA buttons when a template doesn't define its own. */
@@ -19,6 +19,9 @@ const DEFAULT_BUTTONS: WaButton[] = [
 interface TemplatePreviewPanelProps {
     template: TemplateRow | null
     canEdit?: boolean
+    onEdit?: (template: TemplateRow) => void
+    onDelete?: (template: TemplateRow) => void
+    onUse?: (template: TemplateRow) => void
 }
 
 /**
@@ -27,7 +30,13 @@ interface TemplatePreviewPanelProps {
  * header matches the campaign wizard), plus header meta (name, status, category,
  * lang) and action buttons. Placeholder when no template is selected.
  */
-export function TemplatePreviewPanel({ template, canEdit = true }: TemplatePreviewPanelProps) {
+export function TemplatePreviewPanel({
+    template,
+    canEdit = true,
+    onEdit,
+    onDelete,
+    onUse,
+}: TemplatePreviewPanelProps) {
     return (
         <div className="hidden w-[360px] shrink-0 flex-col border-l border-[var(--ink-200)] bg-[var(--paper-warm)] lg:flex">
             {/* Header */}
@@ -71,12 +80,29 @@ export function TemplatePreviewPanel({ template, canEdit = true }: TemplatePrevi
             </div>
 
             {/* Action footer */}
-            <div className="flex items-center gap-1.5 border-t border-[var(--ink-200)] px-[22px] py-3.5">
-                {canEdit && <HeaderButton icon={Pencil}>Éditer</HeaderButton>}
-                <HeaderButton icon={Send}>Envoyer test</HeaderButton>
-                <div className="flex-1" />
-                <HeaderButton variant="primary">Utiliser</HeaderButton>
-            </div>
+            {template ? (
+                <div className="flex items-center gap-1.5 border-t border-[var(--ink-200)] px-[22px] py-3.5">
+                    {canEdit ? (
+                        <>
+                            <HeaderButton icon={Pencil} onClick={() => onEdit?.(template)}>
+                                Éditer
+                            </HeaderButton>
+                            <button
+                                type="button"
+                                aria-label="Supprimer le modèle"
+                                onClick={() => onDelete?.(template)}
+                                className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] text-[var(--ink-400)] transition hover:bg-[var(--status-danger-soft)] hover:text-[var(--status-danger)]"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                        </>
+                    ) : null}
+                    <div className="flex-1" />
+                    <HeaderButton variant="primary" onClick={() => onUse?.(template)}>
+                        Utiliser
+                    </HeaderButton>
+                </div>
+            ) : null}
         </div>
     )
 }
