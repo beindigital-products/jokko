@@ -1,238 +1,82 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test"
 
-// Base URL for the dev server
-const BASE_URL = 'http://localhost:3000';
-const ASSIGNMENTS_URL = `${BASE_URL}/dashboard/assignments`;
+/**
+ * Assignations v3 — the hybrid production page: the functional auto-assignment
+ * master toggle + the operational assignment queue (search / tabs / manual +
+ * bulk assign) + real-time agent load + a read-only routing preview. Verifies
+ * the page renders with NO runtime errors and that each section + the core
+ * interactions work. Owner auth via the shared storageState (auth.setup.ts).
+ *
+ * We do NOT flip the master switch here — it mutates shared org settings (and
+ * re-syncs every membership's capacity); that round-trip is exercised manually.
+ */
+test.describe("Assignations v3", () => {
+    test("renders the hybrid page with no runtime errors", async ({ page }) => {
+        const errors: string[] = []
+        page.on("pageerror", (e) => errors.push(String(e)))
 
-test.describe('Assignments Page', () => {
-    test.beforeEach(async ({ page }) => {
-        // Navigate to assignments page
-        // If redirected to login, the test environment should handle auth
-        await page.goto(ASSIGNMENTS_URL);
-        // Wait for page to be fully loaded (stats cards or main content)
-        await page.waitForLoadState('networkidle');
-    });
+        await page.goto("/dashboard/assignments")
+        await page.waitForLoadState("networkidle")
 
-    // ============================================
-    // #29 - Click to open conversation
-    // ============================================
-    test('should navigate to conversation on click', async ({ page }) => {
-        // Wait for conversations queue to load
-        const conversationItem = page.locator('[data-testid="conversation-item"]').first();
+        const main = page.locator("#main-content")
 
-        // If no conversations exist, skip
-        const count = await conversationItem.count();
-        if (count === 0) {
-            test.skip();
-            return;
-        }
+        await expect(main.getByRole("heading", { name: "Assignations" })).toBeVisible()
+        // 1 · Functional master toggle.
+        await expect(main.getByRole("switch", { name: "Auto-assignation" })).toBeVisible()
+        // 2 · Operational queue + tabs.
+        await expect(main.getByText("File d'attribution", { exact: true })).toBeVisible()
+        await expect(main.getByRole("button", { name: /Non assignées/ })).toBeVisible()
+        await expect(main.getByRole("button", { name: /Assignées/ })).toBeVisible()
+        // 3 · Agent load.
+        await expect(main.getByText("Charge actuelle par agent")).toBeVisible()
+        // 4 · Read-only routing preview.
+        await expect(main.getByText("Routage automatique · aperçu")).toBeVisible()
+        await expect(main.getByText("Lecture seule")).toBeVisible()
 
-        await conversationItem.click();
+        expect(errors, `runtime errors on /dashboard/assignments: ${errors.join(" | ")}`).toEqual([])
+    })
 
-        // Should navigate to a conversation page
-        await expect(page).toHaveURL(/\/dashboard\/conversations\//);
-    });
+    test("the sidebar Assignations item is active on /dashboard/assignments", async ({ page }) => {
+        await page.goto("/dashboard/assignments")
+        await page.waitForLoadState("networkidle")
 
-    // ============================================
-    // #30 - Search filter
-    // ============================================
-    test('should filter conversations with search', async ({ page }) => {
-        // Find the search input
-        const searchInput = page.getByPlaceholder('Rechercher');
+        const link = page.getByTestId("app-sidebar").getByRole("link", { name: "Assignations" })
+        await expect(link).toHaveAttribute("href", "/dashboard/assignments")
+        await expect(link).toHaveAttribute("data-active", "true")
+    })
 
-        // If search input doesn't exist, try alternate selectors
-        const searchVisible = await searchInput.isVisible().catch(() => false);
-        if (!searchVisible) {
-            test.skip();
-            return;
-        }
+    test("the search box filters the queue down to the empty state", async ({ page }) => {
+        await page.goto("/dashboard/assignments")
+        await page.waitForLoadState("networkidle")
 
-        // Type a search query
-        await searchInput.fill('test');
+        const main = page.locator("#main-content")
+        const search = main.getByPlaceholder(/Rechercher par nom/)
+        await expect(search).toBeVisible()
+        await search.fill("zzz-improbable-query-xyz")
+        await expect(main.getByText("File vide")).toBeVisible()
+    })
 
-        // Wait for filter to apply
-        await page.waitForTimeout(300);
+    test("toggling bulk mode reveals row checkboxes when the queue has items", async ({ page }) => {
+        await page.goto("/dashboard/assignments")
+        await page.waitForLoadState("networkidle")
 
-        // The page should still be functional (no crash)
-        await expect(page.locator('body')).toBeVisible();
-    });
+        const main = page.locator("#main-content")
+        const hasItems = (await main.getByRole("button", { name: /^(Assigner|Réassigner)$/ }).count()) > 0
+        test.skip(!hasItems, "File d'attribution vide sur le compte de test")
 
-    // ============================================
-    // #28 - Bulk assign mode
-    // ============================================
-    test('should toggle bulk mode', async ({ page }) => {
-        // Look for bulk mode toggle button
-        const bulkButton = page.getByRole('button', { name: /masse|bulk/i });
+        await main.getByRole("button", { name: "Attribution en lot" }).click()
+        await expect(
+            main.getByRole("button", { name: /Sélectionner|Désélectionner/ }).first(),
+        ).toBeVisible()
+    })
 
-        const bulkVisible = await bulkButton.isVisible().catch(() => false);
-        if (!bulkVisible) {
-            test.skip();
-            return;
-        }
+    test("the Réglages button opens the settings dialog", async ({ page }) => {
+        await page.goto("/dashboard/assignments")
+        await page.waitForLoadState("networkidle")
 
-        // Click to enable bulk mode
-        await bulkButton.click();
-
-        // Should show checkboxes or cancel button
-        const cancelButton = page.getByRole('button', { name: /annuler/i });
-        await expect(cancelButton).toBeVisible();
-
-        // Click cancel to exit bulk mode
-        await cancelButton.click();
-    });
-
-    // ============================================
-    // #31 - Wait time indicator
-    // ============================================
-    test('should display wait time badges', async ({ page }) => {
-        // Look for wait time indicators (badges with time like "5min", "2h")
-        const waitBadges = page.locator('text=/\\d+(min|h|j)/');
-
-        // Should have at least some visible if conversations exist
-        const badgeCount = await waitBadges.count();
-        // Just verify page renders without crash
-        expect(badgeCount).toBeGreaterThanOrEqual(0);
-    });
-
-    // ============================================
-    // #32 - Department filter
-    // ============================================
-    test('should have department filter dropdown', async ({ page }) => {
-        // Look for filter/department dropdown
-        const filterButton = page.locator('button').filter({ hasText: /département|service|filtr/i });
-
-        const filterVisible = await filterButton.first().isVisible().catch(() => false);
-        if (!filterVisible) {
-            // Try dropdown trigger
-            const dropdownTrigger = page.locator('[data-testid="dept-filter"]');
-            const exists = await dropdownTrigger.isVisible().catch(() => false);
-            if (!exists) {
-                test.skip();
-                return;
-            }
-        }
-
-        // Page renders correctly
-        await expect(page.locator('body')).toBeVisible();
-    });
-
-    // ============================================
-    // #33 - Assignment history popover
-    // ============================================
-    test('should show assignment history on click', async ({ page }) => {
-        // Look for history buttons (History icon in conversation items)
-        const historyButton = page.locator('button').filter({
-            has: page.locator('svg.lucide-history, [data-lucide="history"]')
-        }).first();
-
-        const historyVisible = await historyButton.isVisible().catch(() => false);
-        if (!historyVisible) {
-            test.skip();
-            return;
-        }
-
-        await historyButton.click();
-
-        // Should show popover with history content
-        const popover = page.locator('[role="dialog"], [data-radix-popper-content-wrapper]');
-        await expect(popover.first()).toBeVisible();
-    });
-
-    // ============================================
-    // #34 - Team workload progress
-    // ============================================
-    test('should display team workload progress bar', async ({ page }) => {
-        // Look for progress bar element
-        const progressBar = page.locator('[role="progressbar"]');
-
-        const progressVisible = await progressBar.first().isVisible().catch(() => false);
-        if (!progressVisible) {
-            test.skip();
-            return;
-        }
-
-        await expect(progressBar.first()).toBeVisible();
-    });
-
-    // ============================================
-    // #35 - Agent filter click
-    // ============================================
-    test('should filter by agent when clicking agent card', async ({ page }) => {
-        // Look for agent cards in the agents panel
-        const agentCards = page.locator('[data-testid="agent-card"]');
-
-        const agentCount = await agentCards.count();
-        if (agentCount === 0) {
-            // Try finding agent items by avatar/name pattern
-            const agentItems = page.locator('.cursor-pointer').filter({
-                has: page.locator('[class*="rounded-full"]')
-            });
-
-            const itemCount = await agentItems.count();
-            if (itemCount === 0) {
-                test.skip();
-                return;
-            }
-        }
-
-        // Page renders correctly without crash
-        await expect(page.locator('body')).toBeVisible();
-    });
-
-    // ============================================
-    // Stats cards
-    // ============================================
-    test('should display 4 stats cards', async ({ page }) => {
-        // Look for stat cards
-        const statCards = page.locator('[class*="grid"] > [class*="bg-white"]');
-
-        // Wait for content to load
-        await page.waitForTimeout(2000);
-
-        // Should have stats visible (cards or skeleton)
-        const cardCount = await statCards.count();
-        expect(cardCount).toBeGreaterThanOrEqual(0); // May show skeleton
-    });
-
-    // ============================================
-    // Settings dialog
-    // ============================================
-    test('should open assignment settings dialog', async ({ page }) => {
-        // Look for settings button
-        const settingsButton = page.getByRole('button', { name: /paramètres|réglages|settings/i });
-
-        const settingsVisible = await settingsButton.isVisible().catch(() => false);
-        if (!settingsVisible) {
-            test.skip();
-            return;
-        }
-
-        await settingsButton.click();
-
-        // Should show settings dialog
-        const dialog = page.locator('[role="dialog"]');
-        await expect(dialog).toBeVisible();
-    });
-
-    // ============================================
-    // Page load without errors
-    // ============================================
-    test('should load without console errors', async ({ page }) => {
-        const errors: string[] = [];
-        page.on('console', (msg) => {
-            if (msg.type() === 'error') {
-                errors.push(msg.text());
-            }
-        });
-
-        await page.goto(ASSIGNMENTS_URL);
-        await page.waitForLoadState('networkidle');
-
-        // Filter out known non-critical errors (like Convex dev warnings)
-        const criticalErrors = errors.filter(
-            (e) => !e.includes('convex') && !e.includes('Warning') && !e.includes('hydration')
-        );
-
-        expect(criticalErrors).toHaveLength(0);
-    });
-});
+        await page.locator("#main-content").getByRole("button", { name: "Réglages" }).click()
+        const dialog = page.getByRole("dialog")
+        await expect(dialog).toBeVisible()
+        await expect(dialog.getByText("Attribution automatique")).toBeVisible()
+    })
+})
