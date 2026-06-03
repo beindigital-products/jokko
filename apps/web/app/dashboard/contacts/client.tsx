@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { usePaginatedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
-import { ContactList, Tag } from '@/components/contacts/ContactList';
+import type { Tag } from '@/components/contacts/ContactList';
+import { ContactsView } from './_components/ContactsView';
 import { Contact, ContactTag, getInitials } from '@/components/contacts/ContactCard';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
 import type { ContactFormSubmitData } from '@/components/contacts/ContactForm';
@@ -623,7 +624,7 @@ export function ContactsPageClient() {
                     description="Annuaire unifié — synchro WhatsApp, attributs, segments. Import CSV, déduplication, export RGPD."
                 />
             </div>
-            <ContactList
+            <ContactsView
                 contacts={contacts}
                 tags={tags}
                 total={contacts.length}

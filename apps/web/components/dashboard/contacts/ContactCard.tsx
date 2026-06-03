@@ -111,7 +111,7 @@ export function ContactCard({
 
             <div className="mt-4 flex items-center justify-between border-t border-[var(--ink-100)] pt-3">
                 <span className="font-mono text-[9.5px] uppercase tracking-[0.1em] text-[var(--ink-soft)]">
-                    Dernier échange
+                    Ajouté
                 </span>
                 <span className="text-[11px] text-[var(--ink-700)]">{lastExchange}</span>
             </div>

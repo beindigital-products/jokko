@@ -23,7 +23,7 @@ interface ContactsTableProps {
     onRowMore?: (id: string) => void
 }
 
-const COLUMNS = ["", "NOM", "TÉLÉPHONE · EMAIL", "TAGS", "DERNIER ÉCHANGE"]
+const COLUMNS = ["", "NOM", "TÉLÉPHONE · EMAIL", "TAGS", "AJOUTÉ"]
 
 export function ContactsTable({
     entries,
