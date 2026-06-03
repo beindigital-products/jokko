@@ -663,7 +663,7 @@ export function ContactsPageClient() {
             <AlertDialog open={!!contactToDelete} onOpenChange={(open) => !open && setContactToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
+                        <AlertDialogTitle className="font-editorial text-[18px] font-normal text-[var(--ink-900)]">Êtes-vous sûr ?</AlertDialogTitle>
                         <AlertDialogDescription>
                             Cette action est irréversible. Cela supprimera définitivement le contact
                             {contactToDelete?.name ? <strong> {contactToDelete.name} </strong> : " sélectionné "}
@@ -683,7 +683,7 @@ export function ContactsPageClient() {
             <AlertDialog open={!!bulkDeleteIds} onOpenChange={(open) => !open && setBulkDeleteIds(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''} ?</AlertDialogTitle>
+                        <AlertDialogTitle className="font-editorial text-[18px] font-normal text-[var(--ink-900)]">Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''} ?</AlertDialogTitle>
                         <AlertDialogDescription>
                             Cette action est irréversible. Cela supprimera définitivement les {bulkDeleteIds?.length} contacts
                             sélectionnés et toutes les données associées.

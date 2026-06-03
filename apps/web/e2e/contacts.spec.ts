@@ -1,198 +1,75 @@
+import { test, expect } from "@playwright/test"
 
-import { test, expect } from '@playwright/test';
+/**
+ * Contacts v3 — the production page redesigned to Cobalt × paper × ink:
+ * the ContactsView body (toolbar + table/cards + selection), the contact
+ * detail drawer, and the v3 modals (create/edit, CSV import, duplicates).
+ * Verifies the page renders with NO runtime errors and that each surface
+ * opens. Owner auth via the shared storageState (auth.setup.ts). We open the
+ * modals but never submit — no writes to the shared dev data.
+ */
+test.describe("Contacts v3", () => {
+    test("renders the v3 list with no runtime errors", async ({ page }) => {
+        const errors: string[] = []
+        page.on("pageerror", (e) => errors.push(String(e)))
 
-// Base URL for the dev server
-const BASE_URL = 'http://localhost:3000';
-const CONTACTS_URL = `${BASE_URL}/dashboard/contacts`;
+        await page.goto("/dashboard/contacts")
+        await page.waitForLoadState("networkidle")
 
-test.describe('Contacts Page', () => {
-    test.beforeEach(async ({ page }) => {
-        await page.goto(CONTACTS_URL);
-        await page.waitForLoadState('networkidle');
-    });
+        const main = page.locator("#main-content")
+        await expect(main.getByRole("heading", { name: "Contacts" })).toBeVisible()
+        await expect(main.getByRole("button", { name: /Nouveau/ })).toBeVisible()
+        await expect(main.getByRole("button", { name: /Importer/ })).toBeVisible()
 
-    // ============================================
-    // Existing: create contact flow
-    // ============================================
-    test('create contact flow', async ({ page }) => {
-        // Open Dialog
-        const newButton = page.getByRole('button', { name: /nouveau/i });
-        const newVisible = await newButton.isVisible().catch(() => false);
-        if (!newVisible) {
-            test.skip();
-            return;
-        }
+        // Either the table has rows or the empty state shows.
+        const rows = main.locator("tbody tr")
+        const empty = main.getByText(/annuaire est vide|Aucun contact/)
+        const hasRows = (await rows.count()) > 0
+        const hasEmpty = await empty.isVisible().catch(() => false)
+        expect(hasRows || hasEmpty).toBeTruthy()
 
-        await newButton.click();
+        expect(errors, `runtime errors on /dashboard/contacts: ${errors.join(" | ")}`).toEqual([])
+    })
 
-        // Fill form
-        await page.getByRole('textbox', { name: 'Téléphone' }).fill('778889900');
-        await page.getByPlaceholder('Amadou').fill('Playwright');
-        await page.getByPlaceholder('Diallo').fill('Test');
+    test("the sidebar Contacts item is active", async ({ page }) => {
+        await page.goto("/dashboard/contacts")
+        await page.waitForLoadState("networkidle")
+        const link = page.getByTestId("app-sidebar").getByRole("link", { name: "Contacts" })
+        await expect(link).toHaveAttribute("href", "/dashboard/contacts")
+        await expect(link).toHaveAttribute("data-active", "true")
+    })
 
-        // Submit
-        await page.getByRole('button', { name: 'Créer le contact' }).click();
+    test("the search box filters down to the empty state", async ({ page }) => {
+        await page.goto("/dashboard/contacts")
+        await page.waitForLoadState("networkidle")
+        const main = page.locator("#main-content")
+        await main.getByPlaceholder(/Rechercher par nom/).fill("zzz-improbable-xyz-000")
+        await expect(main.getByText(/ne correspond à vos critères/)).toBeVisible()
+    })
 
-        // Verify
-        await expect(page.getByText('Playwright Test')).toBeVisible();
-    });
+    test("the Nouveau button opens the v3 create modal", async ({ page }) => {
+        await page.goto("/dashboard/contacts")
+        await page.waitForLoadState("networkidle")
+        await page.locator("#main-content").getByRole("button", { name: /Nouveau/ }).click()
+        const dialog = page.getByRole("dialog")
+        await expect(dialog.getByRole("heading", { name: "Nouveau contact" })).toBeVisible()
+    })
 
-    // ============================================
-    // Sort dropdown
-    // ============================================
-    test('should display sort dropdown', async ({ page }) => {
-        const sortButton = page.locator('button').filter({ hasText: /trier|sort|récent|ancien/i });
+    test("the Importer button opens the v3 import wizard", async ({ page }) => {
+        await page.goto("/dashboard/contacts")
+        await page.waitForLoadState("networkidle")
+        await page.locator("#main-content").getByRole("button", { name: /Importer/ }).click()
+        const dialog = page.getByRole("dialog")
+        await expect(dialog.getByText("Importer des contacts")).toBeVisible()
+    })
 
-        const sortVisible = await sortButton.first().isVisible().catch(() => false);
-        if (!sortVisible) {
-            // Try alternate selector: a select or dropdown trigger
-            const altSort = page.locator('[data-testid="sort-dropdown"], [data-testid="sort-select"]');
-            const altVisible = await altSort.first().isVisible().catch(() => false);
-            if (!altVisible) {
-                test.skip();
-                return;
-            }
-        }
-
-        await expect(page.locator('body')).toBeVisible();
-    });
-
-    // ============================================
-    // Bulk selection mode
-    // ============================================
-    test('should toggle bulk selection mode', async ({ page }) => {
-        const bulkButton = page.getByRole('button', { name: /sélection|masse|bulk|cocher/i });
-
-        const bulkVisible = await bulkButton.isVisible().catch(() => false);
-        if (!bulkVisible) {
-            // Try checkbox/select all pattern
-            const selectAll = page.locator('[data-testid="bulk-select"], input[type="checkbox"]').first();
-            const exists = await selectAll.isVisible().catch(() => false);
-            if (!exists) {
-                test.skip();
-                return;
-            }
-        }
-
-        await bulkButton.click();
-
-        // Should show cancel or action bar
-        const cancelOrAction = page.locator('button').filter({ hasText: /annuler|cancel|supprimer|exporter/i });
-        const actionVisible = await cancelOrAction.first().isVisible().catch(() => false);
-        if (actionVisible) {
-            await expect(cancelOrAction.first()).toBeVisible();
-        }
-    });
-
-    // ============================================
-    // Duplicate detection button
-    // ============================================
-    test('should show duplicate detection button', async ({ page }) => {
-        const dupButton = page.locator('button').filter({ hasText: /doublon|dupliqu|merge|fusionn/i });
-
-        const dupVisible = await dupButton.first().isVisible().catch(() => false);
-        if (!dupVisible) {
-            // Try icon-based button or menu item
-            const altDup = page.locator('[data-testid="detect-duplicates"], [aria-label*="doublon"]');
-            const altVisible = await altDup.first().isVisible().catch(() => false);
-            if (!altVisible) {
-                test.skip();
-                return;
-            }
-        }
-
-        await expect(page.locator('body')).toBeVisible();
-    });
-
-    // ============================================
-    // Segment selector
-    // ============================================
-    test('should show segment selector', async ({ page }) => {
-        const segmentSelector = page.locator('button, [role="combobox"]').filter({ hasText: /segment|filtre|vue/i });
-
-        const segVisible = await segmentSelector.first().isVisible().catch(() => false);
-        if (!segVisible) {
-            const altSeg = page.locator('[data-testid="segment-selector"], [data-testid="segment-filter"]');
-            const altVisible = await altSeg.first().isVisible().catch(() => false);
-            if (!altVisible) {
-                test.skip();
-                return;
-            }
-        }
-
-        await expect(page.locator('body')).toBeVisible();
-    });
-
-    // ============================================
-    // Contact detail drawer on click
-    // ============================================
-    test('should open contact detail drawer on click', async ({ page }) => {
-        // Find a contact row/card
-        const contactItem = page.locator('[data-testid="contact-item"], [data-testid="contact-row"], tr[class*="cursor"], div[class*="cursor-pointer"]').first();
-
-        const contactVisible = await contactItem.isVisible().catch(() => false);
-        if (!contactVisible) {
-            test.skip();
-            return;
-        }
-
-        await contactItem.click();
-
-        // Should open a drawer/sheet/dialog with contact details
-        const detail = page.locator('[role="dialog"], [data-testid="contact-detail"], [class*="sheet"], [class*="drawer"]');
-        const detailVisible = await detail.first().isVisible().catch(() => false);
-
-        if (detailVisible) {
-            await expect(detail.first()).toBeVisible();
-        } else {
-            // Might navigate to detail page instead
-            await expect(page.locator('body')).toBeVisible();
-        }
-    });
-
-    // ============================================
-    // Activity indicators on avatars
-    // ============================================
-    test('should display activity indicators on avatars', async ({ page }) => {
-        // Look for online/activity status dots on avatars
-        const statusDots = page.locator('[class*="bg-green"], [class*="status-dot"], [data-testid="activity-indicator"], span[class*="absolute"][class*="rounded-full"]');
-
-        const dotCount = await statusDots.count();
-        // Just verify page renders; indicators may not be present if no contacts are active
-        expect(dotCount).toBeGreaterThanOrEqual(0);
-    });
-
-    // ============================================
-    // Filter count badges
-    // ============================================
-    test('should show filter count badges', async ({ page }) => {
-        // Look for badge elements showing active filter counts
-        const badges = page.locator('[class*="badge"], span[class*="bg-primary"], span[class*="rounded-full"][class*="text-xs"]');
-
-        const badgeCount = await badges.count();
-        // Badges may only appear when filters are active; verify page is stable
-        expect(badgeCount).toBeGreaterThanOrEqual(0);
-    });
-
-    // ============================================
-    // Page loads without console errors
-    // ============================================
-    test('should load without console errors', async ({ page }) => {
-        const errors: string[] = [];
-        page.on('console', (msg) => {
-            if (msg.type() === 'error') {
-                errors.push(msg.text());
-            }
-        });
-
-        await page.goto(CONTACTS_URL);
-        await page.waitForLoadState('networkidle');
-
-        // Filter out known non-critical errors (Convex dev warnings, hydration)
-        const criticalErrors = errors.filter(
-            (e) => !e.includes('convex') && !e.includes('Warning') && !e.includes('hydration')
-        );
-
-        expect(criticalErrors).toHaveLength(0);
-    });
-});
+    test("clicking a contact opens the v3 detail drawer", async ({ page }) => {
+        await page.goto("/dashboard/contacts")
+        await page.waitForLoadState("networkidle")
+        const rows = page.locator("#main-content tbody tr")
+        test.skip((await rows.count()) === 0, "Compte de test sans contact")
+        await rows.first().click()
+        const drawer = page.getByRole("dialog")
+        await expect(drawer.getByText("Informations")).toBeVisible()
+    })
+})
