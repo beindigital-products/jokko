@@ -20,10 +20,10 @@ import {
     SheetTitle,
     SheetDescription,
 } from '@/components/ui/sheet';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { Avatar as V3Avatar } from '@/components/dashboard/primitives/Avatar';
+import { Chip } from '@/components/dashboard/primitives/Chip';
+import { avatarColorFromString } from '@/lib/dashboard/avatar-color';
+import { cn } from '@/lib/utils';
 import {
     Phone,
     Mail,
@@ -140,14 +140,15 @@ function ContactDetailDrawer({
 
     if (!contactData) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+            <div className="flex h-full items-center justify-center bg-[var(--paper-white)]">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--ink-200)] border-t-[var(--accent)]" />
             </div>
         );
     }
 
     const displayName = contactData.name || [contactData.firstName, contactData.lastName].filter(Boolean).join(' ') || 'Sans nom';
     const initials = getInitials(contactData.name ?? null, contactData.firstName, contactData.lastName);
+    const avatarColor = avatarColorFromString(displayName);
     const formattedPhone = formatPhoneDisplay(contactData.phone, 'international');
 
     // Build a Contact object for callbacks
@@ -173,234 +174,200 @@ function ContactDetailDrawer({
 
     const tags: ContactTag[] = contactForCallbacks.tags;
 
+    const hasNoExtraInfo =
+        !contactData.email && !contactData.company && !contactData.address && !contactData.city && !contactData.country;
+
     return (
-        <div className="flex flex-col h-full overflow-hidden">
-            {/* Header with avatar */}
-            <div className="flex flex-col items-center pt-2 pb-4">
-                <div className="relative">
-                    <Avatar className="h-16 w-16">
-                        <AvatarImage src={undefined} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-[#14532d] to-[#059669] text-white text-xl font-semibold">
-                            {initials}
-                        </AvatarFallback>
-                    </Avatar>
-                    {contactData.isBlocked && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 border-2 border-white" title="Bloqué" />
-                    )}
-                    {!contactData.isBlocked && contactData.isWhatsApp && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-green-500 border-2 border-white" title="WhatsApp" />
-                    )}
+        <div className="flex h-full flex-col overflow-hidden bg-[var(--paper-white)]">
+            {/* Header */}
+            <div className="border-b border-[var(--ink-200)] px-5 pb-4 pt-6">
+                <div className="flex flex-col items-center text-center">
+                    <V3Avatar
+                        initials={initials}
+                        color={avatarColor}
+                        size="xl"
+                        status={!contactData.isBlocked && contactData.isWhatsApp ? 'online' : undefined}
+                    />
+                    <h2 className="mt-3 text-[16px] font-semibold tracking-[-0.01em] text-[var(--ink-900)]">
+                        {displayName}
+                    </h2>
+                    <p className="font-mono text-[11px] text-[var(--ink-soft)]">{formattedPhone}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+                        {contactData.isBlocked ? <Chip tone="danger">Bloqué</Chip> : null}
+                        {!contactData.isBlocked && contactData.isWhatsApp ? (
+                            <Chip tone="good">WhatsApp</Chip>
+                        ) : null}
+                        {crmLink ? <Chip tone="warn">Sync · {crmLink.providerLabel}</Chip> : null}
+                    </div>
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900 mt-3">{displayName}</h2>
-                <p className="text-sm text-gray-500 font-mono">{formattedPhone}</p>
-                {contactData.isBlocked && (
-                    <Badge variant="destructive" className="mt-1 text-[10px]">Bloqué</Badge>
-                )}
-            </div>
 
-            {/* CRM sync badge */}
-            {crmLink && (
-                <div className="px-6 pb-3 flex justify-center">
-                    <Badge
-                        variant="outline"
-                        className="text-[11px] font-medium border-amber-200 bg-amber-50 text-amber-900 gap-1"
+                {/* Actions */}
+                <div className="mt-4 flex items-center justify-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => { onMessage(contactForCallbacks); onClose(); }}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[var(--ink-700)]"
                     >
-                        Synchronisé avec {crmLink.providerLabel}
-                    </Badge>
-                </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="flex items-center justify-center gap-2 pb-4 px-6">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
-                    onClick={() => { onMessage(contactForCallbacks); onClose(); }}
-                >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    Envoyer un message
-                </Button>
-                {crmLink && crmLink.externalUrl ? (
-                    <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
-                    >
-                        <a href={crmLink.externalUrl} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Message
+                    </button>
+                    {crmLink && crmLink.externalUrl ? (
+                        <a
+                            href={crmLink.externalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)]"
+                        >
                             <ExternalLink className="h-3.5 w-3.5" />
-                            Éditer dans {crmLink.providerLabel}
+                            {crmLink.providerLabel}
                         </a>
-                    </Button>
-                ) : (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
-                        onClick={() => { onEdit(contactForCallbacks); onClose(); }}
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => { onEdit(contactForCallbacks); onClose(); }}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)]"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Éditer
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => { onDelete(contactForCallbacks); onClose(); }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] px-3 py-1.5 text-[12px] font-medium text-[var(--status-danger)] transition-colors hover:bg-[var(--status-danger-soft)]"
                     >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Modifier
-                    </Button>
-                )}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
-                    onClick={() => { onDelete(contactForCallbacks); onClose(); }}
-                >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Supprimer
-                </Button>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Supprimer
+                    </button>
+                </div>
             </div>
-
-            <Separator />
 
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-                {/* Contact details */}
-                <div className="space-y-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Informations</h3>
-
-                    <div className="flex items-center gap-2.5 text-sm">
-                        <Phone className="h-4 w-4 text-gray-400 shrink-0" />
-                        <span className="text-gray-700 font-mono">{formattedPhone}</span>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+                {/* Informations */}
+                <section className="space-y-2.5">
+                    <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                        Informations
+                    </h3>
+                    <div className="flex items-center gap-2.5 text-[13px]">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                        <span className="font-mono text-[var(--ink-700)]">{formattedPhone}</span>
                     </div>
-
-                    {contactData.email && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                            <Mail className="h-4 w-4 text-gray-400 shrink-0" />
-                            <span className="text-gray-700 truncate">{contactData.email}</span>
+                    {contactData.email ? (
+                        <div className="flex items-center gap-2.5 text-[13px]">
+                            <Mail className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                            <span className="truncate text-[var(--ink-700)]">{contactData.email}</span>
                         </div>
-                    )}
-
-                    {contactData.company && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                            <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                            <span className="text-gray-700 truncate">
+                    ) : null}
+                    {contactData.company ? (
+                        <div className="flex items-center gap-2.5 text-[13px]">
+                            <Building2 className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                            <span className="truncate text-[var(--ink-700)]">
                                 {contactData.company}
-                                {contactData.jobTitle && ` - ${contactData.jobTitle}`}
+                                {contactData.jobTitle ? ` · ${contactData.jobTitle}` : ''}
                             </span>
                         </div>
-                    )}
-
-                    {(contactData.address || contactData.city || contactData.country) && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                            <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-                            <span className="text-gray-700 truncate">
+                    ) : null}
+                    {contactData.address || contactData.city || contactData.country ? (
+                        <div className="flex items-center gap-2.5 text-[13px]">
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                            <span className="truncate text-[var(--ink-700)]">
                                 {[contactData.address, contactData.city, contactData.country].filter(Boolean).join(', ')}
                             </span>
                         </div>
-                    )}
-
-                    {!contactData.email && !contactData.company && !contactData.address && !contactData.city && !contactData.country && (
-                        <p className="text-sm text-gray-400 italic">Aucune information supplémentaire</p>
-                    )}
-                </div>
+                    ) : null}
+                    {hasNoExtraInfo ? (
+                        <p className="text-[12.5px] italic text-[var(--ink-soft)]">Aucune information supplémentaire</p>
+                    ) : null}
+                </section>
 
                 {/* Tags */}
-                {tags.length > 0 && (
-                    <div className="space-y-2">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tags</h3>
+                {tags.length > 0 ? (
+                    <section className="space-y-2">
+                        <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                            Tags
+                        </h3>
                         <div className="flex flex-wrap gap-1.5">
                             {tags.map((tag) => (
-                                <Badge
-                                    key={tag.id}
-                                    variant="secondary"
-                                    className="text-xs font-medium px-2 py-0.5"
-                                    style={{
-                                        backgroundColor: `${tag.color}15`,
-                                        color: tag.color,
-                                        borderColor: `${tag.color}40`,
-                                    }}
-                                >
-                                    {tag.name}
-                                </Badge>
+                                <Chip key={tag.id} tone="neutral">{tag.name}</Chip>
                             ))}
                         </div>
-                    </div>
-                )}
+                    </section>
+                ) : null}
 
                 {/* Notes */}
-                {contactData.notes && Array.isArray(contactData.notes) && contactData.notes.length > 0 && (
-                    <div className="space-y-2">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</h3>
+                {contactData.notes && Array.isArray(contactData.notes) && contactData.notes.length > 0 ? (
+                    <section className="space-y-2">
+                        <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                            Notes
+                        </h3>
                         <div className="space-y-2">
                             {contactData.notes.filter(isContactNote).map((note, i) => (
-                                <div key={i} className="bg-gray-50 rounded-lg p-3">
-                                    <p className="text-sm text-gray-700">{note.content}</p>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        {note.authorName && (
-                                            <span className="text-[11px] text-gray-400">{note.authorName}</span>
-                                        )}
-                                        {note.createdAt && (
-                                            <span className="text-[11px] text-gray-400">
-                                                {formatRelativeTime(note.createdAt)}
-                                            </span>
-                                        )}
+                                <div key={i} className="rounded-lg border border-[var(--ink-200)] bg-[var(--paper-warm)] p-3">
+                                    <p className="text-[13px] text-[var(--ink-700)]">{note.content}</p>
+                                    <div className="mt-1.5 flex items-center gap-2 font-mono text-[10px] text-[var(--ink-soft)]">
+                                        {note.authorName ? <span>{note.authorName}</span> : null}
+                                        {note.createdAt ? <span>{formatRelativeTime(note.createdAt)}</span> : null}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                )}
-
-                <Separator />
+                    </section>
+                ) : null}
 
                 {/* Activity Timeline */}
-                <div className="space-y-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Activité</h3>
-
+                <section className="space-y-3">
+                    <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                        Activité
+                    </h3>
                     {!timeline ? (
                         <div className="flex items-center justify-center py-4">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600" />
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--ink-200)] border-t-[var(--accent)]" />
                         </div>
                     ) : timeline.length === 0 ? (
-                        <p className="text-sm text-gray-400 italic">Aucune activité récente</p>
+                        <p className="text-[12.5px] italic text-[var(--ink-soft)]">Aucune activité récente</p>
                     ) : (
                         <div className="relative">
-                            {/* Vertical line */}
-                            <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gray-200" />
-
+                            <div className="absolute bottom-2 left-[9px] top-2 w-px bg-[var(--ink-200)]" />
                             <div className="space-y-3">
-                                {timeline.map((entry, i) => (
-                                    <div key={i} className="flex items-start gap-3 relative">
-                                        {/* Dot */}
-                                        <div className={`relative z-10 mt-1 h-[18px] w-[18px] rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                            entry.type === 'message_received'
-                                                ? 'border-blue-400 bg-blue-50'
-                                                : 'border-green-400 bg-green-50'
-                                        }`}>
-                                            {entry.type === 'message_received' ? (
-                                                <ArrowDownLeft className="h-2.5 w-2.5 text-blue-500" />
-                                            ) : (
-                                                <ArrowUpRight className="h-2.5 w-2.5 text-green-600" />
-                                            )}
-                                        </div>
-
-                                        {/* Content */}
-                                        <div className="flex-1 min-w-0 pb-1">
-                                            <p className="text-sm text-gray-700">
-                                                <span className="font-medium">
-                                                    {entry.type === 'message_received' ? 'Message reçu' : 'Message envoyé'}
-                                                </span>
-                                                {': '}
-                                                <span className="text-gray-500">{entry.content}</span>
-                                            </p>
-                                            <div className="flex items-center gap-1 mt-0.5">
-                                                <Clock className="h-3 w-3 text-gray-300" />
-                                                <span className="text-[11px] text-gray-400">
-                                                    {formatRelativeTime(entry.timestamp)}
-                                                </span>
+                                {timeline.map((entry, i) => {
+                                    const received = entry.type === 'message_received';
+                                    return (
+                                        <div key={i} className="relative flex items-start gap-3">
+                                            <div
+                                                className={cn(
+                                                    'relative z-10 mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2',
+                                                    received
+                                                        ? 'border-[var(--ink-300)] bg-[var(--paper-warm)]'
+                                                        : 'border-[var(--accent)] bg-[var(--accent-muted)]',
+                                                )}
+                                            >
+                                                {received ? (
+                                                    <ArrowDownLeft className="h-2.5 w-2.5 text-[var(--ink-500)]" />
+                                                ) : (
+                                                    <ArrowUpRight className="h-2.5 w-2.5 text-[var(--accent)]" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1 pb-1">
+                                                <p className="text-[13px] text-[var(--ink-700)]">
+                                                    <span className="font-medium text-[var(--ink-900)]">
+                                                        {received ? 'Message reçu' : 'Message envoyé'}
+                                                    </span>
+                                                    {': '}
+                                                    <span className="text-[var(--ink-500)]">{entry.content}</span>
+                                                </p>
+                                                <div className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-[var(--ink-soft)]">
+                                                    <Clock className="h-3 w-3" />
+                                                    <span>{formatRelativeTime(entry.timestamp)}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
-                </div>
+                </section>
             </div>
         </div>
     );
