@@ -187,7 +187,9 @@ export function ConversationLayout({
                         transition={{ duration: 0.2 }}
                         className={cn(
                             'flex flex-col bg-[var(--paper-white)] relative z-0 overflow-hidden',
-                            isMobile ? 'w-full' : 'w-80 md:w-96 lg:w-[400px] shrink-0'
+                            // Match ConversationList's own width (340px) so its right
+                            // border sits flush against the thread — no empty gap.
+                            isMobile ? 'w-full' : 'w-80 md:w-96 lg:w-[340px] shrink-0'
                         )}
                     >
                         <InboxList

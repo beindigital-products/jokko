@@ -34,7 +34,7 @@ export function ConversationsLayoutClient() {
         return (
             <div className="flex h-full gap-0">
                 {/* Contact List Skeleton */}
-                <div className="hidden md:flex w-80 md:w-96 lg:w-[420px] flex-col border-r border-gray-200/80 bg-white p-4 gap-4">
+                <div className="hidden md:flex w-80 md:w-96 lg:w-[340px] flex-col border-r border-gray-200/80 bg-white p-4 gap-4">
                     <div className="space-y-3">
                         <Skeleton className="h-10 w-full" />
                         <div className="flex gap-2">
