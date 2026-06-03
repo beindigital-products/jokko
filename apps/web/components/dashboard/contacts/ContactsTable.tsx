@@ -13,8 +13,6 @@ export interface ContactsTableEntry {
     email?: string
     tags?: ContactTag[]
     lastExchange?: string
-    value?: string
-    commands?: number
 }
 
 interface ContactsTableProps {
@@ -25,7 +23,7 @@ interface ContactsTableProps {
     onRowMore?: (id: string) => void
 }
 
-const COLUMNS = ["", "NOM", "TÉLÉPHONE · EMAIL", "TAGS", "DERNIER ÉCHANGE", "VALEUR", "CMD."]
+const COLUMNS = ["", "NOM", "TÉLÉPHONE · EMAIL", "TAGS", "DERNIER ÉCHANGE"]
 
 export function ContactsTable({
     entries,
@@ -61,8 +59,6 @@ export function ContactsTable({
                         email={e.email}
                         tags={e.tags}
                         lastExchange={e.lastExchange}
-                        value={e.value}
-                        commands={e.commands}
                         selected={selectedIds?.has(e.id)}
                         onToggleSelect={(sel) => onToggleSelect?.(e.id, sel)}
                         onRowClick={() => onRowClick?.(e.id)}

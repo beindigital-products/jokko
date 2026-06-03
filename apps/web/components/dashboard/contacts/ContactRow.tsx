@@ -17,8 +17,6 @@ interface ContactRowProps {
     email?: string
     tags?: ContactTag[]
     lastExchange?: string
-    value?: string
-    commands?: number
     selected?: boolean
     onToggleSelect?: (selected: boolean) => void
     onRowClick?: () => void
@@ -27,7 +25,7 @@ interface ContactRowProps {
 
 /**
  * ContactRow — `tr` for the Contacts table. Selectable checkbox + avatar
- * + name/email + phone + tags + last exchange + value + cmd count + "...".
+ * + name/email + phone + tags + last exchange + "...".
  */
 export function ContactRow({
     name,
@@ -37,8 +35,6 @@ export function ContactRow({
     email,
     tags = [],
     lastExchange = "—",
-    value = "—",
-    commands = 0,
     selected,
     onToggleSelect,
     onRowClick,
@@ -85,11 +81,7 @@ export function ContactRow({
                     ))}
                 </div>
             </td>
-            <td className="px-2 py-3 text-[12px]">{lastExchange}</td>
-            <td className="px-2 py-3 text-right text-[12px] font-semibold tabular-nums">
-                {value}
-            </td>
-            <td className="px-2 py-3 text-right text-[12px] tabular-nums">{commands}</td>
+            <td className="px-2 py-3 text-[12px] text-[var(--ink-700)]">{lastExchange}</td>
             <td className="px-2 py-3 text-right">
                 <button
                     type="button"
