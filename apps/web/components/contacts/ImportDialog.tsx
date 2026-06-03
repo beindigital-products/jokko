@@ -15,7 +15,7 @@ interface ImportDialogProps {
 export function ImportDialog({ open, onOpenChange, onComplete }: ImportDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-3xl p-0 overflow-hidden gap-0">
+            <DialogContent className="max-w-3xl gap-0 overflow-hidden border-[var(--ink-200)] bg-[var(--paper-white)] p-0">
                 <ImportWizard
                     onComplete={() => {
                         onComplete();

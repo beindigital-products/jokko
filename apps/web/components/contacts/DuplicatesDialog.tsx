@@ -11,14 +11,10 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Card, CardContent } from '@/components/ui/card'
 import {
     Loader2,
     Merge,
-    CheckCircle2,
+    Check,
     Users,
     Phone,
     Mail,
@@ -26,6 +22,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPhoneDisplay } from '@/lib/contacts/validation'
+import { Avatar } from '@/components/dashboard/primitives/Avatar'
+import { Chip } from '@/components/dashboard/primitives/Chip'
+import { avatarColorFromString } from '@/lib/dashboard/avatar-color'
 
 interface DuplicatesDialogProps {
     open: boolean
@@ -114,13 +113,16 @@ export function DuplicatesDialog({ open, onOpenChange }: DuplicatesDialogProps) 
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Merge className="h-5 w-5 text-orange-500" />
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto border-[var(--ink-200)] bg-[var(--paper-white)]">
+                <DialogHeader className="space-y-0 text-left">
+                    <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                        Annuaire · doublons
+                    </p>
+                    <DialogTitle className="mt-1 flex items-center gap-2 font-editorial text-[20px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                        <Merge className="h-5 w-5 text-[var(--ink-400)]" />
                         Doublons de contacts
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="mt-1 text-[13px] leading-snug text-[var(--ink-500)]">
                         Contacts potentiellement en double, regroupes par numero de telephone ou nom identique.
                     </DialogDescription>
                 </DialogHeader>
@@ -128,16 +130,16 @@ export function DuplicatesDialog({ open, onOpenChange }: DuplicatesDialogProps) 
                 <div className="space-y-4 mt-4">
                     {isLoading ? (
                         <div className="flex flex-col items-center justify-center py-12 gap-3">
-                            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
-                            <p className="text-sm text-gray-500">Analyse des contacts en cours...</p>
+                            <Loader2 className="h-8 w-8 animate-spin text-[var(--ink-400)]" />
+                            <p className="text-sm text-[var(--ink-soft)]">Analyse des contacts en cours...</p>
                         </div>
                     ) : duplicateGroups.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-12 gap-3">
-                            <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
-                                <CheckCircle2 className="h-6 w-6 text-green-600" />
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--status-good-soft)]">
+                                <Check className="h-6 w-6 text-[var(--status-good)]" strokeWidth={2.5} />
                             </div>
-                            <p className="text-sm font-medium text-gray-900">Aucun doublon detecte</p>
-                            <p className="text-xs text-gray-500 text-center max-w-sm">
+                            <p className="text-sm font-medium text-[var(--ink-900)]">Aucun doublon detecte</p>
+                            <p className="max-w-sm text-center text-xs text-[var(--ink-soft)]">
                                 Tous vos contacts sont uniques. La detection se base sur le numero de telephone et le nom.
                             </p>
                         </div>
@@ -145,23 +147,23 @@ export function DuplicatesDialog({ open, onOpenChange }: DuplicatesDialogProps) 
                         <>
                             {/* Summary + Merge All */}
                             <div className="flex items-center justify-between">
-                                <p className="text-sm text-gray-600">
-                                    <span className="font-semibold text-gray-900">
+                                <p className="text-sm text-[var(--ink-700)]">
+                                    <span className="font-semibold text-[var(--ink-900)]">
                                         {pendingGroups.length}
                                     </span>{' '}
                                     groupe{pendingGroups.length > 1 ? 's' : ''} de doublons
                                     {mergedGroups.size > 0 && (
-                                        <span className="text-green-600 ml-2">
+                                        <span className="ml-2 text-[var(--status-good)]">
                                             ({mergedGroups.size} fusionne{mergedGroups.size > 1 ? 's' : ''})
                                         </span>
                                     )}
                                 </p>
                                 {pendingGroups.length > 1 && (
-                                    <Button
-                                        size="sm"
+                                    <button
+                                        type="button"
                                         onClick={handleMergeAll}
                                         disabled={mergingAll || mergingGroup !== null}
-                                        className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
+                                        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--ink-700)] disabled:opacity-60"
                                     >
                                         {mergingAll ? (
                                             <>
@@ -174,7 +176,7 @@ export function DuplicatesDialog({ open, onOpenChange }: DuplicatesDialogProps) 
                                                 Tout fusionner
                                             </>
                                         )}
-                                    </Button>
+                                    </button>
                                 )}
                             </div>
 
@@ -185,115 +187,101 @@ export function DuplicatesDialog({ open, onOpenChange }: DuplicatesDialogProps) 
                                 const typedGroup = group as DuplicateContact[]
 
                                 return (
-                                    <Card
+                                    <div
                                         key={groupIndex}
                                         className={cn(
-                                            'border transition-all',
-                                            isMerged
-                                                ? 'bg-green-50/50 border-green-200 opacity-60'
-                                                : 'bg-white border-gray-100'
+                                            'rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)] p-3 transition-all',
+                                            isMerged && 'opacity-60'
                                         )}
                                     >
-                                        <CardContent className="p-4">
-                                            <div className="flex items-center justify-between mb-3">
-                                                <div className="flex items-center gap-2">
-                                                    <Users className="h-4 w-4 text-gray-400" />
-                                                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                                        {typedGroup.length} contacts similaires
-                                                    </span>
-                                                </div>
-                                                {isMerged ? (
-                                                    <Badge className="bg-green-100 text-green-700 text-[10px]">
-                                                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                                                        Fusionne
-                                                    </Badge>
-                                                ) : (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() => handleMergeGroup(groupIndex, typedGroup)}
-                                                        disabled={isMerging || mergingAll}
-                                                        className="h-7 gap-1 text-[11px] rounded-full cursor-pointer"
-                                                    >
-                                                        {isMerging ? (
-                                                            <Loader2 className="h-3 w-3 animate-spin" />
-                                                        ) : (
-                                                            <Merge className="h-3 w-3" />
-                                                        )}
-                                                        Fusionner
-                                                    </Button>
-                                                )}
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <Users className="h-4 w-4 text-[var(--ink-400)]" />
+                                                <span className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                                                    {typedGroup.length} contacts similaires
+                                                </span>
                                             </div>
+                                            {isMerged ? (
+                                                <Chip tone="good">
+                                                    <Check className="h-3 w-3" strokeWidth={3} />
+                                                    Fusionne
+                                                </Chip>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleMergeGroup(groupIndex, typedGroup)}
+                                                    disabled={isMerging || mergingAll}
+                                                    className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 py-1 text-[12px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)] disabled:opacity-60"
+                                                >
+                                                    {isMerging ? (
+                                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                                    ) : (
+                                                        <Merge className="h-3 w-3" />
+                                                    )}
+                                                    Fusionner
+                                                </button>
+                                            )}
+                                        </div>
 
-                                            <div className="grid gap-2">
-                                                {typedGroup.map((contact, contactIndex) => (
-                                                    <div
-                                                        key={String(contact._id)}
-                                                        className={cn(
-                                                            'flex items-center gap-3 p-2 rounded-lg',
-                                                            contactIndex === 0
-                                                                ? 'bg-blue-50/50 border border-blue-100'
-                                                                : 'bg-gray-50 border border-gray-100'
-                                                        )}
-                                                    >
-                                                        <Avatar className="h-8 w-8 shrink-0">
-                                                            <AvatarFallback className={cn(
-                                                                'text-white text-xs font-semibold',
-                                                                contactIndex === 0
-                                                                    ? 'bg-gradient-to-br from-blue-600 to-blue-400'
-                                                                    : 'bg-gradient-to-br from-gray-500 to-gray-400'
-                                                            )}>
-                                                                {getInitials(contact.name, contact.firstName, contact.lastName)}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <div className="flex-1 min-w-0">
-                                                            <div className="flex items-center gap-2">
-                                                                <p className="text-sm font-medium text-gray-900 truncate">
-                                                                    {getDisplayName(contact)}
-                                                                </p>
-                                                                {contactIndex === 0 && (
-                                                                    <Badge variant="secondary" className="text-[9px] bg-blue-100 text-blue-700 px-1.5 py-0 shrink-0">
-                                                                        Principal
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <div className="flex items-center gap-3 mt-0.5">
-                                                                <span className="text-[11px] text-gray-500 flex items-center gap-1">
-                                                                    <Phone className="h-3 w-3" />
-                                                                    {formatPhoneDisplay(contact.phone, 'international')}
-                                                                </span>
-                                                                {contact.email && (
-                                                                    <span className="text-[11px] text-gray-500 flex items-center gap-1 truncate">
-                                                                        <Mail className="h-3 w-3" />
-                                                                        {contact.email}
-                                                                    </span>
-                                                                )}
-                                                                {contact.company && (
-                                                                    <span className="text-[11px] text-gray-500 flex items-center gap-1 truncate">
-                                                                        <Building2 className="h-3 w-3" />
-                                                                        {contact.company}
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                        <div className="grid gap-2">
+                                            {typedGroup.map((contact, contactIndex) => (
+                                                <div
+                                                    key={String(contact._id)}
+                                                    className={cn(
+                                                        'flex items-center gap-3 rounded-lg border p-2',
+                                                        contactIndex === 0
+                                                            ? 'border-[var(--accent)] bg-[var(--accent-muted)]'
+                                                            : 'border-[var(--ink-100)] bg-[var(--paper-warm)]'
+                                                    )}
+                                                >
+                                                    <Avatar
+                                                        initials={getInitials(contact.name, contact.firstName, contact.lastName)}
+                                                        color={avatarColorFromString(getDisplayName(contact))}
+                                                        size="md"
+                                                    />
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="truncate text-sm font-medium text-[var(--ink-900)]">
+                                                                {getDisplayName(contact)}
+                                                            </p>
+                                                            {contactIndex === 0 && (
+                                                                <Chip tone="accent" className="shrink-0">
+                                                                    Principal
+                                                                </Chip>
+                                                            )}
                                                         </div>
-                                                        {contact.tags.length > 0 && (
-                                                            <div className="flex gap-1 shrink-0">
-                                                                {contact.tags.slice(0, 2).map((tag) => (
-                                                                    <Badge
-                                                                        key={tag}
-                                                                        variant="secondary"
-                                                                        className="text-[9px] px-1.5 py-0"
-                                                                    >
-                                                                        {tag}
-                                                                    </Badge>
-                                                                ))}
-                                                            </div>
-                                                        )}
+                                                        <div className="mt-0.5 flex items-center gap-3">
+                                                            <span className="flex items-center gap-1 text-[11px] text-[var(--ink-soft)]">
+                                                                <Phone className="h-3 w-3 text-[var(--ink-400)]" />
+                                                                {formatPhoneDisplay(contact.phone, 'international')}
+                                                            </span>
+                                                            {contact.email && (
+                                                                <span className="flex items-center gap-1 truncate text-[11px] text-[var(--ink-soft)]">
+                                                                    <Mail className="h-3 w-3 text-[var(--ink-400)]" />
+                                                                    {contact.email}
+                                                                </span>
+                                                            )}
+                                                            {contact.company && (
+                                                                <span className="flex items-center gap-1 truncate text-[11px] text-[var(--ink-soft)]">
+                                                                    <Building2 className="h-3 w-3 text-[var(--ink-400)]" />
+                                                                    {contact.company}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
+                                                    {contact.tags.length > 0 && (
+                                                        <div className="flex shrink-0 gap-1">
+                                                            {contact.tags.slice(0, 2).map((tag) => (
+                                                                <Chip key={tag} tone="neutral">
+                                                                    {tag}
+                                                                </Chip>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
                                 )
                             })}
                         </>

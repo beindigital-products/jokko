@@ -13,6 +13,7 @@ import {
     Loader2,
     ExternalLink,
     Lock,
+    X,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -26,27 +27,27 @@ import {
     FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { ButtonGroup } from '@/components/ui/button-group';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { PhoneInput } from './PhoneInput';
 import { detectCountry } from '@/lib/contacts/validation';
 import { useCrmLink } from '@/hooks/use-crm-link';
 import type { ComponentProps, ReactNode } from 'react';
+
+// v3 field styles — shared by inputs/textareas (Cobalt × paper × ink).
+const v3FieldClass =
+    'h-9 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 text-[13px] text-[var(--ink-900)] shadow-none placeholder:text-[var(--ink-400)] focus-visible:border-[var(--accent)] focus-visible:ring-0';
+const v3LabelClass = 'text-[12px] font-medium text-[var(--ink-700)]';
 
 // Helper to wrap input with icon
 function InputWithIcon({ leftIcon, className, ...props }: ComponentProps<typeof Input> & { leftIcon?: ReactNode }) {
     return (
         <div className="relative">
             {leftIcon && (
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none">
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--ink-400)] pointer-events-none">
                     {leftIcon}
                 </div>
             )}
-            <Input className={`pl-10 ${className}`} {...props} />
+            <Input className={`${v3FieldClass} pl-9 ${className ?? ''}`} {...props} />
         </div>
     );
 }
@@ -202,15 +203,15 @@ export function ContactForm({
     return (
         <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)}>
-                <Card className="border-0 shadow-none">
-                    <CardContent className="space-y-4 px-0 pb-0">
+                <div>
+                    <div className="space-y-4">
                         {isCrmLinked && crmLink && (
-                            <div className="flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                                <div className="flex items-center gap-2 font-medium">
-                                    <Lock className="h-4 w-4" />
+                            <div className="flex flex-col gap-2 rounded-md border border-[var(--ink-200)] bg-[var(--paper-warm)] p-3 text-[13px] text-[var(--ink-700)]">
+                                <div className="flex items-center gap-2 font-medium text-[var(--ink-900)]">
+                                    <Lock className="h-4 w-4 text-[var(--ink-400)]" />
                                     Contact synchronisé avec {crmLink.providerLabel}
                                 </div>
-                                <p className="text-xs text-amber-800">
+                                <p className="text-[12px] leading-snug text-[var(--ink-soft)]">
                                     Les informations principales sont gérées dans {crmLink.providerLabel}.
                                     Vous pouvez ajouter des tags ou des notes locales côté Jokko.
                                 </p>
@@ -219,10 +220,10 @@ export function ContactForm({
                                         href={crmLink.externalUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex w-fit items-center gap-1.5 rounded-md bg-white px-2.5 py-1 text-xs font-medium text-amber-900 ring-1 ring-amber-200 hover:bg-amber-100"
+                                        className="inline-flex w-fit items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 py-1 text-[12px] font-medium text-[var(--ink-700)] hover:bg-[var(--paper-warm)]"
                                     >
                                         Éditer dans {crmLink.providerLabel}
-                                        <ExternalLink className="h-3 w-3" />
+                                        <ExternalLink className="h-3 w-3 text-[var(--ink-400)]" />
                                     </a>
                                 )}
                             </div>
@@ -232,8 +233,8 @@ export function ContactForm({
                             control={form.control}
                             name="phone"
                             render={({ field, fieldState }) => (
-                                <FormItem>
-                                    <FormLabel>Téléphone *</FormLabel>
+                                <FormItem className="space-y-1.5">
+                                    <FormLabel className={v3LabelClass}>Téléphone *</FormLabel>
                                     <FormControl>
                                         <PhoneInput
                                             indicator={detectCountry(field.value)}
@@ -244,7 +245,7 @@ export function ContactForm({
                                             disabled={coreDisabled}
                                         />
                                     </FormControl>
-                                    <FormDescription>
+                                    <FormDescription className="text-[12px] text-[var(--ink-soft)]">
                                         Format international recommandé pour WhatsApp
                                     </FormDescription>
                                 </FormItem>
@@ -257,8 +258,8 @@ export function ContactForm({
                                 control={form.control}
                                 name="firstName"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Prénom</FormLabel>
+                                    <FormItem className="space-y-1.5">
+                                        <FormLabel className={v3LabelClass}>Prénom</FormLabel>
                                         <FormControl>
                                             <InputWithIcon
                                                 placeholder="Amadou"
@@ -275,11 +276,12 @@ export function ContactForm({
                                 control={form.control}
                                 name="lastName"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Nom</FormLabel>
+                                    <FormItem className="space-y-1.5">
+                                        <FormLabel className={v3LabelClass}>Nom</FormLabel>
                                         <FormControl>
                                             <Input
                                                 placeholder="Diallo"
+                                                className={v3FieldClass}
                                                 disabled={coreDisabled}
                                                 {...field}
                                             />
@@ -294,8 +296,8 @@ export function ContactForm({
                             control={form.control}
                             name="email"
                             render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Email</FormLabel>
+                                <FormItem className="space-y-1.5">
+                                    <FormLabel className={v3LabelClass}>Email</FormLabel>
                                     <FormControl>
                                         <InputWithIcon
                                             type="email"
@@ -305,7 +307,7 @@ export function ContactForm({
                                             {...field}
                                         />
                                     </FormControl>
-                                    <FormMessage />
+                                    <FormMessage className="text-[12px] text-[var(--status-danger)]" />
                                 </FormItem>
                             )}
                         />
@@ -316,8 +318,8 @@ export function ContactForm({
                                 control={form.control}
                                 name="company"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Entreprise</FormLabel>
+                                    <FormItem className="space-y-1.5">
+                                        <FormLabel className={v3LabelClass}>Entreprise</FormLabel>
                                         <FormControl>
                                             <InputWithIcon
                                                 placeholder="Jokko SAS"
@@ -334,11 +336,12 @@ export function ContactForm({
                                 control={form.control}
                                 name="jobTitle"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Fonction</FormLabel>
+                                    <FormItem className="space-y-1.5">
+                                        <FormLabel className={v3LabelClass}>Fonction</FormLabel>
                                         <FormControl>
                                             <Input
                                                 placeholder="Directeur commercial"
+                                                className={v3FieldClass}
                                                 disabled={coreDisabled}
                                                 {...field}
                                             />
@@ -353,8 +356,8 @@ export function ContactForm({
                             control={form.control}
                             name="address"
                             render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Adresse</FormLabel>
+                                <FormItem className="space-y-1.5">
+                                    <FormLabel className={v3LabelClass}>Adresse</FormLabel>
                                     <FormControl>
                                         <InputWithIcon
                                             placeholder="123 Rue de Dakar"
@@ -372,11 +375,12 @@ export function ContactForm({
                                 control={form.control}
                                 name="city"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Ville</FormLabel>
+                                    <FormItem className="space-y-1.5">
+                                        <FormLabel className={v3LabelClass}>Ville</FormLabel>
                                         <FormControl>
                                             <Input
                                                 placeholder="Dakar"
+                                                className={v3FieldClass}
                                                 disabled={coreDisabled}
                                                 {...field}
                                             />
@@ -389,11 +393,12 @@ export function ContactForm({
                                 control={form.control}
                                 name="country"
                                 render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Pays</FormLabel>
+                                    <FormItem className="space-y-1.5">
+                                        <FormLabel className={v3LabelClass}>Pays</FormLabel>
                                         <FormControl>
                                             <Input
                                                 placeholder="Sénégal"
+                                                className={v3FieldClass}
                                                 disabled={coreDisabled}
                                                 {...field}
                                             />
@@ -404,49 +409,53 @@ export function ContactForm({
                         </div>
 
                         {/* Tags */}
-                        <div className="space-y-2">
-                            <Label className="flex items-center gap-2">
-                                <Tag className="h-4 w-4" />
+                        <div className="space-y-1.5">
+                            <label className={`flex items-center gap-1.5 ${v3LabelClass}`}>
+                                <Tag className="h-3.5 w-3.5 text-[var(--ink-400)]" />
                                 Tags
-                            </Label>
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {tags.map((tag) => (
-                                    <Badge
-                                        key={tag}
-                                        variant="secondary"
-                                        className="cursor-pointer hover:bg-red-100"
-                                        onClick={() => handleRemoveTag(tag)}
-                                    >
-                                        {tag} ×
-                                    </Badge>
-                                ))}
-                            </div>
+                            </label>
+                            {tags.length > 0 && (
+                                <div className="flex flex-wrap gap-2 pb-1">
+                                    {tags.map((tag) => (
+                                        <button
+                                            key={tag}
+                                            type="button"
+                                            onClick={() => handleRemoveTag(tag)}
+                                            className="group inline-flex items-center gap-1 rounded-md border border-[var(--ink-200)] bg-[var(--paper-warm)] px-2 py-0.5 text-[12px] text-[var(--ink-700)] transition-colors hover:border-[var(--status-danger)] hover:text-[var(--status-danger)]"
+                                        >
+                                            {tag}
+                                            <X className="h-3 w-3 text-[var(--ink-400)] group-hover:text-[var(--status-danger)]" />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                             <Input
                                 placeholder="Ajouter un tag (Entrée pour valider)"
                                 value={tagInput}
                                 onChange={(e) => setTagInput(e.target.value)}
                                 onKeyDown={handleAddTag}
                                 disabled={isLoading}
+                                className={v3FieldClass}
                             />
                         </div>
 
                         {/* Notes */}
-                        <div className="space-y-2">
-                            <FormLabel className="flex items-center gap-2">
-                                <FileText className="h-4 w-4" />
+                        <div className="space-y-1.5">
+                            <label className={`flex items-center gap-1.5 ${v3LabelClass}`}>
+                                <FileText className="h-3.5 w-3.5 text-[var(--ink-400)]" />
                                 Notes
-                            </FormLabel>
+                            </label>
 
                             {/* Existing Notes Display */}
                             {existingNotes.length > 0 && (
-                                <div className="space-y-2 mb-2 max-h-40 overflow-y-auto bg-gray-50 p-2 rounded border">
+                                <div className="mb-1 max-h-40 space-y-2 overflow-y-auto rounded-md border border-[var(--ink-200)] bg-[var(--paper-warm)] p-2.5">
                                     {existingNotes.map((note, i) => (
-                                        <div key={i} className="text-xs border-b border-gray-100 last:border-0 pb-1 mb-1">
-                                            <div className="flex justify-between text-gray-400">
+                                        <div key={i} className="border-b border-[var(--ink-100)] pb-1.5 text-[12px] last:border-0 last:pb-0">
+                                            <div className="flex justify-between text-[var(--ink-soft)]">
                                                 <span>{note.authorName || 'Agent'}</span>
                                                 <span>{new Date(note.createdAt).toLocaleDateString()}</span>
                                             </div>
-                                            <p className="text-gray-700">{note.content}</p>
+                                            <p className="text-[var(--ink-700)]">{note.content}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -456,11 +465,11 @@ export function ContactForm({
                                 control={form.control}
                                 name="notes"
                                 render={({ field }) => (
-                                    <FormItem>
+                                    <FormItem className="space-y-1.5">
                                         <FormControl>
                                             <Textarea
                                                 placeholder={mode === 'create' ? "Notes sur le contact..." : "Ajouter une nouvelle note..."}
-                                                className="min-h-[100px]"
+                                                className="min-h-[100px] rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-2 text-[13px] text-[var(--ink-900)] shadow-none placeholder:text-[var(--ink-400)] focus-visible:border-[var(--accent)] focus-visible:ring-0"
                                                 disabled={isLoading}
                                                 {...field}
                                             />
@@ -470,37 +479,31 @@ export function ContactForm({
                             />
                         </div>
 
-                    </CardContent>
+                    </div>
 
-                    <CardFooter className="flex justify-end border-t pt-6 px-0 mt-6">
-                        <ButtonGroup>
-                            {onCancel && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={onCancel}
-                                    disabled={isLoading}
-                                >
-                                    Annuler
-                                </Button>
-                            )}
-                            <Button
-                                type="submit"
+                    <div className="mt-6 flex justify-end gap-2 border-t border-[var(--ink-200)] bg-[var(--paper-warm)]/40 -mx-6 -mb-6 px-6 py-3.5">
+                        {onCancel && (
+                            <button
+                                type="button"
+                                onClick={onCancel}
                                 disabled={isLoading}
-                                className="min-w-[120px]"
+                                className="rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)] disabled:opacity-60"
                             >
-                                {isLoading ? (
-                                    <>
-                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                        {mode === 'create' ? 'Création...' : 'Enregistrement...'}
-                                    </>
-                                ) : (
-                                    mode === 'create' ? 'Créer le contact' : 'Enregistrer'
-                                )}
-                            </Button>
-                        </ButtonGroup>
-                    </CardFooter>
-                </Card>
+                                Annuler
+                            </button>
+                        )}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--ink-700)] disabled:opacity-60"
+                        >
+                            {isLoading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            {isLoading
+                                ? (mode === 'create' ? 'Création…' : 'Enregistrement…')
+                                : (mode === 'create' ? 'Créer le contact' : 'Enregistrer')}
+                        </button>
+                    </div>
+                </div>
             </form>
         </Form>
     );
