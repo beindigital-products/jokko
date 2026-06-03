@@ -269,11 +269,16 @@ function ThreadHeader({
             <div className="flex min-w-0 items-center gap-2.5">
                 <Avatar initials={initialsFromName(data.contact?.name, phone)} color={avatarColorFromString(name)} />
                 <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                        <span className="truncate text-[13px] font-semibold text-[var(--ink-900)]">{name}</span>
-                        <span className="font-mono text-[11px] text-[var(--ink-soft)]">{phone}</span>
-                    </div>
+                    {/* Name first (priority); phone sits just below in a smaller mono. */}
+                    <span className="block truncate text-[13.5px] font-semibold leading-tight text-[var(--ink-900)]">
+                        {name}
+                    </span>
                     <div className="mt-0.5 flex items-center gap-1.5">
+                        {phone && phone !== name ? (
+                            <span className="font-mono text-[10.5px] text-[var(--ink-soft)]">
+                                {phone}
+                            </span>
+                        ) : null}
                         {isTyping ? (
                             <span className="text-[11px] font-medium text-[var(--accent)] animate-pulse">
                                 {typingUsers.length > 0 ? `${typingUsers[0]} écrit…` : "écrit…"}
