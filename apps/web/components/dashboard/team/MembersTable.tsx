@@ -1,8 +1,16 @@
+import type { ReactNode } from "react"
+
 import { MemberRow } from "./MemberRow"
 import { MEMBERS_COLS, type TeamMember } from "./types"
 
 /** Members table — sticky-ish mono header + one MemberRow per member. */
-export function MembersTable({ members }: { members: TeamMember[] }) {
+export function MembersTable({
+    members,
+    renderMenu,
+}: {
+    members: TeamMember[]
+    renderMenu?: (member: TeamMember) => ReactNode
+}) {
     return (
         <div className="flex-1 overflow-auto">
             <div className="min-w-[760px]">
@@ -19,7 +27,7 @@ export function MembersTable({ members }: { members: TeamMember[] }) {
                     <div />
                 </div>
                 {members.map((m) => (
-                    <MemberRow key={m.id} member={m} />
+                    <MemberRow key={m.id} member={m} menu={renderMenu?.(m)} />
                 ))}
             </div>
         </div>

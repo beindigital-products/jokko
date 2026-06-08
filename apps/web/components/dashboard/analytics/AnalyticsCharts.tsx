@@ -11,22 +11,31 @@ import {
 
 // ── 30-day conversation volume, stacked by channel (shadcn bar) ───────────────
 
+/** One day's stacked bar: `day` label + an arbitrary set of numeric series. */
 export interface VolumePoint {
     day: string
-    paris: number
-    dakar: number
-    abidjan: number
+    [channel: string]: number | string
 }
 
-const VOLUME_CONFIG = {
-    paris: { label: "Paris", color: "var(--accent)" },
-    dakar: { label: "Dakar", color: "var(--ink-900)" },
-    abidjan: { label: "Abidjan", color: "var(--status-warn)" },
-} satisfies ChartConfig
+export interface VolumeChannel {
+    key: string
+    label: string
+    color: string
+}
 
-export function VolumeChart({ data }: { data: VolumePoint[] }) {
+export function VolumeChart({
+    data,
+    channels,
+}: {
+    data: VolumePoint[]
+    channels: VolumeChannel[]
+}) {
+    const config: ChartConfig = Object.fromEntries(
+        channels.map((c) => [c.key, { label: c.label, color: c.color }]),
+    )
+    const lastKey = channels[channels.length - 1]?.key
     return (
-        <ChartContainer config={VOLUME_CONFIG} className="aspect-auto h-[200px] w-full">
+        <ChartContainer config={config} className="aspect-auto h-[200px] w-full">
             <BarChart accessibilityLayer data={data} barCategoryGap={2} margin={{ left: -20, right: 4 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis
@@ -38,9 +47,15 @@ export function VolumeChart({ data }: { data: VolumePoint[] }) {
                     fontSize={10}
                 />
                 <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="paris" stackId="v" fill="var(--color-paris)" />
-                <Bar dataKey="dakar" stackId="v" fill="var(--color-dakar)" />
-                <Bar dataKey="abidjan" stackId="v" fill="var(--color-abidjan)" radius={[2, 2, 0, 0]} />
+                {channels.map((c) => (
+                    <Bar
+                        key={c.key}
+                        dataKey={c.key}
+                        stackId="v"
+                        fill={`var(--color-${c.key})`}
+                        radius={c.key === lastKey ? [2, 2, 0, 0] : undefined}
+                    />
+                ))}
             </BarChart>
         </ChartContainer>
     )
@@ -55,7 +70,14 @@ export interface StatusSlice {
     color: string
 }
 
-export function StatusDonut({ data }: { data: StatusSlice[] }) {
+export function StatusDonut({
+    data,
+    centerLabel,
+}: {
+    data: StatusSlice[]
+    /** Override the donut center text (defaults to the summed value as "%"). */
+    centerLabel?: string
+}) {
     const config: ChartConfig = Object.fromEntries(
         data.map((d) => [d.key, { label: d.label, color: d.color }]),
     )
@@ -87,7 +109,7 @@ export function StatusDonut({ data }: { data: StatusSlice[] }) {
                                         y={viewBox.cy}
                                         className="fill-[var(--ink-900)] font-display text-[18px] font-bold"
                                     >
-                                        {total}%
+                                        {centerLabel ?? `${total}%`}
                                     </tspan>
                                 </text>
                             )

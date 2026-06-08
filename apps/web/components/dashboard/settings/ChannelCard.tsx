@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { MessageCircle, MoreHorizontal } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -10,11 +11,14 @@ export type ChannelQuality = "GREEN" | "YELLOW" | "RED" | "UNKNOWN"
 interface ChannelCardProps {
     name: string
     phone: string
-    wabaId: string
+    wabaId?: string
     status: { label: string; tone: ChipTone }
     quality: ChannelQuality
-    volume: number
+    /** Daily message volume — "—" when not available. */
+    volume?: number | string
     onMore?: () => void
+    /** Trailing slot — overrides the default ⋮ button (e.g. a dropdown menu). */
+    menu?: ReactNode
 }
 
 const QUALITY_TONE: Record<ChannelQuality, "good" | "warn" | "danger" | "neutral"> = {
@@ -39,6 +43,7 @@ export function ChannelCard({
     quality,
     volume,
     onMore,
+    menu,
 }: ChannelCardProps) {
     return (
         <div className="flex items-center justify-between rounded-lg border border-[var(--ink-200)] bg-[var(--paper-white)] p-3">
@@ -52,7 +57,7 @@ export function ChannelCard({
                         <Chip tone={status.tone}>{status.label}</Chip>
                     </div>
                     <div className="font-mono text-[11px] text-[var(--ink-soft)]">
-                        {phone} · {wabaId}
+                        {phone} · WABA {wabaId ?? "—"}
                     </div>
                 </div>
             </div>
@@ -75,17 +80,19 @@ export function ChannelCard({
                         VOLUME
                     </div>
                     <div className="font-display text-[16px] font-bold tabular-nums text-[var(--ink-900)]">
-                        {volume}
+                        {volume ?? "—"}
                     </div>
                 </div>
-                <button
-                    type="button"
-                    onClick={onMore}
-                    className="rounded p-1 text-[var(--ink-400)] hover:bg-[var(--paper-warm)]"
-                    aria-label="Plus d'actions"
-                >
-                    <MoreHorizontal className="h-4 w-4" />
-                </button>
+                {menu ?? (
+                    <button
+                        type="button"
+                        onClick={onMore}
+                        className="rounded p-1 text-[var(--ink-400)] hover:bg-[var(--paper-warm)]"
+                        aria-label="Plus d'actions"
+                    >
+                        <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                )}
             </div>
         </div>
     )

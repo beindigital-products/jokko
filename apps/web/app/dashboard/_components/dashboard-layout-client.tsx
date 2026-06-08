@@ -25,7 +25,19 @@ function isFullBleedRoute(pathname: string): boolean {
         pathname.startsWith('/dashboard/conversations') ||
         pathname.startsWith('/dashboard/mentions') ||
         pathname.startsWith('/dashboard/assignments') ||
-        pathname.startsWith('/dashboard/modeles')
+        pathname.startsWith('/dashboard/modeles') ||
+        pathname === '/dashboard/campagnes' ||
+        // Campaign detail (full-bleed v3 screen) — but not the legacy `/new` wizard page.
+        (pathname.startsWith('/dashboard/campagnes/') && pathname !== '/dashboard/campagnes/new') ||
+        // Automations: v3 list + full-screen flow editor (self-managed layout).
+        pathname.startsWith('/dashboard/automatisations') ||
+        // Integrations: full-bleed v3 catalog + connection detail.
+        pathname.startsWith('/dashboard/integrations') ||
+        // Team + Analytics: full-bleed v3 screens (self-managed h-full layout).
+        pathname.startsWith('/dashboard/team') ||
+        pathname.startsWith('/dashboard/analytics') ||
+        // Settings: full-bleed v3 screen (vertical sub-nav + content panel).
+        pathname.startsWith('/dashboard/settings')
     )
 }
 

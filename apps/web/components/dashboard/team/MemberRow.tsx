@@ -1,3 +1,4 @@
+import type { ReactNode } from "react"
 import { MoreHorizontal } from "lucide-react"
 
 import { Avatar } from "../primitives/Avatar"
@@ -13,8 +14,11 @@ const STATUS: Record<MemberStatus, { label: string; color: string }> = {
     offline: { label: "Hors ligne", color: "var(--ink-400)" },
 }
 
-/** A single member row in the team table. */
-export function MemberRow({ member }: { member: TeamMember }) {
+/**
+ * A single member row in the team table. `menu` overrides the trailing ⋮
+ * cell — the page passes a wired dropdown; without it a static glyph shows.
+ */
+export function MemberRow({ member, menu }: { member: TeamMember; menu?: ReactNode }) {
     const s = STATUS[member.status]
     return (
         <div
@@ -53,13 +57,15 @@ export function MemberRow({ member }: { member: TeamMember }) {
                 {member.conv}
             </div>
             <div className="text-[11.5px] text-[var(--ink-soft)]">{member.joined}</div>
-            <button
-                type="button"
-                aria-label="Plus"
-                className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--ink-400)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)]"
-            >
-                <MoreHorizontal className="h-4 w-4" />
-            </button>
+            {menu ?? (
+                <button
+                    type="button"
+                    aria-label="Plus"
+                    className="flex h-7 w-7 items-center justify-center rounded-md text-[var(--ink-400)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)]"
+                >
+                    <MoreHorizontal className="h-4 w-4" />
+                </button>
+            )}
         </div>
     )
 }

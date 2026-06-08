@@ -14,9 +14,9 @@ export function VolumeCard({
         <AnalyticsCard className="lg:col-span-2">
             <div className="mb-6 flex items-baseline justify-between gap-3">
                 <div>
-                    <AnalyticsEyebrow>Volume conversations</AnalyticsEyebrow>
+                    <AnalyticsEyebrow>Volume de messages</AnalyticsEyebrow>
                     <div className="mt-1 font-editorial text-[20px] tracking-tight text-[var(--ink-900)]">
-                        30 derniers jours · par canal
+                        Sur la période · par type
                     </div>
                 </div>
                 <div className="flex flex-wrap gap-3 text-[11.5px] text-[var(--ink-700)]">
@@ -28,7 +28,7 @@ export function VolumeCard({
                     ))}
                 </div>
             </div>
-            <VolumeChart data={volume} />
+            <VolumeChart data={volume} channels={channels} />
         </AnalyticsCard>
     )
 }

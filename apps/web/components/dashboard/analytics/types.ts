@@ -3,7 +3,9 @@ import type { StatusSlice, VolumePoint } from "./AnalyticsCharts"
 export interface AnalyticsKpi {
     label: string
     value: string
-    delta: string
+    /** Optional change pill; omit when there's no prior-period comparison. */
+    delta?: string
+    trend?: "up" | "down"
     sub?: string
 }
 
@@ -12,11 +14,12 @@ export interface AgentRow {
     name: string
     conv: number
     time: string
-    csat: string
+    /** Satisfaction score — optional (not tracked by the backend yet). */
+    csat?: string
 }
 
 export interface ChannelLegend {
-    key: keyof Omit<VolumePoint, "day">
+    key: string
     label: string
     color: string
 }

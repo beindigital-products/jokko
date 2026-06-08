@@ -1,5 +1,6 @@
 "use client"
 
+import type { ReactNode } from "react"
 import { Download, SlidersHorizontal } from "lucide-react"
 
 import { PageHeader } from "../shell/PageHeader"
@@ -12,22 +13,35 @@ import { PeakHoursCard } from "./PeakHoursCard"
 import type { AnalyticsData } from "./types"
 
 /**
- * AnalyticsScreen — v3 "Analytics" page (Insights · 30 days). Composes
- * KPI cards + volume chart + top agents + status donut + peak-hours
- * heatmap. Recreates `Jokko Desktop.html` ScreenAnalytics. Presentational.
+ * AnalyticsScreen — v3 "Analytics" page (Insights). Composes KPI cards +
+ * volume chart + top agents + status donut + peak-hours heatmap. Recreates
+ * `Jokko Desktop.html` ScreenAnalytics.
+ *
+ * `eyebrow`/`actions` default to the static design, but the dashboard page
+ * overrides them with the live period label + real date-picker / CSV export.
  */
-export function AnalyticsScreen({ data }: { data: AnalyticsData }) {
+export function AnalyticsScreen({
+    data,
+    eyebrow = "Insights · 30 derniers jours",
+    actions,
+}: {
+    data: AnalyticsData
+    eyebrow?: string
+    actions?: ReactNode
+}) {
     return (
         <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--paper-white)]">
             <PageHeader
-                eyebrow="Insights · 30 derniers jours"
+                eyebrow={eyebrow}
                 title="Analytics"
-                description="Volume, temps de réponse, taux de résolution, performance des agents et campagnes."
+                description="Volume, temps de réponse, taux de réponse et performance des agents."
                 actions={
-                    <>
-                        <HeaderButton icon={SlidersHorizontal}>30 derniers jours</HeaderButton>
-                        <HeaderButton icon={Download}>Exporter</HeaderButton>
-                    </>
+                    actions ?? (
+                        <>
+                            <HeaderButton icon={SlidersHorizontal}>30 derniers jours</HeaderButton>
+                            <HeaderButton icon={Download}>Exporter</HeaderButton>
+                        </>
+                    )
                 }
             />
 

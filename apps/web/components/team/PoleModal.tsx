@@ -1,75 +1,21 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import {
-    Building2,
-    Palette,
-    Type,
-    AlignLeft,
-    Info,
-    LayoutGrid,
-    Users,
-    MessageSquare,
-    Phone,
-    Settings,
-    Shield,
-    Briefcase,
-    Headphones,
-    Laptop,
-    Truck,
-    Wallet,
-    Globe,
-    MoreHorizontal,
-    Loader2,
-} from 'lucide-react'
-import { useMutation } from "convex/react"
-import { api } from "@/convex/_generated/api"
-import { Id } from "@/convex/_generated/dataModel"
+import { useState } from 'react'
+import { Loader2, Plus } from 'lucide-react'
+import { useMutation, useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import type { Id } from '@/convex/_generated/dataModel'
 
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import {
-    Form,
-    FormControl,
-    FormDescription,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
-import { Button } from '@/components/ui/button'
-import { ButtonGroup } from '@/components/ui/button-group'
-import { ScrollArea } from '@/components/ui/scroll-area'
-
-// ============================================
-// SCHEMA
-// ============================================
-
-const poleSchema = z.object({
-    name: z.string().min(2, 'Le nom doit contenir au moins 2 caracteres'),
-    description: z.string().max(200, 'Description trop longue').optional(),
-    color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Couleur invalide'),
-    icon: z.string().min(1, 'Selectionnez une icone'),
-})
-
-type PoleFormValues = z.infer<typeof poleSchema>
-
-// ============================================
-// TYPES
-// ============================================
+import { avatarColorFromString, initialsFromName } from '@/lib/dashboard/avatar-color'
 
 interface Pole {
-    id: Id<"poles">
+    id: Id<'poles'>
     name: string
     description?: string
     color?: string
@@ -84,350 +30,299 @@ interface PoleModalProps {
     onSuccess: () => void
 }
 
-// ============================================
-// CONSTANTS
-// ============================================
+/** Design palette (Jokko Desktop.html PoleDialog). */
+const PALETTE = ['#6938EF', '#1F6E5A', '#B8860B', '#DC3838', '#A8174C', '#0B7285', '#252525']
 
-const PRESET_COLORS = [
-    '#ef4444', // red
-    '#f97316', // orange
-    '#f59e0b', // amber
-    '#84cc16', // lime
-    '#10b981', // emerald
-    '#06b6d4', // cyan
-    '#3b82f6', // blue
-    '#6366f1', // indigo
-    '#8b5cf6', // violet
-    '#d946ef', // fuchsia
-    '#f43f5e', // rose
-    '#6b7280', // gray
-]
+interface RosterMember {
+    id: Id<'memberships'>
+    poleId?: Id<'poles'> | null
+    user: { name?: string | null; email: string }
+}
 
-const ICONS = [
-    { name: 'Building2', icon: Building2 },
-    { name: 'Users', icon: Users },
-    { name: 'MessageSquare', icon: MessageSquare },
-    { name: 'Phone', icon: Phone },
-    { name: 'Settings', icon: Settings },
-    { name: 'Shield', icon: Shield },
-    { name: 'Briefcase', icon: Briefcase },
-    { name: 'Headphones', icon: Headphones },
-    { name: 'Laptop', icon: Laptop },
-    { name: 'Truck', icon: Truck },
-    { name: 'Wallet', icon: Wallet },
-    { name: 'Globe', icon: Globe },
-]
+/** v3 Nouveau / Configurer pôle — recreates the `dialogs.jsx` PoleDialog. */
+export function PoleModal({ open, onOpenChange, pole, onSuccess }: PoleModalProps) {
+    const create = !pole
 
-// ============================================
-// COMPONENT
-// ============================================
-
-export function PoleModal({
-    open,
-    onOpenChange,
-    pole,
-    onSuccess,
-}: PoleModalProps) {
-    const [error, setError] = useState<string | null>(null)
-
-    // Convex
     const createPole = useMutation(api.poles.create)
     const updatePole = useMutation(api.poles.update)
+    const removePole = useMutation(api.poles.remove)
+    const changePole = useMutation(api.team.changePole)
+    const membersData = useQuery(api.team.listMembers, open ? {} : 'skip')
 
-    const isEditing = !!pole
-    const defaultValues = useMemo<PoleFormValues>(() => ({
-        name: pole?.name || '',
-        description: pole?.description || '',
-        color: pole?.color || '#10b981',
-        icon: pole?.icon || 'Building2',
-    }), [pole])
+    const members = (membersData?.members ?? []) as unknown as RosterMember[]
+    const currentUserRole = (membersData?.currentUserRole ?? 'agent') as string
+    const canDelete = currentUserRole === 'owner'
 
-    const form = useForm<PoleFormValues>({
-        resolver: zodResolver(poleSchema),
-        defaultValues,
-        values: defaultValues,
-    })
+    const [name, setName] = useState('')
+    const [description, setDescription] = useState('')
+    const [color, setColor] = useState(PALETTE[0])
+    const [selected, setSelected] = useState<Set<string> | null>(null)
+    const [error, setError] = useState<string | null>(null)
+    const [saving, setSaving] = useState(false)
+    const [deleting, setDeleting] = useState(false)
+    const [initialized, setInitialized] = useState(false)
 
-    // Watch for preview
-    const formValues = useWatch({ control: form.control })
-
-    const onSubmit = async (values: PoleFormValues) => {
+    // Initialise fields + roster once the members are loaded for this opening.
+    if (open && !initialized && membersData !== undefined) {
+        setName(pole?.name ?? '')
+        setDescription(pole?.description ?? '')
+        setColor(pole?.color || PALETTE[0])
+        setSelected(
+            new Set(
+                pole
+                    ? members.filter((m) => String(m.poleId) === String(pole.id)).map((m) => String(m.id))
+                    : [],
+            ),
+        )
+        setInitialized(true)
+    }
+    if (!open && initialized) {
+        setInitialized(false)
         setError(null)
+        setSaving(false)
+    }
 
+    const handleOpenChange = (next: boolean) => {
+        if (saving || deleting) return
+        onOpenChange(next)
+    }
+
+    const toggle = (id: string) => {
+        setSelected((prev) => {
+            const next = new Set(prev ?? [])
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }
+
+    const applyRoster = async (poleId: Id<'poles'>) => {
+        const sel = selected ?? new Set<string>()
+        for (const m of members) {
+            const wasIn = pole ? String(m.poleId) === String(pole.id) : false
+            const nowIn = sel.has(String(m.id))
+            if (nowIn && !wasIn) await changePole({ membershipId: m.id, poleId })
+            else if (!nowIn && wasIn) await changePole({ membershipId: m.id, poleId: undefined })
+        }
+    }
+
+    const handleSave = async () => {
+        if (name.trim().length < 2) {
+            setError('Le nom du pôle doit contenir au moins 2 caractères.')
+            return
+        }
+        setSaving(true)
+        setError(null)
         try {
-            if (isEditing && pole) {
+            if (create) {
+                const newId = (await createPole({
+                    name: name.trim(),
+                    description: description.trim() || undefined,
+                    color,
+                    icon: 'Building2',
+                })) as Id<'poles'>
+                await applyRoster(newId)
+            } else {
                 await updatePole({
                     id: pole.id,
-                    name: values.name,
-                    description: values.description,
-                    color: values.color,
-                    icon: values.icon,
+                    name: name.trim(),
+                    description: description.trim() || undefined,
+                    color,
+                    icon: pole.icon || 'Building2',
                 })
-            } else {
-                await createPole({
-                    name: values.name,
-                    description: values.description,
-                    color: values.color,
-                    icon: values.icon,
-                })
+                await applyRoster(pole.id)
             }
-
             onSuccess()
             onOpenChange(false)
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+            setSaving(false)
         }
     }
 
-    const isLoading = form.formState.isSubmitting
+    const handleDelete = async () => {
+        if (!pole || !canDelete) return
+        setDeleting(true)
+        setError(null)
+        try {
+            await removePole({ id: pole.id })
+            onSuccess()
+            onOpenChange(false)
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+            setDeleting(false)
+        }
+    }
 
-    // Icon Component Helper
-    const SelectedIcon = ICONS.find(i => i.name === formValues.icon)?.icon || Building2
+    const inputClass =
+        'h-11 w-full rounded-lg border border-[var(--ink-200)] bg-[var(--paper-white)] px-3.5 text-[14px] text-[var(--ink-900)] outline-none placeholder:text-[var(--ink-400)] focus:border-[var(--accent)]'
 
     return (
-        <Dialog open={open} onOpenChange={(val) => {
-            if (!isLoading) onOpenChange(val)
-        }}>
-            <DialogContent className="sm:max-w-[900px] overflow-hidden p-0 gap-0">
-                <div className="flex h-[600px] flex-col md:flex-row">
-                    {/* Main Form Area */}
-                    <div className="flex-1 overflow-y-auto p-6 md:p-8">
-                        <DialogHeader className="mb-6">
-                            <DialogTitle className="flex items-center gap-2 text-2xl">
-                                <div className="h-10 w-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
-                                    {isEditing ? <Palette className="h-5 w-5" /> : <Building2 className="h-5 w-5" />}
-                                </div>
-                                {isEditing ? 'Modifier le pole' : 'Nouveau pole'}
-                            </DialogTitle>
-                            <DialogDescription className="text-base text-gray-500">
-                                {isEditing
-                                    ? 'Modifiez les informations du service ou departement.'
-                                    : 'Creez un nouveau service pour organiser vos agents.'}
-                            </DialogDescription>
-                        </DialogHeader>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
+            <DialogContent className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-[620px]">
+                <div className="border-b border-[var(--ink-200)] px-6 pb-4 pt-5">
+                    <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                        Équipe · pôles
+                    </p>
+                    <DialogTitle className="mt-1 font-editorial text-[24px] font-normal italic tracking-tight text-[var(--ink-900)]">
+                        {create ? 'Nouveau pôle' : `Configurer le pôle ${pole?.name ?? ''}`}
+                    </DialogTitle>
+                    <DialogDescription className="mt-1.5 text-[13px] text-[var(--ink-500)]">
+                        Le pôle regroupe des agents pour le routage par numéro ou par mot-clé.
+                    </DialogDescription>
+                </div>
 
-                        <Form {...form}>
-                            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                                {/* Name */}
-                                <FormField
-                                    control={form.control}
-                                    name="name"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="flex items-center gap-2 text-gray-700">
-                                                <Type className="h-3.5 w-3.5" />
-                                                Nom du pole
-                                            </FormLabel>
-                                            <FormControl>
-                                                <Input
-                                                    placeholder="Ex: Service Commercial"
-                                                    className="h-11 rounded-xl border-gray-200"
-                                                    {...field}
-                                                />
-                                            </FormControl>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                {/* Description */}
-                                <FormField
-                                    control={form.control}
-                                    name="description"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                            <FormLabel className="flex items-center gap-2 text-gray-700">
-                                                <AlignLeft className="h-3.5 w-3.5" />
-                                                Description courte
-                                            </FormLabel>
-                                            <FormControl>
-                                                <Textarea
-                                                    placeholder="Decrivez le role de ce service..."
-                                                    className="min-h-[80px] rounded-xl border-gray-200 resize-none"
-                                                    {...field}
-                                                />
-                                            </FormControl>
-                                            <FormDescription className="text-xs">
-                                                Cette description apparaitra dans les tooltips.
-                                            </FormDescription>
-                                            <FormMessage />
-                                        </FormItem>
-                                    )}
-                                />
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    {/* Color Picker */}
-                                    <FormField
-                                        control={form.control}
-                                        name="color"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="flex items-center gap-2 text-gray-700">
-                                                    <Palette className="h-3.5 w-3.5" />
-                                                    Couleur distinctive
-                                                </FormLabel>
-                                                <FormControl>
-                                                    <div className="grid grid-cols-6 gap-2">
-                                                        {PRESET_COLORS.map((color) => (
-                                                            <button
-                                                                key={color}
-                                                                type="button"
-                                                                onClick={() => field.onChange(color)}
-                                                                className={`
-                                                                    h-8 w-8 rounded-full transition-all duration-200
-                                                                    hover:scale-110 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-green-600
-                                                                    ${field.value === color ? 'scale-110 ring-2 ring-offset-1 ring-green-600 shadow-sm' : ''}
-                                                                `}
-                                                                style={{ backgroundColor: color }}
-                                                                title={color}
-                                                            />
-                                                        ))}
-                                                    </div>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
+                <div className="flex flex-col gap-[18px] overflow-y-auto px-6 py-5">
+                    <div className="grid grid-cols-[1.5fr_1fr] gap-3.5">
+                        <Field label="Nom du pôle">
+                            <input
+                                autoFocus
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="ex. Service après-vente"
+                                className={inputClass}
+                            />
+                        </Field>
+                        <Field label="Couleur">
+                            <div className="flex h-11 items-center gap-1.5 rounded-lg border border-[var(--ink-200)] bg-[var(--paper-warm)] px-2.5">
+                                {PALETTE.map((c) => (
+                                    <button
+                                        key={c}
+                                        type="button"
+                                        aria-label={`Couleur ${c}`}
+                                        onClick={() => setColor(c)}
+                                        style={{ background: c }}
+                                        className={`h-[18px] w-[18px] rounded-full transition-transform ${
+                                            c === color
+                                                ? 'ring-2 ring-[var(--ink-900)] ring-offset-2 ring-offset-[var(--paper-warm)]'
+                                                : 'hover:scale-110'
+                                        }`}
                                     />
-
-                                    {/* Icon Picker */}
-                                    <FormField
-                                        control={form.control}
-                                        name="icon"
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <FormLabel className="flex items-center gap-2 text-gray-700">
-                                                    <LayoutGrid className="h-3.5 w-3.5" />
-                                                    Icone
-                                                </FormLabel>
-                                                <FormControl>
-                                                    <ScrollArea className="h-[120px] rounded-xl border border-gray-200 p-2">
-                                                        <div className="grid grid-cols-4 gap-2">
-                                                            {ICONS.map((item) => (
-                                                                <button
-                                                                    key={item.name}
-                                                                    type="button"
-                                                                    onClick={() => field.onChange(item.name)}
-                                                                    className={`
-                                                                        flex flex-col items-center justify-center p-2 rounded-lg transition-all
-                                                                        hover:bg-gray-100 focus:outline-none
-                                                                        ${field.value === item.name ? 'bg-green-50 text-green-600 ring-1 ring-green-200' : 'text-gray-500'}
-                                                                    `}
-                                                                >
-                                                                    <item.icon className="h-5 w-5" />
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </ScrollArea>
-                                                </FormControl>
-                                                <FormMessage />
-                                            </FormItem>
-                                        )}
-                                    />
-                                </div>
-
-                                {error && (
-                                    <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600 flex items-center gap-2">
-                                        <Info className="h-4 w-4 flex-shrink-0" />
-                                        {error}
-                                    </div>
-                                )}
-
-                                {/* Footer */}
-                                <div className="pt-2 flex items-center justify-end gap-3 border-t border-gray-100 mt-6">
-                                    <ButtonGroup>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => onOpenChange(false)}
-                                            disabled={isLoading}
-                                        >
-                                            Annuler
-                                        </Button>
-                                        <Button
-                                            type="submit"
-                                            disabled={isLoading}
-                                            className="bg-green-600 hover:bg-green-700 text-white min-w-[140px]"
-                                        >
-                                            {isLoading ? (
-                                                <>
-                                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                                    Traitement...
-                                                </>
-                                            ) : isEditing ? 'Mettre a jour' : 'Creer le pole'}
-                                        </Button>
-                                    </ButtonGroup>
-                                </div>
-                            </form>
-                        </Form>
+                                ))}
+                            </div>
+                        </Field>
                     </div>
 
-                    {/* Preview Sidebar */}
-                    <div className="hidden md:flex w-[300px] bg-gray-50/50 border-l border-gray-200/50 p-8 flex-col items-center justify-center">
-                        <div className="w-full max-w-[240px]">
-                            <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest text-center mb-6">
-                                Apercu en direct
-                            </p>
+                    <Field label="Description">
+                        <input
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                            placeholder="À quoi sert ce pôle ? (optionnel)"
+                            className={inputClass}
+                        />
+                    </Field>
 
-                            {/* Card Preview */}
-                            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 transition-all duration-300 group hover:shadow-md hover:border-gray-300">
-                                <div className="flex items-start justify-between mb-4">
-                                    <div
-                                        className="h-12 w-12 rounded-xl flex items-center justify-center transition-colors duration-300"
-                                        style={{
-                                            backgroundColor: `${formValues.color}15`,
-                                            color: formValues.color
-                                        }}
-                                    >
-                                        <SelectedIcon className="h-6 w-6" />
-                                    </div>
-                                    <div className="h-6 w-6 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </div>
+                    <Field label={create ? 'Ajouter des membres' : 'Membres'}>
+                        <div className="max-h-[208px] overflow-y-auto rounded-xl border border-[var(--ink-200)] p-1.5">
+                            {membersData === undefined ? (
+                                <div className="flex items-center justify-center gap-2 py-6 text-[13px] text-[var(--ink-soft)]">
+                                    <Loader2 className="h-4 w-4 animate-spin" /> Chargement…
                                 </div>
-
-                                <h3 className="font-bold text-gray-900 text-lg mb-1 break-words">
-                                    {formValues.name || 'Nom du pole'}
-                                </h3>
-
-                                <p className="text-sm text-gray-500 line-clamp-2 min-h-[40px] mb-4">
-                                    {formValues.description || 'La description du service s\'affichera ici...'}
-                                </p>
-
-                                <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
-                                    <div className="flex -space-x-2">
-                                        {[1, 2, 3].map(i => (
-                                            <div key={i} className="h-6 w-6 rounded-full ring-2 ring-white bg-gray-200" />
-                                        ))}
-                                    </div>
-                                    <span className="text-xs font-medium text-gray-400 ml-1">
-                                        + 5 membres
-                                    </span>
+                            ) : members.length === 0 ? (
+                                <div className="py-6 text-center text-[13px] text-[var(--ink-soft)]">
+                                    Aucun membre à afficher.
                                 </div>
-                            </div>
-
-                            {/* List Preview */}
-                            <div className="mt-8 opacity-60 scale-95">
-                                <div className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-200">
-                                    <div
-                                        className="h-8 w-8 rounded-lg flex items-center justify-center"
-                                        style={{
-                                            backgroundColor: `${formValues.color}15`,
-                                            color: formValues.color
-                                        }}
-                                    >
-                                        <SelectedIcon className="h-4 w-4" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-900 truncate">
-                                            {formValues.name || 'Nom du pole'}
-                                        </p>
-                                    </div>
-                                </div>
-                            </div>
+                            ) : (
+                                members.map((m, i) => {
+                                    const on = (selected ?? new Set()).has(String(m.id))
+                                    const label = m.user.name || m.user.email
+                                    return (
+                                        <div
+                                            key={m.id}
+                                            className={`flex items-center gap-3 px-2.5 py-2 ${
+                                                i === 0 ? '' : 'border-t border-[var(--ink-100)]'
+                                            }`}
+                                        >
+                                            <span
+                                                className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                                                style={{ background: avatarColorFromString(label) }}
+                                            >
+                                                {initialsFromName(label)}
+                                            </span>
+                                            <div className="min-w-0 flex-1">
+                                                <div className="truncate text-[13px] font-medium tracking-tight text-[var(--ink-900)]">
+                                                    {label}
+                                                </div>
+                                                <div className="truncate text-[11.5px] text-[var(--ink-soft)]">
+                                                    {m.user.email}
+                                                </div>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={on}
+                                                aria-label={`${on ? 'Retirer' : 'Ajouter'} ${label}`}
+                                                onClick={() => toggle(String(m.id))}
+                                                className="relative h-4 w-7 shrink-0 rounded-full transition-colors"
+                                                style={{ background: on ? 'var(--accent)' : 'var(--ink-200)' }}
+                                            >
+                                                <span
+                                                    className="absolute top-0.5 h-3 w-3 rounded-full bg-white shadow-sm transition-all"
+                                                    style={{ left: on ? 14 : 2 }}
+                                                />
+                                            </button>
+                                        </div>
+                                    )
+                                })
+                            )}
                         </div>
+                    </Field>
+
+                    {error && (
+                        <div className="rounded-lg border border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)] px-3.5 py-2.5 text-[12.5px] text-[var(--status-danger)]">
+                            {error}
+                        </div>
+                    )}
+                </div>
+
+                <div className="flex items-center justify-between gap-2 border-t border-[var(--ink-200)] bg-[var(--paper-warm)] px-5 py-3.5">
+                    {create ? (
+                        <span className="text-[12px] text-[var(--ink-500)]">Visible par toute l&apos;équipe.</span>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={handleDelete}
+                            disabled={!canDelete || deleting || saving}
+                            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors disabled:cursor-not-allowed"
+                            style={{ color: canDelete ? 'var(--status-danger)' : 'var(--ink-400)' }}
+                        >
+                            {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                            {canDelete ? 'Supprimer le pôle' : 'Suppression réservée au propriétaire'}
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => handleOpenChange(false)}
+                            className="rounded-md px-3.5 py-2 text-[13px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--ink-100)]"
+                        >
+                            Annuler
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving || deleting}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[var(--ink-700)] disabled:opacity-50"
+                        >
+                            {saving ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : create ? (
+                                <Plus className="h-3.5 w-3.5" />
+                            ) : null}
+                            {create ? 'Créer le pôle' : 'Enregistrer'}
+                        </button>
                     </div>
                 </div>
             </DialogContent>
         </Dialog>
+    )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div>
+            <div className="mb-1.5 text-[12px] font-medium tracking-tight text-[var(--ink-700)]">{label}</div>
+            {children}
+        </div>
     )
 }

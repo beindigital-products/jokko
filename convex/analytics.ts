@@ -297,6 +297,45 @@ export const getDashboardStats = query({
             ? Math.min(100, Math.round((conversationOutbound / conversationInbound) * 100))
             : 0;
 
+        // ── Peak hours heatmap (business hours, weekday × 2h bucket) ──
+        // Computed from real message timestamps. Off-hours (before 8h / after
+        // 22h) are excluded — this is a business-hours staffing view. Hours use
+        // the server clock (no per-org timezone yet), so treat them as ~UTC.
+        const HEAT_HOURS = [8, 10, 12, 14, 16, 18, 20];
+        const HEAT_DAY_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+        const HEAT_DAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+        const heatCounts: number[][] = HEAT_DAY_LABELS.map(() => HEAT_HOURS.map(() => 0));
+        for (const msg of messages) {
+            if (msg.createdAt < start || msg.createdAt > end) continue;
+            const dt = new Date(msg.createdAt);
+            const bucket = Math.floor((dt.getHours() - 8) / 2);
+            if (bucket < 0 || bucket > 6) continue;
+            const dayIdx = (dt.getDay() + 6) % 7; // Monday-first
+            heatCounts[dayIdx][bucket]++;
+        }
+        let heatMax = 0;
+        let peakDay = 0;
+        let peakBucket = 0;
+        for (let d = 0; d < 7; d++) {
+            for (let h = 0; h < 7; h++) {
+                if (heatCounts[d][h] > heatMax) {
+                    heatMax = heatCounts[d][h];
+                    peakDay = d;
+                    peakBucket = h;
+                }
+            }
+        }
+        const peakStartHour = HEAT_HOURS[peakBucket];
+        const heatmap = {
+            rows: heatCounts.map((row) => row.map((c) => (heatMax > 0 ? c / heatMax : 0))),
+            hours: HEAT_HOURS.map((h) => `${h}h`),
+            days: HEAT_DAY_LABELS,
+            peakLabel:
+                heatMax > 0
+                    ? `${HEAT_DAY_NAMES[peakDay]} ${peakStartHour}h–${peakStartHour + 2}h`
+                    : '—',
+        };
+
         return {
             global: {
                 totalMessages,
@@ -317,6 +356,7 @@ export const getDashboardStats = query({
                 messages: formatTrend(totalMessages, prevTotalMessages),
                 conversations: formatTrend(currentNewConvs, prevNewConvs),
             },
+            heatmap,
         };
     }
 });

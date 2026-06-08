@@ -22,7 +22,8 @@ export function TopAgentsCard({ agents }: { agents: AgentRow[] }) {
                                 {a.name}
                             </div>
                             <div className="font-mono text-[11px] text-[var(--ink-soft)]">
-                                {a.conv} conv · {a.time} · {a.csat}★
+                                {a.conv} conv · {a.time}
+                                {a.csat ? ` · ${a.csat}★` : ""}
                             </div>
                         </div>
                     </div>
