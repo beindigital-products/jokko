@@ -8,6 +8,14 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 // Queries
 // ============================================
 
+// Safety ceiling for the inbox list scan. The query reads the most-recent
+// conversations (ordered by lastMessageAt) and enriches each (contact +
+// assignee), so an unbounded `.collect()` would hit Convex's read limit on a
+// very large tenant. 1000 is well above any realistic active inbox, so it's a
+// no-op for normal use and a guard against a pathological scan. Proper
+// server-side pagination + a search index is the follow-up for huge tenants.
+const CONVERSATION_LIST_LIMIT = 1000;
+
 export const list = query({
     args: {
         organizationId: v.id("organizations"),
@@ -33,11 +41,8 @@ export const list = query({
                 .withIndex("by_org_status", (q) =>
                     q.eq("organizationId", args.organizationId).eq("status", "ARCHIVED")
                 )
-                .order("desc") // Most recent first (based on status change?) or created? Schema has by_org_last_message too.
-                // Schema: .index("by_org_last_message", ["organizationId", "lastMessageAt"])
-                // Use by_org_last_message for optimal sorting, then filter in memory?
-                // Or use filtering.
-                .collect();
+                .order("desc") // Most recent first
+                .take(CONVERSATION_LIST_LIMIT);
         } else {
             // Active conversations (OPEN, SNOOZED, etc.)
             // We probably want to exclude ARCHIVED unless explicitly requested.
@@ -48,7 +53,7 @@ export const list = query({
                     q.eq("organizationId", args.organizationId)
                 )
                 .order("desc")
-                .collect();
+                .take(CONVERSATION_LIST_LIMIT);
 
             // Filter out ARCHIVED/RESOLVED since we are not in 'archived' mode
             conversations = conversations.filter(c => c.status !== "ARCHIVED" && c.status !== "RESOLVED");

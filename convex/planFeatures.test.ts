@@ -57,6 +57,10 @@ async function seedOrgWithPlan(t: any, plan: PlanKey) {
             name: `Org ${plan}`,
             ownerId: uid,
             plan,
+            // Hors essai + plan choisi : on isole le gating PAR PLAN.
+            // (Le bypass pendant l'essai est couvert par des tests dédiés.)
+            trialEndsAt: Date.now() - 1000,
+            hasSelectedPlan: true,
             createdAt: Date.now(),
             updatedAt: Date.now(),
         });
@@ -291,4 +295,54 @@ describe("Plan features — broadcasts.create bloqué par plan", () => {
             expect(bid).toBeDefined();
         });
     }
+});
+
+/**
+ * Régression : le gating serveur doit honorer la période d'essai, comme le front
+ * (`hasFeatureAccess`). Avant le fix, `requirePlanFeature` ignorait le trial → un
+ * utilisateur en essai (plan FREE) était bloqué côté serveur sur flows/broadcasts/etc.
+ */
+describe("Plan features — bypass pendant l'essai (régression)", () => {
+    async function setTrial(t: any, oid: any, opts: { trialEndsAt: number; hasSelectedPlan: boolean }) {
+        await t.run(async (ctx: any) => ctx.db.patch(oid, opts));
+    }
+
+    it("AUTORISE flows.create pour une org FREE EN ESSAI (trial actif)", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid } = await seedOrgWithPlan(t, "FREE");
+        // Essai actif + aucun plan choisi → tout déverrouillé.
+        await setTrial(t, oid, { trialEndsAt: Date.now() + 86_400_000, hasSelectedPlan: false });
+
+        const flowId = await t
+            .withIdentity({ subject: uid })
+            .mutation(api.flows.create, { name: "Trial Flow", triggerType: "NEW_CONVERSATION" });
+        expect(flowId).toBeDefined();
+    });
+
+    it("AUTORISE broadcasts.create en essai (FREE) — trial bypass", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid, tplId } = await seedOrgWithPlan(t, "FREE");
+        await setTrial(t, oid, { trialEndsAt: Date.now() + 86_400_000, hasSelectedPlan: false });
+
+        const bid = await t.withIdentity({ subject: uid }).mutation(api.broadcasts.create, {
+            name: "Promo essai",
+            templateId: tplId as any,
+            audienceConfig: { type: "ALL" },
+        });
+        expect(bid).toBeDefined();
+    });
+
+    it("VERROUILLE après essai expiré sans plan choisi (message dédié)", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid } = await seedOrgWithPlan(t, "FREE");
+        // Essai terminé + aucun plan → tout verrouillé.
+        await setTrial(t, oid, { trialEndsAt: Date.now() - 1000, hasSelectedPlan: false });
+
+        await expect(
+            t.withIdentity({ subject: uid }).mutation(api.flows.create, {
+                name: "Flow",
+                triggerType: "NEW_CONVERSATION",
+            }),
+        ).rejects.toThrow(/période d'essai est terminée/);
+    });
 });

@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { action, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requirePlanFeatureInAction } from "./lib/planFeatures";
 import OpenAI from "openai";
 
 export const getFlowContext = internalQuery({
@@ -23,9 +24,15 @@ export const getFlowContext = internalQuery({
             .query("poles")
             .withIndex("by_organization", (q) => q.eq("organizationId", currentOrganizationId))
             .collect();
+        const org = await ctx.db.get(currentOrganizationId);
 
         return {
             services: poles.map((p) => ({ name: p.name, description: p.description })),
+            // État plan/trial pour le gating serveur de l'IA (PRO+).
+            plan: org?.plan ?? "FREE",
+            trialEndsAt: org?.trialEndsAt,
+            hasSelectedPlan: org?.hasSelectedPlan,
+            createdAt: org?.createdAt,
         };
     },
 });
@@ -39,6 +46,19 @@ export const generateFlow = action({
     handler: async (ctx, args) => {
         // Fetch Context (Organization Info like Services/Poles)
         const flowContext = await ctx.runQuery(internal.ai.getFlowContext, {});
+
+        if (!flowContext) throw new Error("Aucune organisation active");
+        // IA = feature PRO+ — gating serveur (honore le trial). Empêche la
+        // consommation du budget OpenAI par un plan qui n'y a pas droit.
+        await requirePlanFeatureInAction(
+            {
+                plan: flowContext.plan,
+                trialEndsAt: flowContext.trialEndsAt,
+                hasSelectedPlan: flowContext.hasSelectedPlan,
+                createdAt: flowContext.createdAt,
+            },
+            "ai",
+        );
 
         let servicesContext = "";
         if (flowContext?.services && flowContext.services.length > 0) {

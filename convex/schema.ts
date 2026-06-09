@@ -1081,7 +1081,9 @@ export default defineSchema({
     })
         .index("by_conversation", ["conversationId"])
         .index("by_organization", ["organizationId"])
-        .index("by_external_id", ["externalId"]),
+        .index("by_external_id", ["externalId"])
+        // Date-bounded org scans (analytics windows) without reading all history.
+        .index("by_org_created", ["organizationId", "createdAt"]),
 
     // ============================================
     // TYPING INDICATORS
@@ -1730,6 +1732,22 @@ export default defineSchema({
         remoteAccountId: v.string(),
         remoteAccountLabel: v.optional(v.string()),
         scalingMode: v.union(v.literal("standard"), v.literal("large")),
+        // Sync preferences (set from the connector detail modal). Direction gates
+        // pull (poller) vs push (enqueue); frequency sets the poll cadence.
+        // Absent = legacy default ("two" / "rt").
+        syncDirection: v.optional(v.union(v.literal("out"), v.literal("in"), v.literal("two"))),
+        syncFrequency: v.optional(v.union(v.literal("rt"), v.literal("hourly"), v.literal("daily"))),
+        // Per-connection field mapping: which remote CRM property feeds each Jokko
+        // identity field. Absent / empty = adapter default. Honored at import.
+        fieldMapping: v.optional(
+            v.object({
+                firstName: v.optional(v.string()),
+                lastName: v.optional(v.string()),
+                email: v.optional(v.string()),
+                phone: v.optional(v.string()),
+                tags: v.optional(v.string()),
+            }),
+        ),
         debugMode: v.optional(v.boolean()),
         debugModeExpiresAt: v.optional(v.number()),
         refreshInFlight: v.optional(v.boolean()),

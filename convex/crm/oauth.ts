@@ -66,7 +66,7 @@ async function beginOAuthFlow(
         throw new Error(`Fournisseur OAuth non supporté au MVP : ${params.provider}`);
     }
 
-    const { organizationId, role, plan } = await ctx.runQuery(
+    const { organizationId, role, plan, trialEndsAt, hasSelectedPlan, createdAt } = await ctx.runQuery(
         internal.crm.oauth._sessionContext,
         { userId },
     );
@@ -74,8 +74,8 @@ async function beginOAuthFlow(
     if (!hasPermission(role, "integrations:manage")) {
         throw new Error("Permission refusée : integrations:manage");
     }
-    // Feature gate plan : intégrations CRM réservées au plan PRO+
-    await requirePlanFeatureInAction(plan, "integrations_crm");
+    // Feature gate plan : intégrations CRM réservées au plan PRO+ (honore le trial)
+    await requirePlanFeatureInAction({ plan, trialEndsAt, hasSelectedPlan, createdAt }, "integrations_crm");
 
     const verifier = generatePkceVerifier();
     const challenge = await pkceChallengeFromVerifier(verifier);
@@ -168,7 +168,14 @@ export const _sessionContext = internalQuery({
             .first();
         const organizationId = session?.currentOrganizationId;
         if (!organizationId) {
-            return { organizationId: null, role: "AGENT" as const, plan: "FREE" as string };
+            return {
+                organizationId: null,
+                role: "AGENT" as const,
+                plan: "FREE" as string,
+                trialEndsAt: undefined as number | undefined,
+                hasSelectedPlan: undefined as boolean | undefined,
+                createdAt: undefined as number | undefined,
+            };
         }
         const [membership, org] = await Promise.all([
             ctx.db
@@ -183,6 +190,10 @@ export const _sessionContext = internalQuery({
             organizationId: organizationId as string | null,
             role: (membership?.role ?? "AGENT") as "OWNER" | "ADMIN" | "AGENT",
             plan: (org?.plan ?? "FREE") as string,
+            // Trial/plan state so action-side gating honors the trial (cf. requirePlanFeatureInAction).
+            trialEndsAt: org?.trialEndsAt as number | undefined,
+            hasSelectedPlan: org?.hasSelectedPlan as boolean | undefined,
+            createdAt: org?.createdAt as number | undefined,
         };
     },
 });

@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requirePlanFeature } from "./lib/planFeatures";
 
 // Helper to get Org ID (simplified)
 async function getOrganizationId(ctx: any, userId: string) {
@@ -32,6 +33,9 @@ export const getDashboardStats = query({
         const organizationId = await getOrganizationId(ctx, userId);
         if (!organizationId) throw new Error("No organization found");
 
+        // Analytics avancées (BUSINESS+) — gating serveur (le front gate déjà via FeatureGate).
+        await requirePlanFeature(ctx, organizationId, "analytics_advanced");
+
         const start = args.startDate || 0;
         const end = args.endDate || Date.now();
 
@@ -58,9 +62,15 @@ export const getDashboardStats = query({
         }
 
         // 2. Aggregate Messages & Calculate Response Times
+        // Bound the scan to the requested window via the (org, createdAt) index
+        // instead of collecting the org's ENTIRE message history into memory
+        // (which hits Convex's read limit on a large tenant). The analytics page
+        // always passes a date range (default: last 30 days).
         const messages = await ctx.db
             .query("messages")
-            .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+            .withIndex("by_org_created", (q) =>
+                q.eq("organizationId", organizationId).gte("createdAt", start).lte("createdAt", end),
+            )
             .collect();
 
         // Group by conversation for response time calc

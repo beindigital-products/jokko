@@ -6,6 +6,7 @@ import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { hasPermission, type Role } from "./lib/permissions";
+import { requirePlanFeature } from "./lib/planFeatures";
 
 // Helper to normalize search text
 const getSearchName = (args: { name?: string, firstName?: string, lastName?: string, phone?: string, email?: string }) => {
@@ -1029,6 +1030,9 @@ export const createSegment = mutation({
 
         if (!session || !session.currentOrganizationId) throw new Error("No active organization");
         const orgId = session.currentOrganizationId;
+
+        // Segments = feature BUSINESS+ (gating serveur ; honore le trial).
+        await requirePlanFeature(ctx, orgId, "segments");
 
         const now = Date.now();
         return await ctx.db.insert("contactSegments", {

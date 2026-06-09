@@ -48,7 +48,7 @@ export const connectWithApiKey = action({
             throw new Error(`Le fournisseur ${provided} n'utilise pas une clé API`);
         }
 
-        const { organizationId, role, plan } = await ctx.runQuery(
+        const { organizationId, role, plan, trialEndsAt, hasSelectedPlan, createdAt } = await ctx.runQuery(
             internal.crm.oauth._sessionContext,
             { userId },
         );
@@ -56,8 +56,8 @@ export const connectWithApiKey = action({
         if (!hasPermission(role, "integrations:manage")) {
             throw new Error("Permission refusée : integrations:manage");
         }
-        // Feature gate plan : intégrations CRM réservées au plan PRO+
-        await requirePlanFeatureInAction(plan, "integrations_crm");
+        // Feature gate plan : intégrations CRM réservées au plan PRO+ (honore le trial)
+        await requirePlanFeatureInAction({ plan, trialEndsAt, hasSelectedPlan, createdAt }, "integrations_crm");
 
         const trimmedKey = args.apiKey.trim();
         if (!trimmedKey) throw new Error("Clé API requise");
