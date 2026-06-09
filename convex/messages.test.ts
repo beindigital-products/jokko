@@ -279,4 +279,25 @@ describe("messages.addInternalNote", () => {
         const conv = await t.run(async (ctx: any) => ctx.db.get(conversationId));
         expect(conv.preview).toBe(preview);
     });
+
+    it("ignores mentions of users who are NOT members of the org (no notif leak)", async () => {
+        // A stranger account with no membership in this org. The mentions array
+        // is client-supplied; a member must not be able to push a MENTION
+        // (leaking the contact name + a 140-char note excerpt + deep link) to an
+        // arbitrary user id.
+        const strangerId = await t.run(async (ctx: any) =>
+            ctx.db.insert("users", { email: "stranger@test.com", name: "Stranger" }));
+
+        const id = await asAuthor.mutation(api.messages.addInternalNote, {
+            conversationId,
+            content: "@Stranger ping",
+            mentions: [{ userId: strangerId, name: "Stranger" }],
+        });
+
+        // The note itself is still created…
+        const msg = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(msg.isInternal).toBe(true);
+        // …but the non-member receives NO notification.
+        expect(await notifsFor(strangerId)).toHaveLength(0);
+    });
 });

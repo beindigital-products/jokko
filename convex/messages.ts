@@ -371,6 +371,17 @@ export const addInternalNote = mutation({
                 if (m.userId === userId) continue; // don't notify yourself
                 if (seen.has(m.userId)) continue;
                 seen.add(m.userId);
+                // SECURITY: only notify users who are actually members of this
+                // org. The mentions array is client-supplied; without this a
+                // caller could push a MENTION (leaking the contact name + a
+                // 140-char note excerpt + deep link) to an arbitrary userId.
+                const mentionIsMember = await ctx.db
+                    .query("memberships")
+                    .withIndex("by_user_org", (q) =>
+                        q.eq("userId", m.userId).eq("organizationId", conversation.organizationId),
+                    )
+                    .first();
+                if (!mentionIsMember) continue;
                 await createNotification(ctx, {
                     organizationId: conversation.organizationId,
                     userId: m.userId,

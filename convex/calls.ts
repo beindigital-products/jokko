@@ -16,6 +16,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireMembership, requirePermission } from "./lib/auth";
 
 // ============================================
 // WEBHOOK HANDLER (called from http.ts)
@@ -319,6 +320,19 @@ export const getActiveCall = query({
         organizationId: v.id("organizations"),
     },
     handler: async (ctx, args) => {
+        // SECURITY: only members of the org may read its active call (the result
+        // embeds contact PII). Return null for non-members so the reactive
+        // subscription stays quiet instead of erroring.
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return null;
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", args.organizationId),
+            )
+            .first();
+        if (!membership) return null;
+
         // Find any ringing call for this org
         const call = await ctx.db
             .query("calls")
@@ -419,6 +433,19 @@ export const getCallHistory = query({
         conversationId: v.id("conversations"),
     },
     handler: async (ctx, args) => {
+        // SECURITY: scope the history read to members of the conversation's org.
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation) return [];
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return [];
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", conversation.organizationId),
+            )
+            .first();
+        if (!membership) return [];
+
         return await ctx.db
             .query("calls")
             .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
@@ -444,6 +471,16 @@ export const getChannelsWithTokenError = query({
     handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
         if (!userId) return [];
+
+        // SECURITY: l'appelant doit être membre de l'org ciblée (sinon divulgation
+        // cross-tenant des erreurs de token Meta via un simple organizationId).
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", args.organizationId),
+            )
+            .first();
+        if (!membership) return [];
 
         const window = args.windowMs ?? 24 * 60 * 60 * 1000;
         const since = Date.now() - window;
@@ -503,11 +540,16 @@ export const requestOutboundCall = mutation({
         conversationId: v.id("conversations"),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const conversation = await ctx.db.get(args.conversationId);
         if (!conversation) throw new Error("Conversation not found");
+
+        // SECURITY: caller must be a member of the conversation's org with
+        // permission to place calls (prevents cross-tenant CPR sends).
+        const { userId } = await requirePermission(
+            ctx,
+            conversation.organizationId,
+            "calls:initiate",
+        );
 
         const contact = conversation.contactId
             ? await ctx.db.get(conversation.contactId)
@@ -602,11 +644,11 @@ export const startOutboundCall = mutation({
         sdpOffer: v.string(),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
+
+        // SECURITY: enforce org membership + calls:initiate on the call's org.
+        await requirePermission(ctx, call.organizationId, "calls:initiate");
 
         if (call.status !== "PERMISSION_GRANTED") {
             throw new Error(`Cannot start call: status is ${call.status}, expected PERMISSION_GRANTED`);
@@ -636,11 +678,11 @@ export const acceptCall = mutation({
         sdpAnswer: v.string(),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
+
+        // SECURITY: only a member of the call's org with calls:answer may pick it up.
+        const { userId } = await requirePermission(ctx, call.organizationId, "calls:answer");
 
         // Optimistic concurrency: only accept if still ringing
         if (call.status !== "RINGING") {
@@ -673,6 +715,9 @@ export const confirmConnected = mutation({
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
 
+        // SECURITY: was fully unauthenticated — require org membership.
+        await requireMembership(ctx, call.organizationId);
+
         if (call.status !== "PRE_ACCEPTED") {
             console.log(`[CALLS] confirmConnected: call ${args.callId} is ${call.status}, not PRE_ACCEPTED`);
             return;
@@ -695,11 +740,11 @@ export const rejectCall = mutation({
         callId: v.id("calls"),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
+
+        // SECURITY: only a member of the call's org with calls:answer may reject it.
+        await requirePermission(ctx, call.organizationId, "calls:answer");
 
         if (call.status !== "RINGING") {
             throw new Error(`Call is no longer ringing (status: ${call.status})`);
@@ -747,6 +792,9 @@ export const terminateCall = mutation({
     handler: async (ctx, args) => {
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
+
+        // SECURITY: was fully unauthenticated — require org membership.
+        await requireMembership(ctx, call.organizationId);
 
         if (call.status === "TERMINATED" || call.status === "REJECTED" || call.status === "MISSED") {
             return; // Already ended

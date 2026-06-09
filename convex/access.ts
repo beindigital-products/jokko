@@ -74,12 +74,12 @@ export const getAccessStatus = query({
  * Backfill : remplit trialStartedAt / trialEndsAt sur les orgs existantes
  * qui n'ont pas encore ces champs. Idempotent.
  */
-export const backfillTrial = mutation({
+export const backfillTrial = internalMutation({
     args: {},
     handler: async (ctx) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Non authentifié");
-
+        // internalMutation: run once from the Convex CLI / dashboard, never from
+        // a client. (Was a public mutation that scanned + patched ALL orgs —
+        // any authed user could trigger a full-table write.)
         const orgs = await ctx.db.query("organizations").collect();
         const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
         let patched = 0;
