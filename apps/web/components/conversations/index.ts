@@ -8,11 +8,8 @@
  */
 
 export { ConversationLayout } from './ConversationLayout'
-export { ContactList } from './ContactList'
-export { ConversationView } from './ConversationView'
 export { MessageBubble } from './MessageBubble'
 export { MessageInput } from './MessageInput'
-export { ContactInfo } from './ContactInfo'
 export { EmptyState } from './EmptyState'
 
 // Assignment components
