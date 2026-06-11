@@ -1,14 +1,27 @@
+import { Loader2 } from "lucide-react"
+
 import type { BillingData } from "./types"
+
+interface PlanAction {
+    label: string
+    onClick: () => void
+    loading?: boolean
+}
 
 interface PlanCardProps {
     plan: BillingData["plan"]
+    /** Filled white button (e.g. "Gérer l'abonnement" / "Passer à Business"). */
+    primary?: PlanAction
+    /** Outlined glass button (e.g. "Changer de plan"). */
+    secondary?: PlanAction
 }
 
 /**
  * PlanCard — hero accent-gradient card showing plan name, price, tagline
  * and action buttons. Matches the `ScreenBilling` violet hero card design.
+ * Buttons are driven by `primary`/`secondary` props (hidden when absent).
  */
-export function PlanCard({ plan }: PlanCardProps) {
+export function PlanCard({ plan, primary, secondary }: PlanCardProps) {
     return (
         <div
             className="relative overflow-hidden rounded-xl"
@@ -93,31 +106,38 @@ export function PlanCard({ plan }: PlanCardProps) {
                 <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
                     {plan.priceUnit}
                 </div>
-                <div
-                    className="mt-4 flex items-center justify-end gap-2"
-                >
-                    <button
-                        type="button"
-                        className="inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors"
-                        style={{
-                            background: "rgba(255,255,255,0.15)",
-                            color: "#fff",
-                            border: "1px solid rgba(255,255,255,0.25)",
-                        }}
-                    >
-                        Changer de plan
-                    </button>
-                    <button
-                        type="button"
-                        className="inline-flex items-center rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors"
-                        style={{
-                            background: "#fff",
-                            color: "var(--accent)",
-                        }}
-                    >
-                        Passer à Business
-                    </button>
-                </div>
+                {primary || secondary ? (
+                    <div className="mt-4 flex items-center justify-end gap-2">
+                        {secondary ? (
+                            <button
+                                type="button"
+                                onClick={secondary.onClick}
+                                disabled={secondary.loading}
+                                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors disabled:opacity-60"
+                                style={{
+                                    background: "rgba(255,255,255,0.15)",
+                                    color: "#fff",
+                                    border: "1px solid rgba(255,255,255,0.25)",
+                                }}
+                            >
+                                {secondary.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                {secondary.label}
+                            </button>
+                        ) : null}
+                        {primary ? (
+                            <button
+                                type="button"
+                                onClick={primary.onClick}
+                                disabled={primary.loading}
+                                className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors disabled:opacity-60"
+                                style={{ background: "#fff", color: "var(--accent)" }}
+                            >
+                                {primary.loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                                {primary.label}
+                            </button>
+                        ) : null}
+                    </div>
+                ) : null}
             </div>
         </div>
     )
