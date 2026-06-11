@@ -20,6 +20,7 @@ import type {
     UnifiedContact,
     UnifiedDeal,
 } from "../../core/types";
+import { mappedIdentity } from "../../core/mapping";
 
 const HUBSPOT_API = "https://api.hubapi.com";
 const HUBSPOT_AUTH = "https://app.hubspot.com/oauth/authorize";
@@ -188,25 +189,37 @@ export async function refreshToken(p: { refreshToken: string }): Promise<AuthTok
     };
 }
 
-function toUnifiedContact(raw: {
-    id: string;
-    properties: Record<string, string | null>;
-    updatedAt?: string;
-}): UnifiedContact {
+type FieldMapping = AdapterCallCtx["fieldMapping"];
+
+/**
+ * Maps a HubSpot contact record to a UnifiedContact. A per-connection
+ * `mapping` overrides which remote property feeds each identity field; absent
+ * keys fall back to the HubSpot defaults.
+ */
+export function toUnifiedContact(
+    raw: { id: string; properties: Record<string, string | null>; updatedAt?: string },
+    mapping?: FieldMapping,
+): UnifiedContact {
     const p = raw.properties ?? {};
-    const emails = [p.email, p.work_email].filter(
-        (e): e is string => typeof e === "string" && e.length > 0,
-    );
-    const phones: Array<{ raw: string; type?: string }> = [];
-    if (p.phone) phones.push({ raw: p.phone, type: "primary" });
-    if (p.mobilephone) phones.push({ raw: p.mobilephone, type: "mobile" });
+    const id = mappedIdentity(p, mapping, {
+        firstName: p.firstname ?? undefined,
+        lastName: p.lastname ?? undefined,
+        emails: [p.email, p.work_email].filter(
+            (e): e is string => typeof e === "string" && e.length > 0,
+        ),
+        phones: [
+            ...(p.phone ? [{ raw: p.phone, type: "primary" }] : []),
+            ...(p.mobilephone ? [{ raw: p.mobilephone, type: "mobile" }] : []),
+        ],
+    });
 
     return {
         externalId: raw.id,
-        firstName: p.firstname ?? undefined,
-        lastName: p.lastname ?? undefined,
-        emails,
-        phones,
+        firstName: id.firstName,
+        lastName: id.lastName,
+        emails: id.emails,
+        phones: id.phones,
+        externalTags: id.tags,
         company: p.company ?? undefined,
         jobTitle: p.jobtitle ?? undefined,
         externalOwnerId: p.hubspot_owner_id ?? undefined,
@@ -229,6 +242,14 @@ const CONTACT_PROPERTIES = [
     "lastmodifieddate",
 ];
 
+/** Default property list plus any custom-mapped properties (deduped). */
+function contactPropsFor(mapping?: FieldMapping): string[] {
+    const extra = [mapping?.firstName, mapping?.lastName, mapping?.email, mapping?.phone, mapping?.tags].filter(
+        (x): x is string => typeof x === "string" && x.length > 0,
+    );
+    return Array.from(new Set([...CONTACT_PROPERTIES, ...extra]));
+}
+
 export async function pullContactsPage(p: {
     ctx: AdapterCallCtx;
     cursor?: string;
@@ -238,7 +259,7 @@ export async function pullContactsPage(p: {
     if (!accessToken) throw new CRMAuthError("missing access token", { provider: "hubspot" });
     const params = new URLSearchParams({
         limit: "100",
-        properties: CONTACT_PROPERTIES.join(","),
+        properties: contactPropsFor(p.ctx.fieldMapping).join(","),
         archived: "false",
     });
     if (p.cursor) params.set("after", p.cursor);
@@ -252,7 +273,7 @@ export async function pullContactsPage(p: {
     };
 
     return {
-        items: json.results.map(toUnifiedContact),
+        items: json.results.map((r) => toUnifiedContact(r, p.ctx.fieldMapping)),
         nextCursor: json.paging?.next?.after,
         hasMore: Boolean(json.paging?.next?.after),
     };

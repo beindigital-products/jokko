@@ -11,6 +11,7 @@ import {
     internalAction,
     internalMutation,
     internalQuery,
+    type MutationCtx,
 } from "../_generated/server";
 import { getAdapter } from "./registry";
 import { decrypt, encrypt } from "../lib/encryption";
@@ -152,6 +153,7 @@ export const runTick = internalAction({
                 instanceUrl: connection.instanceUrl,
             },
             scalingMode: connection.scalingMode,
+            fieldMapping: connection.fieldMapping,
         };
 
         try {
@@ -415,6 +417,36 @@ export const _markFailed = internalMutation({
     },
 });
 
+/**
+ * Find-or-create org-scoped tags by name, returning their ids (deduped,
+ * case-insensitive). Used to enrich imported contacts with their CRM tags.
+ */
+async function resolveTagIds(
+    ctx: MutationCtx,
+    orgId: Id<"organizations">,
+    names: string[] | undefined,
+    now: number,
+): Promise<Id<"tags">[]> {
+    if (!names?.length) return [];
+    const out: Id<"tags">[] = [];
+    const seen = new Set<string>();
+    for (const rawName of names) {
+        const name = rawName.trim();
+        if (!name || seen.has(name.toLowerCase())) continue;
+        seen.add(name.toLowerCase());
+        const existing = await ctx.db
+            .query("tags")
+            .withIndex("by_org_name", (q) => q.eq("organizationId", orgId).eq("name", name))
+            .first();
+        out.push(
+            existing
+                ? existing._id
+                : await ctx.db.insert("tags", { organizationId: orgId, name, createdAt: now }),
+        );
+    }
+    return out;
+}
+
 export const _persistContactBatch = internalMutation({
     args: {
         jobId: v.id("crmImportJobs"),
@@ -476,6 +508,8 @@ export const _persistContactBatch = internalMutation({
                 }
             }
 
+            const tagIds = await resolveTagIds(ctx, orgId, raw.externalTags, now);
+
             if (!contactId) {
                 if (!phoneResult?.ok) {
                     continue;
@@ -500,6 +534,7 @@ export const _persistContactBatch = internalMutation({
                     email,
                     company: raw.company,
                     jobTitle: raw.jobTitle,
+                    tags: tagIds.length ? tagIds : undefined,
                     whatsappOptIn: {
                         status: "unknown",
                         source: "crm_import_unknown",
@@ -515,6 +550,11 @@ export const _persistContactBatch = internalMutation({
                 if (phoneResult?.ok) {
                     patch.phoneE164 = phoneResult.e164;
                     patch.phoneCountryCode = phoneResult.countryCode;
+                }
+                if (tagIds.length) {
+                    const existing = await ctx.db.get(contactId);
+                    const existingTags = (existing?.tags ?? []) as Id<"tags">[];
+                    patch.tags = Array.from(new Set<string>([...existingTags, ...tagIds])) as Id<"tags">[];
                 }
                 await ctx.db.patch(contactId, patch);
             }

@@ -7,6 +7,7 @@ interface IntegrationSectionProps {
     integrations: Integration[]
     onConfigure?: (id: string) => void
     onConnect?: (id: string) => void
+    onDisconnect?: (id: string) => void
 }
 
 /**
@@ -19,6 +20,7 @@ export function IntegrationSection({
     integrations,
     onConfigure,
     onConnect,
+    onDisconnect,
 }: IntegrationSectionProps) {
     if (integrations.length === 0) return null
 
@@ -37,6 +39,7 @@ export function IntegrationSection({
                         integration={it}
                         onConfigure={onConfigure}
                         onConnect={onConnect}
+                        onDisconnect={onDisconnect}
                     />
                 ))}
             </div>

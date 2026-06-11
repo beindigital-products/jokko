@@ -88,3 +88,69 @@ export function fullNameFrom(parts: {
     const joined = [parts.firstName, parts.lastName].filter(Boolean).join(" ").trim();
     return joined || "Contact";
 }
+
+// ── Per-connection field mapping ────────────────────────────────────────────
+
+/** Which remote CRM property feeds each Jokko field (adapter-agnostic). */
+export interface FieldMapping {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    /** Remote property holding tags (array, or a comma/semicolon-separated string). */
+    tags?: string;
+}
+
+export interface MappedIdentity {
+    firstName?: string;
+    lastName?: string;
+    emails: string[];
+    phones: Array<{ raw: string; type?: string }>;
+    /** Parsed tag names from the mapped tags property (undefined if not mapped). */
+    tags?: string[];
+}
+
+/** Parse a remote tags value (array or comma/semicolon-separated string) into clean names. */
+export function parseTagList(value: unknown): string[] {
+    if (Array.isArray(value)) {
+        return value.map((v) => String(v).trim()).filter((v) => v.length > 0);
+    }
+    if (typeof value === "string") {
+        return value
+            .split(/[,;]/)
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0);
+    }
+    return [];
+}
+
+/**
+ * Overlays a connection's field mapping on an adapter's default identity fields.
+ * For each mapped key, reads that property off the raw remote record (as a
+ * non-empty string) and overrides the default; unmapped keys keep the default.
+ * No mapping → returns the defaults untouched (zero behavior change). Shared by
+ * every CRM adapter so mapping behaves identically across providers.
+ */
+export function mappedIdentity(
+    raw: unknown,
+    mapping: FieldMapping | undefined,
+    defaults: MappedIdentity,
+): MappedIdentity {
+    const m = mapping ?? {};
+    if (!m.firstName && !m.lastName && !m.email && !m.phone && !m.tags) return defaults;
+
+    const rec = (raw ?? {}) as Record<string, unknown>;
+    const str = (k?: string): string | undefined => {
+        if (!k) return undefined;
+        const v = rec[k];
+        return typeof v === "string" && v.trim().length > 0 ? v : undefined;
+    };
+
+    return {
+        firstName: m.firstName ? str(m.firstName) : defaults.firstName,
+        lastName: m.lastName ? str(m.lastName) : defaults.lastName,
+        emails: m.email ? (str(m.email) ? [str(m.email)!] : []) : defaults.emails,
+        phones: m.phone ? (str(m.phone) ? [{ raw: str(m.phone)!, type: "primary" }] : []) : defaults.phones,
+        tags: m.tags ? parseTagList(rec[m.tags]) : defaults.tags,
+    };
+}

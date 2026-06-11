@@ -7,6 +7,7 @@ import {
     action,
     internalMutation,
     internalQuery,
+    mutation,
     query,
 } from "../_generated/server";
 import { internal } from "../_generated/api";
@@ -114,7 +115,73 @@ export const getConnection = query({
             scopes: conn.scopes,
             instanceUrl: conn.instanceUrl,
             debugMode: conn.debugMode,
+            syncDirection: conn.syncDirection ?? "two",
+            syncFrequency: conn.syncFrequency ?? "rt",
+            fieldMapping: conn.fieldMapping ?? {},
         };
+    },
+});
+
+/**
+ * Updates a connection's sync preferences (direction + frequency) from the
+ * connector detail modal. Direction gates pull/push; frequency sets the poll
+ * cadence — `nextPollAt` is bumped so the new cadence takes effect promptly.
+ */
+export const updateSyncPreferences = mutation({
+    args: {
+        connectionId: v.id("crmConnections"),
+        syncDirection: v.optional(v.union(v.literal("out"), v.literal("in"), v.literal("two"))),
+        syncFrequency: v.optional(v.union(v.literal("rt"), v.literal("hourly"), v.literal("daily"))),
+        fieldMapping: v.optional(
+            v.object({
+                firstName: v.optional(v.string()),
+                lastName: v.optional(v.string()),
+                email: v.optional(v.string()),
+                phone: v.optional(v.string()),
+                tags: v.optional(v.string()),
+            }),
+        ),
+    },
+    handler: async (ctx, { connectionId, syncDirection, syncFrequency, fieldMapping }) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) throw new Error("unauthenticated");
+
+        const conn = await ctx.db.get(connectionId);
+        if (!conn) throw new Error("connection_not_found");
+
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+        if (session?.currentOrganizationId !== conn.organizationId) throw new Error("forbidden");
+
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", conn.organizationId),
+            )
+            .first();
+        if (!membership || !hasPermission(membership.role, "integrations:manage")) {
+            throw new Error("forbidden");
+        }
+
+        const now = Date.now();
+        const patch: {
+            updatedAt: number;
+            syncDirection?: "out" | "in" | "two";
+            syncFrequency?: "rt" | "hourly" | "daily";
+            fieldMapping?: { firstName?: string; lastName?: string; email?: string; phone?: string; tags?: string };
+            nextPollAt?: number;
+        } = { updatedAt: now };
+        if (syncDirection !== undefined) patch.syncDirection = syncDirection;
+        if (fieldMapping !== undefined) patch.fieldMapping = fieldMapping;
+        // A new cadence should apply on the next tick rather than waiting out the old interval.
+        if (syncFrequency !== undefined) {
+            patch.syncFrequency = syncFrequency;
+            patch.nextPollAt = now;
+        }
+        await ctx.db.patch(connectionId, patch);
+        return { ok: true };
     },
 });
 

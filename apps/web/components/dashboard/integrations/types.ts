@@ -18,6 +18,8 @@ export interface Integration {
     health: IntegrationHealth
     /** Short status string (e.g. "synchronisé il y a 4 min" or "—"). */
     last: string
+    /** False = roadmap/showcase connector (renders "Bientôt", not connectable). Defaults true. */
+    available?: boolean
 }
 
 export type FilterCategory = "Tous" | IntegrationCategory

@@ -43,6 +43,9 @@ export async function enqueueConversationEvent(
 
     const now = Date.now();
     for (const c of active) {
+        // Direction "in" = pull-only → never push Jokko events to the CRM.
+        if ((c.syncDirection ?? "two") === "in") continue;
+
         const link = await ctx.db
             .query("crmContactLinks")
             .withIndex("by_contact", (q) => q.eq("contactId", input.contactId))

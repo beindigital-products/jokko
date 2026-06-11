@@ -20,6 +20,7 @@ import type {
     UnifiedContact,
     UnifiedDeal,
 } from "../../core/types";
+import { mappedIdentity, type FieldMapping } from "../../core/mapping";
 
 const SELLSY_API = "https://api.sellsy.com/v2";
 const SELLSY_AUTH = "https://login.sellsy.com/oauth2/authorization";
@@ -159,16 +160,23 @@ interface SellsyContact {
     updated?: string;
 }
 
-function toUnifiedContact(raw: SellsyContact): UnifiedContact {
+function toUnifiedContact(raw: SellsyContact, mapping?: FieldMapping): UnifiedContact {
     const phones: Array<{ raw: string; type?: string }> = [];
     if (raw.phone_number) phones.push({ raw: raw.phone_number, type: "primary" });
     if (raw.mobile_number) phones.push({ raw: raw.mobile_number, type: "mobile" });
-    return {
-        externalId: String(raw.id),
+    const id = mappedIdentity(raw, mapping, {
         firstName: raw.first_name,
         lastName: raw.last_name,
         emails: raw.email ? [raw.email] : [],
         phones,
+    });
+    return {
+        externalId: String(raw.id),
+        firstName: id.firstName,
+        lastName: id.lastName,
+        emails: id.emails,
+        phones: id.phones,
+        externalTags: id.tags,
         company: raw.company?.name,
         externalOwnerId: raw.owner?.id ? String(raw.owner.id) : undefined,
         externalUpdatedAtMs: raw.updated ? Date.parse(raw.updated) : undefined,
@@ -190,7 +198,7 @@ export async function pullContactsPage(p: {
         method: "GET",
     })) as { data?: SellsyContact[]; pagination?: { total?: number } };
 
-    const items = (json.data ?? []).map(toUnifiedContact);
+    const items = (json.data ?? []).map((r) => toUnifiedContact(r, p.ctx.fieldMapping));
     const hasMore = items.length === limit;
     return {
         items,

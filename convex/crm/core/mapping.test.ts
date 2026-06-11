@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { normalizeToE164, selectBestPhone, fullNameFrom } from "./mapping";
+import { normalizeToE164, selectBestPhone, fullNameFrom, mappedIdentity, parseTagList } from "./mapping";
 
 describe("normalizeToE164", () => {
     it("parses French number with country prefix", () => {
@@ -138,5 +138,59 @@ describe("fullNameFrom", () => {
     it("handles missing parts", () => {
         expect(fullNameFrom({ firstName: "Jean" })).toBe("Jean");
         expect(fullNameFrom({})).toBe("Contact");
+    });
+});
+
+describe("mappedIdentity", () => {
+    const defaults = {
+        firstName: "Awa",
+        lastName: "Diop",
+        emails: ["awa@perso.com"],
+        phones: [{ raw: "+221770000000", type: "primary" }],
+    };
+    const raw = {
+        firstname: "Awa",
+        work_email: "awa@work.com",
+        custom_phone: "+221760000000",
+        empty: "",
+    } as Record<string, unknown>;
+
+    it("returns the defaults untouched when no mapping is provided", () => {
+        expect(mappedIdentity(raw, undefined, defaults)).toEqual(defaults);
+        expect(mappedIdentity(raw, {}, defaults)).toEqual(defaults);
+    });
+
+    it("overrides only the mapped fields, reading them off the raw record", () => {
+        const out = mappedIdentity(raw, { email: "work_email", phone: "custom_phone" }, defaults);
+        expect(out.emails).toEqual(["awa@work.com"]);
+        expect(out.phones).toEqual([{ raw: "+221760000000", type: "primary" }]);
+        // unmapped identity fields keep their defaults
+        expect(out.firstName).toBe("Awa");
+        expect(out.lastName).toBe("Diop");
+    });
+
+    it("yields an empty value when the mapped property is missing or blank", () => {
+        const out = mappedIdentity(raw, { email: "does_not_exist", phone: "empty" }, defaults);
+        expect(out.emails).toEqual([]);
+        expect(out.phones).toEqual([]);
+    });
+
+    it("parses tags from the mapped property (string or array)", () => {
+        const rawTags = { tags_csv: "vip; lead , ", tags_arr: ["a", " b "] } as Record<string, unknown>;
+        expect(mappedIdentity(rawTags, { tags: "tags_csv" }, defaults).tags).toEqual(["vip", "lead"]);
+        expect(mappedIdentity(rawTags, { tags: "tags_arr" }, defaults).tags).toEqual(["a", "b"]);
+        // tags-only mapping must not short-circuit identity defaults
+        expect(mappedIdentity(rawTags, { tags: "tags_csv" }, defaults).firstName).toBe("Awa");
+    });
+});
+
+describe("parseTagList", () => {
+    it("splits comma/semicolon strings and trims, drops blanks", () => {
+        expect(parseTagList("vip, lead ; ,client")).toEqual(["vip", "lead", "client"]);
+    });
+    it("handles arrays and non-strings", () => {
+        expect(parseTagList(["a", " b ", ""])).toEqual(["a", "b"]);
+        expect(parseTagList(null)).toEqual([]);
+        expect(parseTagList(42)).toEqual([]);
     });
 });
