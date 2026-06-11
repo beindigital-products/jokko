@@ -934,3 +934,54 @@ describe("Contacts", () => {
         });
     });
 });
+
+describe("contacts.list — tag filter", () => {
+    let t: any;
+    let asMember: any;
+    const PAGE = { numItems: 50, cursor: null };
+
+    beforeEach(async () => {
+        t = convexTest(schema, modules);
+        const { userId } = await t.run(async (ctx: any) => {
+            const userId = await ctx.db.insert("users", { email: "tagger@test.com", name: "Tagger" });
+            const orgId = await ctx.db.insert("organizations", {
+                name: "Tag Org", ownerId: userId, plan: "BUSINESS",
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            await ctx.db.insert("memberships", {
+                userId, organizationId: orgId, role: "OWNER", status: "ONLINE",
+                maxConversations: 10, activeConversations: 0, lastSeenAt: Date.now(), joinedAt: Date.now(),
+            });
+            await ctx.db.insert("userSessions", { userId, currentOrganizationId: orgId, lastActivityAt: Date.now() });
+            const vip = await ctx.db.insert("tags", { organizationId: orgId, name: "VIP", color: "#f00", createdAt: Date.now() });
+            const prospect = await ctx.db.insert("tags", { organizationId: orgId, name: "Prospect", color: "#0f0", createdAt: Date.now() });
+            const mk = (name: string, phone: string, tags: any[]) =>
+                ctx.db.insert("contacts", {
+                    organizationId: orgId, name, phone, searchName: name.toLowerCase(),
+                    tags, createdAt: Date.now(), updatedAt: Date.now(),
+                });
+            await mk("Awa", "+221770000001", [vip]);
+            await mk("Bintou", "+221770000002", [vip, prospect]);
+            await mk("Cheikh", "+221770000003", [prospect]);
+            await mk("Diallo", "+221770000004", []);
+            return { userId };
+        });
+        asMember = t.withIdentity({ subject: userId, issuer: "test" });
+    });
+
+    it("returns only contacts carrying the requested tag", async () => {
+        const res = await asMember.query(api.contacts.list, { paginationOpts: PAGE, tag: "VIP" });
+        expect(res.page).toHaveLength(2);
+        expect(res.page.every((c: any) => c.tags.some((tg: any) => tg.name === "VIP"))).toBe(true);
+    });
+
+    it("returns every contact when no tag filter is given", async () => {
+        const res = await asMember.query(api.contacts.list, { paginationOpts: PAGE });
+        expect(res.page).toHaveLength(4);
+    });
+
+    it("returns empty for a tag that does not exist in the org", async () => {
+        const res = await asMember.query(api.contacts.list, { paginationOpts: PAGE, tag: "Inexistant" });
+        expect(res.page).toHaveLength(0);
+    });
+});
