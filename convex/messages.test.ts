@@ -1,5 +1,5 @@
 import { convexTest } from "convex-test";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { api } from "./_generated/api";
 import schema from "./schema";
 import { modules } from "./test.modules";
@@ -232,6 +232,18 @@ describe("messages.addInternalNote", () => {
         asAuthor = t.withIdentity({ subject: authorId, issuer: "test" });
     });
 
+    // addInternalNote schedules a best-effort mention email (internalAction).
+    // convex-test can't run scheduled *actions* in teardown, so cancel any
+    // pending jobs before the test ends — we assert scheduling separately.
+    afterEach(async () => {
+        await t.run(async (ctx: any) => {
+            const jobs = await ctx.db.system.query("_scheduled_functions").collect();
+            for (const j of jobs) {
+                if (j.state.kind === "pending") await ctx.scheduler.cancel(j._id);
+            }
+        });
+    });
+
     const notifsFor = (uid: string) =>
         t.run(async (ctx: any) =>
             ctx.db.query("notifications")
@@ -299,5 +311,17 @@ describe("messages.addInternalNote", () => {
         expect(msg.isInternal).toBe(true);
         // …but the non-member receives NO notification.
         expect(await notifsFor(strangerId)).toHaveLength(0);
+    });
+
+    it("schedules a best-effort mention email for a member who has an email", async () => {
+        await asAuthor.mutation(api.messages.addInternalNote, {
+            conversationId,
+            content: "@Inès peux-tu regarder ?",
+            mentions: [{ userId: mateId, name: "Inès" }],
+        });
+        const jobs = await t.run(async (ctx: any) =>
+            ctx.db.system.query("_scheduled_functions").collect());
+        expect(jobs.some((j: any) => String(j.name).includes("mention_emails"))).toBe(true);
+        // afterEach cancels the job so the SES action never runs in teardown.
     });
 });

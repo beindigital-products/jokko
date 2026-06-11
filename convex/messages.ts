@@ -394,8 +394,19 @@ export const addInternalNote = mutation({
                         messageId: String(messageId),
                     },
                 });
-                // TODO(mentions-email): sendMentionEmail({ to: <user email>, ... })
-                //   convex/lib/email.ts — proactive email still deferred.
+                // Proactive email (best-effort, scheduled) to the mentioned
+                // member. A failed send is logged inside the action, never blocks
+                // the note — the in-app MENTION notification already landed.
+                const mentionedUser = await ctx.db.get(m.userId);
+                if (mentionedUser?.email) {
+                    await ctx.scheduler.runAfter(0, internal.mention_emails.send, {
+                        to: mentionedUser.email,
+                        authorName,
+                        where,
+                        excerpt: content.slice(0, 140),
+                        conversationId: String(args.conversationId),
+                    });
+                }
             }
         }
 

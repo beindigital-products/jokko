@@ -16,6 +16,7 @@ import { render } from "@react-email/render";
 import { InvitationEmail } from "../emails/invitation";
 import { VerificationEmail } from "../emails/verification";
 import { PasswordResetEmail } from "../emails/password_reset";
+import { MentionEmail } from "../emails/mention";
 import { DOMParser } from "@xmldom/xmldom";
 
 // Polyfill DOMParser for AWS SDK in Convex runtime
@@ -98,5 +99,24 @@ export async function sendPasswordResetEmail(params: {
         to: params.to,
         subject: "Réinitialisez votre mot de passe - Jokko",
         react: PasswordResetEmail({ resetUrl: params.resetUrl }),
+    });
+}
+
+export async function sendMentionEmail(params: {
+    to: string;
+    authorName: string;
+    where: string;
+    excerpt: string;
+    url: string;
+}) {
+    return sendEmail({
+        to: params.to,
+        subject: `${params.authorName} vous a mentionné sur Jokko`,
+        react: MentionEmail({
+            authorName: params.authorName,
+            where: params.where,
+            excerpt: params.excerpt,
+            url: params.url,
+        }),
     });
 }
