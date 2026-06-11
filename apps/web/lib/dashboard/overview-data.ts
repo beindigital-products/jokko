@@ -66,7 +66,7 @@ export interface ConversationListItemInput {
 export interface BroadcastListItemInput {
     _id: string
     name: string
-    status: "DRAFT" | "SCHEDULED" | "SENDING" | "COMPLETED" | "FAILED" | "CANCELLED"
+    status: "DRAFT" | "SCHEDULED" | "SENDING" | "PAUSED" | "COMPLETED" | "FAILED" | "CANCELLED"
     sentCount: number
     deliveredCount: number
     readCount: number
@@ -105,6 +105,17 @@ export interface PoleLike {
  * (see `@jokko/core/whatsapp-pricing`); 60 is a reasonable West-Africa average.
  */
 export const FCFA_PER_MARKETING_CONVERSATION = 60
+
+/**
+ * Per-conversation FCFA estimate by Meta category, anchored to the marketing
+ * rate (Utility ≈ ⅓, Authentication ≈ marketing). Real pricing is
+ * country-specific — these are display estimates in the user's currency.
+ */
+export const FCFA_PER_CONVERSATION: Record<string, number> = {
+    MARKETING: FCFA_PER_MARKETING_CONVERSATION,
+    UTILITY: 20,
+    AUTHENTICATION: 55,
+}
 
 // ───────────────────────────────────────────────────────────────────────────
 // Small helpers
@@ -414,7 +425,7 @@ export function usageSpentThisMonth(
     return spent
 }
 
-const fcfa = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`
+export const fcfa = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} FCFA`
 
 /**
  * The WhatsApp marketing-credit bar (FCFA, not euros). `balance` is the org

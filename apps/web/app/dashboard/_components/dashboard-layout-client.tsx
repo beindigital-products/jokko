@@ -37,7 +37,11 @@ function isFullBleedRoute(pathname: string): boolean {
         pathname.startsWith('/dashboard/team') ||
         pathname.startsWith('/dashboard/analytics') ||
         // Settings: full-bleed v3 screen (vertical sub-nav + content panel).
-        pathname.startsWith('/dashboard/settings')
+        pathname.startsWith('/dashboard/settings') ||
+        // Billing: full-bleed v3 screen (plan hero + usage + credit + picker).
+        pathname === '/dashboard/billing' ||
+        // Help: full-bleed v3 screen (search + resources + support + status).
+        pathname.startsWith('/dashboard/help')
     )
 }
 

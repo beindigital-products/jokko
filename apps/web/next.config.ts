@@ -24,6 +24,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/dashboard/flows', destination: '/dashboard/automatisations', permanent: true },
       { source: '/dashboard/flows/:path*', destination: '/dashboard/automatisations/:path*', permanent: true },
+      // Creation moved into a modal on the list page; keep old links working.
+      { source: '/dashboard/automatisations/nouveau', destination: '/dashboard/automatisations', permanent: true },
     ];
   },
   images: {
