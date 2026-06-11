@@ -17,6 +17,42 @@ import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { requireMembership, requirePermission } from "./lib/auth";
+import { callCostFcfa } from "./lib/callPricing";
+
+/**
+ * Debit the org's credit for a finished OUTBOUND call (inbound is free).
+ *
+ * Billed exactly once: both terminateCall and handleCallTerminate guard on a
+ * terminal status before reaching here, so whichever ends the call first bills
+ * it and the other early-returns. Never drives the balance negative; records a
+ * USAGE transaction so the spend shows up in the credit history.
+ */
+async function billOutboundCall(
+    ctx: any,
+    call: any,
+    durationSeconds: number | undefined,
+) {
+    if (call.direction !== "OUTBOUND") return;
+    const cost = callCostFcfa(call.toPhone, durationSeconds);
+    if (cost <= 0) return;
+
+    const org = await ctx.db.get(call.organizationId);
+    const balance = org?.creditBalance ?? 0;
+    const debit = Math.min(cost, balance); // clamp: never go below zero
+    if (debit <= 0) return;
+
+    const newBalance = balance - debit;
+    await ctx.db.patch(call.organizationId, { creditBalance: newBalance });
+    await ctx.db.insert("creditTransactions", {
+        organizationId: call.organizationId,
+        amount: -debit,
+        type: "USAGE" as const,
+        description: `Appel sortant ${call.toPhone} (${Math.ceil((durationSeconds ?? 0) / 60)} min)`,
+        referenceId: String(call._id),
+        balanceAfter: newBalance,
+        createdAt: Date.now(),
+    });
+}
 
 // ============================================
 // WEBHOOK HANDLER (called from http.ts)
@@ -221,6 +257,9 @@ async function handleCallTerminate(ctx: any, args: { callId: string }) {
         terminationReason: "remote_hangup",
         updatedAt: now,
     });
+
+    // Debit the org's credit for this outbound call.
+    await billOutboundCall(ctx, call, durationSeconds);
 
     // Insert system message into conversation
     if (call.conversationId) {
@@ -556,6 +595,15 @@ export const requestOutboundCall = mutation({
             : null;
         if (!contact?.phone) throw new Error("Contact has no phone number");
 
+        // CREDIT GATE: outbound calls are billable per minute. Block the call when
+        // the org has no credit so an agent can't start a call that can't be paid
+        // for. The frontend maps INSUFFICIENT_CREDIT to a role-aware message
+        // (admin/owner → "Recharger le compte"; agent → "prévenez un administrateur").
+        const org = await ctx.db.get(conversation.organizationId);
+        if ((org?.creditBalance ?? 0) <= 0) {
+            throw new Error("INSUFFICIENT_CREDIT: solde insuffisant pour passer un appel");
+        }
+
         // Check for existing active calls
         const existingCalls = await ctx.db
             .query("calls")
@@ -718,20 +766,39 @@ export const confirmConnected = mutation({
         // SECURITY: was fully unauthenticated — require org membership.
         await requireMembership(ctx, call.organizationId);
 
-        if (call.status !== "PRE_ACCEPTED") {
-            console.log(`[CALLS] confirmConnected: call ${args.callId} is ${call.status}, not PRE_ACCEPTED`);
+        const now = Date.now();
+
+        // Inbound: the agent pre-accepted and ICE is now connected → mark CONNECTED
+        // and send `accept` to Meta to finalize the incoming call.
+        if (call.status === "PRE_ACCEPTED") {
+            await ctx.db.patch(args.callId, {
+                status: "CONNECTED" as const,
+                answeredAt: call.answeredAt ?? now,
+                updatedAt: now,
+            });
+            await ctx.scheduler.runAfter(0, internal.call_actions.sendAccept, { callId: args.callId });
+            console.log(`[CALLS] confirmConnected: inbound call ${args.callId} -> CONNECTED`);
             return;
         }
 
-        await ctx.db.patch(args.callId, {
-            status: "CONNECTED" as const,
-            updatedAt: Date.now(),
-        });
+        // Outbound: the call was RINGING after we sent the SDP offer; ICE is now
+        // connected → mark CONNECTED. No `accept` action — the offer/answer
+        // handshake already established the call with Meta. Set answeredAt so the
+        // duration + "Appel audio" system message are correct (outbound calls had
+        // no answeredAt, so they always rendered as "Appel manqué"). Leaving the
+        // call stuck at RINGING also made getActiveCall treat the live call as an
+        // incoming one and routed hang-up to reject (Meta "method not allowed").
+        if (call.status === "RINGING" && call.direction === "OUTBOUND") {
+            await ctx.db.patch(args.callId, {
+                status: "CONNECTED" as const,
+                answeredAt: call.answeredAt ?? now,
+                updatedAt: now,
+            });
+            console.log(`[CALLS] confirmConnected: outbound call ${args.callId} -> CONNECTED`);
+            return;
+        }
 
-        // Send accept to Meta
-        await ctx.scheduler.runAfter(0, internal.call_actions.sendAccept, {
-            callId: args.callId,
-        });
+        console.log(`[CALLS] confirmConnected: call ${args.callId} is ${call.status}/${call.direction}, no transition`);
     },
 });
 
@@ -812,6 +879,9 @@ export const terminateCall = mutation({
             terminationReason: "agent_hangup",
             updatedAt: now,
         });
+
+        // Debit the org's credit for this outbound call.
+        await billOutboundCall(ctx, call, durationSeconds);
 
         // Send terminate to Meta
         await ctx.scheduler.runAfter(0, internal.call_actions.sendTerminate, {

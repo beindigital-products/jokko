@@ -106,6 +106,22 @@ describe('mapCallError() — billing errors', () => {
 });
 
 // ---------------------------------------------------------------------------
+// mapCallError — insufficient call credit
+// ---------------------------------------------------------------------------
+
+describe('mapCallError() — insufficient call credit', () => {
+    it('backend INSUFFICIENT_CREDIT error -> action {type: "recharge"}', () => {
+        const result = mapCallError('INSUFFICIENT_CREDIT: solde insuffisant pour passer un appel');
+        expect(result.action).toEqual({ type: 'recharge' });
+        expect(result.message).toMatch(/credit insuffisant/i);
+    });
+
+    it('"solde insuffisant" alone -> recharge', () => {
+        expect(mapCallError('solde insuffisant').action).toEqual({ type: 'recharge' });
+    });
+});
+
+// ---------------------------------------------------------------------------
 // mapCallError — null / undefined fallback
 // ---------------------------------------------------------------------------
 

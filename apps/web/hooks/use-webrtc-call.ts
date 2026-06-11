@@ -1,37 +1,71 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback } from 'react';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useCallStore } from '@/lib/stores/call-store';
 import type { Id } from '@/convex/_generated/dataModel';
 
 /**
- * Hook managing the browser-side RTCPeerConnection for WhatsApp Business calls.
+ * Browser-side RTCPeerConnection manager for WhatsApp Business calls.
  *
- * Flow (inbound):
- * 1. Meta sends SDP offer via webhook -> stored in Convex `calls` table
- * 2. Browser picks it up via useQuery subscription (in CallNotificationProvider)
- * 3. Agent clicks "Accept" -> this hook creates RTCPeerConnection
- * 4. Sets remote description (Meta's offer), creates answer
- * 5. Sends SDP answer to Convex -> Convex action -> Meta Graph API (pre_accept)
- * 6. WebRTC ICE negotiation completes -> confirmConnected -> Meta (accept)
- * 7. Audio flows: Meta servers <-> Agent's browser
+ * The peer connection, mic stream and remote-audio element are MODULE-LEVEL
+ * singletons — not per-hook refs. A call is a single shared session, but this
+ * hook is mounted in several components at once: the provider that PLACES the
+ * outbound call, the ActiveCallBar that CONTROLS it (mute/hang-up), and the
+ * IncomingCallDialog that ANSWERS inbound calls. Per-instance refs gave each
+ * component its own dead RTCPeerConnection, so on outbound calls the remote
+ * audio never reached the bar's <audio> element (silence) and mute/hang-up
+ * acted on an empty connection. One shared connection fixes all of that, and
+ * the remote audio plays through a single programmatic Audio() element so it
+ * no longer depends on which component rendered a <audio ref>.
  *
- * Flow (outbound):
- * 1. Agent clicks "Call" -> requestOutboundCall -> CPR sent to contact
- * 2. Contact accepts permission -> status becomes PERMISSION_GRANTED (reactive)
- * 3. Agent clicks "Appeler maintenant" -> initiateCall creates RTCPeerConnection
- * 4. Creates SDP offer -> startOutboundCall -> Meta API sends offer
- * 5. Meta sends SDP answer via webhook -> stored in calls table (reactive)
- * 6. Browser picks up SDP answer -> setRemoteDescription -> audio flows
+ * Flow (inbound): Meta SDP offer (webhook) -> Convex -> Accept -> answer ->
+ *   pre_accept -> ICE connected -> confirmConnected (accept) -> audio.
+ * Flow (outbound): CPR/permission -> offer -> startOutboundCall -> Meta ->
+ *   SDP answer (webhook) -> applyRemoteSdpAnswer -> ICE connected -> audio.
  */
-export function useWebRTCCall() {
-    const [isAudioReady, setIsAudioReady] = useState(false);
-    const peerConnectionRef = useRef<RTCPeerConnection | null>(null);
-    const localStreamRef = useRef<MediaStream | null>(null);
-    const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
 
+let peerConnection: RTCPeerConnection | null = null;
+let localStream: MediaStream | null = null;
+let remoteAudio: HTMLAudioElement | null = null;
+
+const ICE_SERVERS: RTCIceServer[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+];
+
+/** Play Meta's relayed remote audio through a single shared Audio() element. */
+function attachRemoteStream(stream: MediaStream) {
+    if (typeof window === 'undefined') return;
+    if (!remoteAudio) {
+        remoteAudio = new Audio();
+        remoteAudio.autoplay = true;
+    }
+    remoteAudio.srcObject = stream;
+    // getUserMedia was already granted in this session, so autoplaying the
+    // remote audio is permitted; still catch to avoid an unhandled rejection.
+    remoteAudio.play().catch((err) => console.warn('[WebRTC] remote audio play() blocked:', err));
+}
+
+/** Tear down the shared peer connection, mic stream and remote audio element. */
+function teardownPeer() {
+    if (peerConnection) {
+        peerConnection.close();
+        peerConnection = null;
+    }
+    if (localStream) {
+        localStream.getTracks().forEach((t) => t.stop());
+        localStream = null;
+    }
+    if (remoteAudio) {
+        remoteAudio.pause();
+        remoteAudio.srcObject = null;
+        remoteAudio = null;
+    }
+}
+
+export function useWebRTCCall() {
     const { setCallState, toggleMute: storeToggleMute, isMuted, clearCall, setMicStream } = useCallStore();
 
     const acceptCallMutation = useMutation(api.calls.acceptCall);
@@ -43,23 +77,16 @@ export function useWebRTCCall() {
     const answerCall = useCallback(async (callId: Id<"calls">, sdpOffer: string) => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            localStreamRef.current = stream;
+            teardownPeer(); // drop any stale connection from a previous call
+            localStream = stream;
 
-            const pc = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                ],
-            });
-            peerConnectionRef.current = pc;
+            const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+            peerConnection = pc;
 
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
             pc.ontrack = (event) => {
-                if (remoteAudioRef.current && event.streams[0]) {
-                    remoteAudioRef.current.srcObject = event.streams[0];
-                    setIsAudioReady(true);
-                }
+                if (event.streams[0]) attachRemoteStream(event.streams[0]);
             };
 
             await pc.setRemoteDescription({ type: 'offer', sdp: sdpOffer });
@@ -80,20 +107,20 @@ export function useWebRTCCall() {
                     confirmConnectedMutation({ callId });
                 }
                 if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-                    cleanup();
+                    teardownPeer();
                     setCallState('ended');
                 }
             };
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-                    cleanup();
+                    teardownPeer();
                     setCallState('ended');
                 }
             };
         } catch (error) {
             console.error('[WebRTC] Failed to answer call:', error);
-            cleanup();
+            teardownPeer();
             setCallState('ended');
             throw error;
         }
@@ -135,23 +162,16 @@ export function useWebRTCCall() {
                     throw micErr;
                 }
             }
-            localStreamRef.current = stream;
+            teardownPeer(); // drop any stale connection from a previous call
+            localStream = stream;
 
-            const pc = new RTCPeerConnection({
-                iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' },
-                ],
-            });
-            peerConnectionRef.current = pc;
+            const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+            peerConnection = pc;
 
-            stream.getTracks().forEach(track => pc.addTrack(track, stream));
+            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 
             pc.ontrack = (event) => {
-                if (remoteAudioRef.current && event.streams[0]) {
-                    remoteAudioRef.current.srcObject = event.streams[0];
-                    setIsAudioReady(true);
-                }
+                if (event.streams[0]) attachRemoteStream(event.streams[0]);
             };
 
             // Create offer
@@ -171,7 +191,7 @@ export function useWebRTCCall() {
                     confirmConnectedMutation({ callId });
                 }
                 if (state === 'disconnected' || state === 'failed' || state === 'closed') {
-                    cleanup();
+                    teardownPeer();
                     // Don't override error state set by the provider
                     const currentState = useCallStore.getState().callState;
                     if (currentState !== 'error') {
@@ -182,7 +202,7 @@ export function useWebRTCCall() {
 
             pc.onconnectionstatechange = () => {
                 if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-                    cleanup();
+                    teardownPeer();
                     const currentState = useCallStore.getState().callState;
                     if (currentState !== 'error') {
                         setCallState('ended');
@@ -191,7 +211,7 @@ export function useWebRTCCall() {
             };
         } catch (error) {
             console.error('[WebRTC] Failed to initiate outbound call:', error);
-            cleanup();
+            teardownPeer();
             // Don't override error state set by the provider
             const currentState = useCallStore.getState().callState;
             if (currentState !== 'error') {
@@ -203,7 +223,7 @@ export function useWebRTCCall() {
 
     // ---- Apply remote SDP answer (for outbound calls) ----
     const applyRemoteSdpAnswer = useCallback(async (sdpAnswer: string) => {
-        const pc = peerConnectionRef.current;
+        const pc = peerConnection;
         if (!pc) {
             console.error('[WebRTC] No peer connection for remote SDP answer');
             return;
@@ -217,7 +237,7 @@ export function useWebRTCCall() {
     }, []);
 
     const hangUp = useCallback(async (callId: Id<"calls">) => {
-        cleanup();
+        teardownPeer();
         setCallState('ended');
 
         try {
@@ -230,26 +250,13 @@ export function useWebRTCCall() {
     }, [terminateCallMutation, setCallState, clearCall]);
 
     const toggleMute = useCallback(() => {
-        const stream = localStreamRef.current;
-        if (stream) {
-            stream.getAudioTracks().forEach(track => {
+        if (localStream) {
+            localStream.getAudioTracks().forEach((track) => {
                 track.enabled = !track.enabled;
             });
         }
         storeToggleMute();
     }, [storeToggleMute]);
-
-    function cleanup() {
-        if (peerConnectionRef.current) {
-            peerConnectionRef.current.close();
-            peerConnectionRef.current = null;
-        }
-        if (localStreamRef.current) {
-            localStreamRef.current.getTracks().forEach(t => t.stop());
-            localStreamRef.current = null;
-        }
-        setIsAudioReady(false);
-    }
 
     return {
         answerCall,
@@ -258,8 +265,6 @@ export function useWebRTCCall() {
         hangUp,
         toggleMute,
         isMuted,
-        isAudioReady,
-        remoteAudioRef,
     };
 }
 
