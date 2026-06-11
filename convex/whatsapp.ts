@@ -1,6 +1,7 @@
 import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { generateRegistrationPin } from "./lib/registration";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { encrypt, decrypt } from "./lib/encryption";
 
@@ -324,7 +325,7 @@ export const finalizeWhatsAppRegistration = action({
                 },
                 body: JSON.stringify({
                     messaging_product: "whatsapp",
-                    pin: crypto.randomUUID().replace(/-/g, "").substring(0, 6),
+                    pin: generateRegistrationPin(),
                 }),
             }
         );
@@ -638,7 +639,7 @@ export const addChannel = action({
                 },
                 body: JSON.stringify({
                     messaging_product: "whatsapp",
-                    pin: crypto.randomUUID().replace(/-/g, "").substring(0, 6),
+                    pin: generateRegistrationPin(),
                 }),
             }
         );
