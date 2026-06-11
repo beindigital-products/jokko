@@ -975,12 +975,16 @@ Return ONLY a JSON object:
             });
         } else {
             // Standard Auto Assign (with pole filter: channel pole > AI-detected pole)
-            const effectivePoleId = args.channelPoleId || specificPoleId;
+            // Channel pole takes priority over the AI-detected pole. The validator
+            // is v.optional(v.id("poles")) — it accepts undefined but REJECTS null,
+            // so coalesce "no pole" to undefined and OMIT the arg entirely (passing
+            // null here crashed auto-routing on every unrouted inbound message).
+            const effectivePoleId = args.channelPoleId || specificPoleId || undefined;
             const result: any = await ctx.runMutation(internal.assignments.assignToBestAvailable, {
                 conversationId,
                 organizationId,
                 excludeOfflineAgents: settings.excludeOfflineAgents ?? true,
-                poleId: effectivePoleId as any
+                ...(effectivePoleId ? { poleId: effectivePoleId as Id<"poles"> } : {}),
             });
 
             if (!result.success && result.reason === "NO_ONLINE_AGENTS") {

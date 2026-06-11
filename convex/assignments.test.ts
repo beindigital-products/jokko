@@ -604,4 +604,39 @@ describe("Assignments", () => {
             ).rejects.toThrow("Only admins can update settings");
         });
     });
+
+    // ============================================
+    // analyzeAndRoute (auto-routing) — regression
+    // ============================================
+    describe("analyzeAndRoute", () => {
+        it("does not crash when no pole is resolved (regression: poleId=null → ArgumentValidationError)", async () => {
+            const { userId, orgId } = await setupTestEnv(t);
+
+            // Enable auto-assign so the routing context is "enabled" and the action
+            // actually reaches the assignToBestAvailable call (the buggy line).
+            await t.withIdentity({ subject: userId }).mutation(api.assignments.updateAssignmentSettings, {
+                autoAssignEnabled: true,
+                maxConcurrentChats: 5,
+                excludeOfflineAgents: false,
+            });
+
+            const { agentUserId } = await createAgent(t, orgId, "Routing Agent", { status: "ONLINE" });
+            const { convId } = await createConversation(t, orgId);
+
+            // No channelPoleId arg + no OPENAI_API_KEY in the vitest env → the
+            // AI block is skipped and the resolved pole is null. Before the fix,
+            // the action passed `poleId: null` into v.optional(v.id("poles")) and
+            // threw on EVERY unrouted inbound message; after the fix it omits the arg.
+            await t.action(api.assignments.analyzeAndRoute, {
+                conversationId: convId,
+                organizationId: orgId,
+                messageText: "Bonjour, j'ai une question",
+            });
+
+            // It completed without throwing AND routed the conversation to an agent.
+            const conv = await t.run(async (ctx: any) => ctx.db.get(convId));
+            expect(conv.assignedTo).toBeDefined();
+            expect([userId, agentUserId]).toContain(conv.assignedTo);
+        });
+    });
 });
