@@ -1,10 +1,8 @@
 import React from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ButtonType } from '@/convex/lib/templateTypes';
 import { Plus, Trash2 } from 'lucide-react';
+
+import { ButtonType } from '@/convex/lib/templateTypes';
+import { TextField, SelectField } from '@/components/dashboard/templates/form-controls';
 import type { TemplateButtonData } from '../types';
 
 interface TemplateButtonsBuilderProps {
@@ -13,6 +11,19 @@ interface TemplateButtonsBuilderProps {
     allowedTypes: ButtonType[];
     maxButtons: number;
 }
+
+/** French label for each WhatsApp button kind. */
+const BUTTON_LABELS: Record<string, string> = {
+    QUICK_REPLY: 'Réponse rapide',
+    URL: 'Lien URL',
+    PHONE_NUMBER: 'Appel téléphone',
+    COPY_CODE: 'Copier le code',
+    VOICE_CALL: 'Appel vocal',
+    CATALOG: 'Catalogue',
+    MPM: 'Multi-produits',
+    SPM: 'Produit',
+    OTP: 'Code OTP',
+};
 
 export const TemplateButtonsBuilder: React.FC<TemplateButtonsBuilderProps> = ({
     buttons,
@@ -27,9 +38,7 @@ export const TemplateButtonsBuilder: React.FC<TemplateButtonsBuilderProps> = ({
     };
 
     const handleRemoveButton = (index: number) => {
-        const newButtons = [...buttons];
-        newButtons.splice(index, 1);
-        onChange(newButtons);
+        onChange(buttons.filter((_, i) => i !== index));
     };
 
     const handleUpdateButton = <Field extends keyof TemplateButtonData>(
@@ -43,90 +52,79 @@ export const TemplateButtonsBuilder: React.FC<TemplateButtonsBuilderProps> = ({
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-2">
             <div className="flex items-center justify-between">
-                <Label>Boutons ({buttons.length}/{maxButtons})</Label>
+                <span className="text-[12px] font-medium text-[var(--ink-700)]">
+                    Boutons{' '}
+                    <span className="font-normal text-[var(--ink-soft)]">
+                        ({buttons.length}/{maxButtons})
+                    </span>
+                </span>
                 {buttons.length < maxButtons && (
-                    <Button type="button" variant="outline" size="sm" onClick={handleAddButton}>
-                        <Plus className="mr-2 h-3 w-3" />
+                    <button
+                        type="button"
+                        onClick={handleAddButton}
+                        className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium text-[var(--accent)] transition hover:bg-[var(--accent-muted)]"
+                    >
+                        <Plus className="h-3 w-3" />
                         Ajouter
-                    </Button>
+                    </button>
                 )}
             </div>
 
-            {buttons.map((btn, index) => (
-                <div key={index} className="flex gap-4 items-start p-3 bg-muted/40 rounded-md border">
-                    <div className="flex-1 space-y-3">
-                        <div className="grid grid-cols-2 gap-3">
-                            <div className="space-y-1">
-                                <Label className="text-xs">Type</Label>
-                                <Select
-                                    value={btn.type}
-                                    onValueChange={(v) => handleUpdateButton(index, 'type', v as ButtonType)}
-                                >
-                                    <SelectTrigger className="h-8">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {allowedTypes.map(t => (
-                                            <SelectItem key={t} value={t}>{t}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs">Texte du bouton</Label>
-                                <Input
-                                    value={btn.text}
-                                    onChange={(e) => handleUpdateButton(index, 'text', e.target.value)}
-                                    className="h-8"
-                                    placeholder="Ex: Visiter le site"
-                                    maxLength={25}
-                                />
-                            </div>
+            <div className="space-y-2">
+                {buttons.map((btn, index) => (
+                    <div key={index} className="space-y-2">
+                        <div className="flex items-center gap-2">
+                            <SelectField
+                                value={btn.type}
+                                onChange={(e) => handleUpdateButton(index, 'type', e.target.value as ButtonType)}
+                                className="w-[140px] shrink-0"
+                            >
+                                {allowedTypes.map((t) => (
+                                    <option key={t} value={t}>
+                                        {BUTTON_LABELS[t] ?? t}
+                                    </option>
+                                ))}
+                            </SelectField>
+                            <TextField
+                                value={btn.text}
+                                onChange={(e) => handleUpdateButton(index, 'text', e.target.value)}
+                                placeholder="Libellé du bouton"
+                                maxLength={25}
+                            />
+                            <button
+                                type="button"
+                                aria-label="Supprimer le bouton"
+                                onClick={() => handleRemoveButton(index)}
+                                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[var(--ink-200)] text-[var(--ink-400)] transition hover:bg-[var(--paper-warm)] hover:text-[var(--status-danger)]"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                         </div>
 
                         {btn.type === 'URL' && (
-                            <div className="space-y-1">
-                                <Label className="text-xs">URL</Label>
-                                <Input
-                                    value={btn.url || ''}
-                                    onChange={(e) => handleUpdateButton(index, 'url', e.target.value)}
-                                    className="h-8"
-                                    placeholder="https://example.com"
-                                />
-                            </div>
+                            <TextField
+                                value={btn.url || ''}
+                                onChange={(e) => handleUpdateButton(index, 'url', e.target.value)}
+                                placeholder="https://exemple.com"
+                            />
                         )}
 
                         {btn.type === 'PHONE_NUMBER' && (
-                            <div className="space-y-1">
-                                <Label className="text-xs">Numéro de téléphone</Label>
-                                <Input
-                                    value={btn.phoneNumber || ''}
-                                    onChange={(e) => handleUpdateButton(index, 'phoneNumber', e.target.value)}
-                                    className="h-8"
-                                    placeholder="+221..."
-                                />
-                            </div>
+                            <TextField
+                                value={btn.phoneNumber || ''}
+                                onChange={(e) => handleUpdateButton(index, 'phoneNumber', e.target.value)}
+                                placeholder="+221 77 123 45 67"
+                            />
                         )}
                     </div>
-                    <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => handleRemoveButton(index)}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </div>
-            ))}
+                ))}
 
-            {buttons.length === 0 && (
-                <div className="text-sm text-muted-foreground text-center py-4 border rounded-md border-dashed">
-                    Aucun bouton configuré.
-                </div>
-            )}
+                {buttons.length === 0 && (
+                    <p className="text-[12px] text-[var(--ink-soft)]">Aucun bouton ajouté.</p>
+                )}
+            </div>
         </div>
     );
 };

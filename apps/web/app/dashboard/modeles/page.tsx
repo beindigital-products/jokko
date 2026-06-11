@@ -49,8 +49,11 @@ function payloadToCreateArgs(payload: TemplateCreatePayload) {
         language: payload.language,
         category: payload.category,
         type: payload.type,
-        header: payload.header ? { type: payload.header.type, text: payload.header.text } : undefined,
+        header: payload.header
+            ? { type: payload.header.type, text: payload.header.text, mediaUrl: payload.header.mediaUrl }
+            : undefined,
         body: payload.body,
+        bodyExamples: payload.bodyExamples?.length ? payload.bodyExamples : undefined,
         footer: payload.footer,
         buttons: buttons.length ? buttons : undefined,
     };
@@ -80,7 +83,10 @@ export default function TemplatesPage() {
     const submitToMeta = useAction(api.templates.actions.submitToMeta);
     const syncFromMeta = useAction(api.templates.actions.syncFromMeta);
 
-    const handleCreate = async (payload: TemplateCreatePayload, { submit }: { submit: boolean }) => {
+    const handleCreate = async (
+        payload: TemplateCreatePayload,
+        { submit }: { submit: boolean },
+    ): Promise<boolean> => {
         try {
             const id = await createTemplate(payloadToCreateArgs(payload));
             if (submit && id) {
@@ -91,9 +97,11 @@ export default function TemplatesPage() {
                     alert(`Brouillon créé. La soumission à Meta a échoué : ${getErrorMessage(error)}`);
                 }
             }
+            return true;
         } catch (error) {
             console.error(error);
             alert(`Erreur : ${getErrorMessage(error)}`);
+            return false;
         }
     };
 

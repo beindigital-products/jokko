@@ -1,69 +1,117 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
-import { TemplateTypeGrid } from "./TemplateTypeGrid"
 import { TemplateCreateModal } from "./TemplateCreateModal"
 
 afterEach(cleanup)
 
-describe("TemplateTypeGrid", () => {
-    it("renders the type groups and reports the picked type", () => {
-        const onSelect = vi.fn()
-        render(<TemplateTypeGrid onSelect={onSelect} />)
-        expect(screen.getByText("Templates de Base")).toBeInTheDocument()
-        expect(screen.getByText("Interactifs")).toBeInTheDocument()
-        fireEvent.click(screen.getByText("Texte Simple"))
-        expect(onSelect).toHaveBeenCalledWith("TEXT")
-    })
-})
+/** Fill a valid snake_case name and advance past step 1. */
+function fillNameAndContinue(name = "promo_ete") {
+    fireEvent.change(screen.getByPlaceholderText("devis_envoye_fr"), { target: { value: name } })
+    fireEvent.click(screen.getByRole("button", { name: "Continuer" }))
+}
 
-describe("TemplateCreateModal", () => {
+describe("TemplateCreateModal (wizard)", () => {
     it("renders nothing when closed", () => {
-        const { container } = render(
-            <TemplateCreateModal open={false} onOpenChange={() => {}} />,
-        )
+        const { container } = render(<TemplateCreateModal open={false} onOpenChange={() => {}} />)
         expect(container).toBeEmptyDOMElement()
     })
 
-    it("advances from type selection to the builder", () => {
+    it("opens on step 1 and gates Continue on a valid snake_case name", () => {
         render(<TemplateCreateModal open onOpenChange={() => {}} />)
-        expect(screen.getByText(/Choisissez le type/i)).toBeInTheDocument()
-        fireEvent.click(screen.getByText("Appel à l'Action"))
-        // Builder step is now visible.
-        expect(screen.getByPlaceholderText("ex. confirmation_commande")).toBeInTheDocument()
-        expect(screen.getByText("Aperçu WhatsApp")).toBeInTheDocument()
+        expect(screen.getByText("Configurez le modèle")).toBeInTheDocument()
+
+        const cont = screen.getByRole("button", { name: "Continuer" })
+        expect(cont).toBeDisabled()
+
+        fireEvent.change(screen.getByPlaceholderText("devis_envoye_fr"), { target: { value: "ab" } })
+        expect(cont).toBeDisabled() // too short
+
+        fireEvent.change(screen.getByPlaceholderText("devis_envoye_fr"), { target: { value: "promo_ete" } })
+        expect(cont).not.toBeDisabled()
     })
 
-    it("adapts the form to the type's features (Authentication: no header, OTP button)", () => {
-        render(<TemplateCreateModal open onOpenChange={() => {}} defaultType="AUTHENTICATION" />)
-        expect(screen.queryByText("En-tête (header)")).not.toBeInTheDocument()
-        expect(screen.getByText("Code OTP")).toBeInTheDocument()
-    })
+    it("advances to the content step and requires a body before continuing", () => {
+        render(<TemplateCreateModal open onOpenChange={() => {}} />)
+        fillNameAndContinue()
+        expect(screen.getByText("Composez le message")).toBeInTheDocument()
 
-    it("requires a name before the draft can be created and reports submit intent", () => {
-        const onOpenChange = vi.fn()
-        const onCreate = vi.fn()
-        render(
-            <TemplateCreateModal
-                open
-                onOpenChange={onOpenChange}
-                onCreate={onCreate}
-                defaultType="CALL_TO_ACTION"
-            />,
-        )
-        const draftBtn = screen.getByRole("button", { name: "Créer le brouillon" })
-        expect(draftBtn).toBeDisabled()
-
-        fireEvent.change(screen.getByPlaceholderText("ex. confirmation_commande"), {
-            target: { value: "offre_printemps" },
+        const cont = screen.getByRole("button", { name: "Continuer" })
+        expect(cont).toBeDisabled()
+        fireEvent.change(screen.getByPlaceholderText("Saisissez votre message…"), {
+            target: { value: "Bonjour {{1}}" },
         })
-        expect(draftBtn).not.toBeDisabled()
+        expect(cont).not.toBeDisabled()
+    })
+
+    it("requires a sample for each detected variable", () => {
+        render(<TemplateCreateModal open onOpenChange={() => {}} />)
+        fillNameAndContinue()
+        fireEvent.change(screen.getByPlaceholderText("Saisissez votre message…"), {
+            target: { value: "Bonjour {{1}}" },
+        })
+        fireEvent.click(screen.getByRole("button", { name: "Continuer" })) // → variables
+
+        expect(screen.getByText("Un exemple par variable")).toBeInTheDocument()
+        const cont = screen.getByRole("button", { name: "Continuer" })
+        expect(cont).toBeDisabled()
+        fireEvent.change(screen.getByPlaceholderText("ex. Margaux"), { target: { value: "Margaux" } })
+        expect(cont).not.toBeDisabled()
+    })
+
+    it("submits the derived TEXT payload to Meta and shows the success screen", async () => {
+        const onCreate = vi.fn().mockResolvedValue(true)
+        render(<TemplateCreateModal open onOpenChange={() => {}} onCreate={onCreate} />)
+
+        fillNameAndContinue()
+        fireEvent.change(screen.getByPlaceholderText("Saisissez votre message…"), {
+            target: { value: "Bonjour, votre commande est confirmée." },
+        })
+        fireEvent.click(screen.getByRole("button", { name: "Continuer" })) // → variables
+        fireEvent.click(screen.getByRole("button", { name: "Continuer" })) // → buttons
+        fireEvent.click(screen.getByRole("button", { name: "Continuer" })) // → récap
 
         fireEvent.click(screen.getByRole("button", { name: /Soumettre à Meta/ }))
+
+        await waitFor(() => expect(onCreate).toHaveBeenCalled())
         expect(onCreate).toHaveBeenCalledWith(
-            expect.objectContaining({ name: "offre_printemps", type: "CALL_TO_ACTION" }),
+            expect.objectContaining({ name: "promo_ete", type: "TEXT", category: "MARKETING" }),
             { submit: true },
         )
-        expect(onOpenChange).toHaveBeenCalledWith(false)
+        await waitFor(() => expect(screen.getByText("Soumis à Meta")).toBeInTheDocument())
+    })
+
+    it("derives CALL_TO_ACTION when a URL button is added", async () => {
+        const onCreate = vi.fn().mockResolvedValue(true)
+        render(<TemplateCreateModal open onOpenChange={() => {}} onCreate={onCreate} />)
+        fillNameAndContinue()
+        fireEvent.change(screen.getByPlaceholderText("Saisissez votre message…"), {
+            target: { value: "Découvrez la boutique." },
+        })
+        fireEvent.click(screen.getByRole("button", { name: "Continuer" })) // → variables
+        fireEvent.click(screen.getByRole("button", { name: "Continuer" })) // → buttons
+
+        fireEvent.click(screen.getByRole("button", { name: /Ajouter un bouton/ }))
+        fireEvent.click(screen.getByRole("button", { name: "Lien URL" }))
+        fireEvent.change(screen.getByPlaceholderText("Texte du bouton"), { target: { value: "Voir" } })
+        fireEvent.change(screen.getByPlaceholderText("https://…"), { target: { value: "https://x.co" } })
+
+        fireEvent.click(screen.getByRole("button", { name: "Continuer" })) // → récap
+        fireEvent.click(screen.getByRole("button", { name: /Soumettre à Meta/ }))
+
+        await waitFor(() => expect(onCreate).toHaveBeenCalled())
+        expect(onCreate).toHaveBeenCalledWith(
+            expect.objectContaining({ type: "CALL_TO_ACTION" }),
+            { submit: true },
+        )
+    })
+
+    it("hands advanced formats off to the full-page editor", () => {
+        const onAdvanced = vi.fn()
+        render(<TemplateCreateModal open onOpenChange={() => {}} onAdvanced={onAdvanced} />)
+        fireEvent.click(screen.getByText(/Format avancé/))
+        expect(screen.getByText("Carrousel, liste, catalogue…")).toBeInTheDocument()
+        fireEvent.click(screen.getByText("Carrousel"))
+        expect(onAdvanced).toHaveBeenCalledWith("CAROUSEL")
     })
 })

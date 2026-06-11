@@ -9,21 +9,30 @@ import {
     type TemplateType,
 } from "@/convex/lib/templateTypes"
 import { Chip } from "../primitives/Chip"
+import { TEMPLATE_TYPE_ICONS } from "./template-type-icons"
 
 interface TemplateTypeGridProps {
     selectedType?: TemplateType
     onSelect: (type: TemplateType) => void
+    /** Optional predicate to restrict which types are offered (e.g. advanced only). */
+    filter?: (type: TemplateType) => boolean
 }
 
 /**
- * TemplateTypeGrid — first step of template creation. Groups every WhatsApp
- * template type (Base / Interactifs / E-commerce / Avancés) from the shared
- * {@link TEMPLATE_TYPE_CONFIGS} into selectable v3 cards. Presentational.
+ * TemplateTypeGrid — groups every WhatsApp template type (Base / Interactifs /
+ * E-commerce / Avancés) from the shared {@link TEMPLATE_TYPE_CONFIGS} into
+ * selectable v3 cards. Used as the "advanced formats" picker inside the
+ * creation wizard. Presentational.
  */
-export function TemplateTypeGrid({ selectedType, onSelect }: TemplateTypeGridProps) {
+export function TemplateTypeGrid({ selectedType, onSelect, filter }: TemplateTypeGridProps) {
+    const groups = TEMPLATE_TYPE_GROUPS.map((group) => ({
+        ...group,
+        types: filter ? group.types.filter(filter) : group.types,
+    })).filter((group) => group.types.length > 0)
+
     return (
         <div className="space-y-7">
-            {TEMPLATE_TYPE_GROUPS.map((group) => (
+            {groups.map((group) => (
                 <section key={group.id}>
                     <div className="font-mono text-[10.5px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
                         {group.titleFr}
@@ -34,6 +43,7 @@ export function TemplateTypeGrid({ selectedType, onSelect }: TemplateTypeGridPro
                     <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                         {group.types.map((type) => {
                             const config = TEMPLATE_TYPE_CONFIGS[type]
+                            const TypeIcon = TEMPLATE_TYPE_ICONS[type]
                             const active = selectedType === type
                             return (
                                 <button
@@ -49,13 +59,13 @@ export function TemplateTypeGrid({ selectedType, onSelect }: TemplateTypeGridPro
                                 >
                                     <span
                                         className={cn(
-                                            "grid h-10 w-10 shrink-0 place-items-center rounded-xl border text-[18px] transition",
+                                            "grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition",
                                             active
-                                                ? "border-[var(--accent)]/30 bg-[var(--paper-white)]"
-                                                : "border-[var(--ink-100)] bg-[var(--paper-warm)]",
+                                                ? "border-[var(--accent)]/30 bg-[var(--paper-white)] text-[var(--accent)]"
+                                                : "border-[var(--ink-100)] bg-[var(--paper-warm)] text-[var(--ink-500)] group-hover:text-[var(--ink-700)]",
                                         )}
                                     >
-                                        {config.icon}
+                                        <TypeIcon className="h-[18px] w-[18px]" strokeWidth={1.6} />
                                     </span>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between gap-2">

@@ -22,6 +22,7 @@ export const create = mutation({
 
         header: headerValidator,
         body: v.optional(v.string()),
+        bodyExamples: v.optional(v.array(v.string())),
         footer: v.optional(v.string()),
         buttons: buttonsValidator,
 
@@ -66,6 +67,7 @@ export const create = mutation({
 
             header: args.header,
             body: args.body,
+            bodyExamples: args.bodyExamples,
             footer: args.footer,
             buttons: args.buttons,
 
@@ -106,6 +108,7 @@ export const update = mutation({
 
         header: headerValidator,
         body: v.optional(v.string()),
+        bodyExamples: v.optional(v.array(v.string())),
         footer: v.optional(v.string()),
         buttons: buttonsValidator,
 

@@ -28,7 +28,7 @@ interface TemplatesScreenProps {
     /** Sync-from-Meta in flight (spins the header button). */
     syncing?: boolean
     onSync?: () => void
-    onCreate?: (payload: TemplateCreatePayload, opts: { submit: boolean }) => void
+    onCreate?: (payload: TemplateCreatePayload, opts: { submit: boolean }) => void | boolean | Promise<boolean | void>
     /** Picked type needs the advanced (legacy) builder. */
     onAdvanced?: (type: TemplateType) => void
     onEdit?: (template: TemplateRow) => void

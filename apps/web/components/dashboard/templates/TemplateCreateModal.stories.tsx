@@ -2,8 +2,7 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { useState } from "react"
 import { Plus } from "lucide-react"
 
-import type { TemplateType } from "@/convex/lib/templateTypes"
-import { TemplateCreateModal } from "./TemplateCreateModal"
+import { TemplateCreateModal, type TemplateCreatePayload } from "./TemplateCreateModal"
 
 const meta = {
     title: "Screens/Templates/Création de modèle",
@@ -13,13 +12,13 @@ const meta = {
 export default meta
 type Story = StoryObj
 
-/** Shared frame: a height-bounded paper surface the modal can overlay. */
-function ModalFrame({ defaultType }: { defaultType?: TemplateType }) {
+/** Height-bounded paper surface the modal can overlay. */
+function ModalFrame() {
     const [open, setOpen] = useState(true)
     return (
         <div
             className="relative flex items-center justify-center"
-            style={{ width: "100%", height: 760, background: "var(--paper-warm)" }}
+            style={{ width: "100%", height: 820, background: "var(--paper-warm)" }}
         >
             {!open ? (
                 <button
@@ -31,43 +30,24 @@ function ModalFrame({ defaultType }: { defaultType?: TemplateType }) {
                     Nouveau modèle
                 </button>
             ) : null}
-            <TemplateCreateModal open={open} onOpenChange={setOpen} defaultType={defaultType} />
+            <TemplateCreateModal
+                open={open}
+                onOpenChange={setOpen}
+                onCreate={(payload: TemplateCreatePayload) => {
+                    console.log("create", payload)
+                    return true
+                }}
+                onAdvanced={(type) => {
+                    console.log("advanced", type)
+                    setOpen(false)
+                }}
+            />
         </div>
     )
 }
 
-/* Step 1 — pick a template type. */
-function TypeSelectionStory() {
-    return <ModalFrame />
-}
-export const TypeSelection: Story = {
-    name: "Étape 1 · Choix du type",
-    render: () => <TypeSelectionStory />,
-}
-
-/* Step 2 — builder for a Call-to-action template (header + body + buttons). */
-function BuilderStory() {
-    return <ModalFrame defaultType="CALL_TO_ACTION" />
-}
-export const Builder: Story = {
-    name: "Étape 2 · Configuration (appel à l'action)",
-    render: () => <BuilderStory />,
-}
-
-/* Step 2 — builder for a Media template (image/video/document header). */
-function BuilderMediaStory() {
-    return <ModalFrame defaultType="MEDIA" />
-}
-export const BuilderMedia: Story = {
-    name: "Étape 2 · Configuration (média)",
-    render: () => <BuilderMediaStory />,
-}
-
-/* Step 2 — builder for an Authentication (OTP) template. */
-function BuilderAuthStory() {
-    return <ModalFrame defaultType="AUTHENTICATION" />
-}
-export const BuilderAuthentication: Story = {
-    name: "Étape 2 · Configuration (authentification)",
-    render: () => <BuilderAuthStory />,
+/** The 5-step "Nouveau modèle" wizard (Réglages → Contenu → Variables → Boutons → Récap). */
+export const Wizard: Story = {
+    name: "Assistant · 5 étapes",
+    render: () => <ModalFrame />,
 }
