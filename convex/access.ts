@@ -544,3 +544,64 @@ export const simulateMentionDev = internalMutation({
         };
     },
 });
+
+/**
+ * Dev-only : crée UNE conversation d'exemple (contact + quelques messages
+ * client/agent) sur l'org courante d'un compte, pour tester l'inbox / le
+ * brouillon IA en QA. Idempotent : ne fait rien si l'org a déjà une
+ * conversation. NE PAS utiliser en prod.
+ */
+export const seedSampleConversationDev = internalMutation({
+    args: { email: v.string() },
+    handler: async (ctx, { email }) => {
+        const user = await ctx.db
+            .query("users")
+            .withIndex("email", (q) => q.eq("email", email))
+            .first();
+        if (!user) throw new Error(`Utilisateur ${email} introuvable`);
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", user._id))
+            .first();
+        const orgId = session?.currentOrganizationId;
+        if (!orgId) throw new Error("Aucune organisation courante");
+
+        const existing = await ctx.db
+            .query("conversations")
+            .withIndex("by_org_last_message", (q) => q.eq("organizationId", orgId))
+            .first();
+        if (existing) {
+            return { ok: true, skipped: true, conversationId: existing._id };
+        }
+
+        const now = Date.now();
+        const phone = "+221770000123";
+        const contactId = await ctx.db.insert("contacts", {
+            organizationId: orgId, name: "Awa Ndiaye", phone, searchName: "awa ndiaye",
+            isWhatsApp: true, tags: [], createdAt: now, updatedAt: now,
+        });
+        const conversationId = await ctx.db.insert("conversations", {
+            organizationId: orgId, contactId, channel: "WHATSAPP", status: "OPEN",
+            lastMessageAt: now, lastMessageDirection: "INBOUND",
+            preview: "Vous livrez à Dakar ?", unreadCount: 1,
+            createdAt: now, updatedAt: now, tags: [],
+        });
+        const turns: Array<{ dir: "INBOUND" | "OUTBOUND"; text: string }> = [
+            { dir: "INBOUND", text: "Bonjour, j'ai une question sur vos tarifs." },
+            { dir: "OUTBOUND", text: "Bonjour Awa ! Avec plaisir, que souhaitez-vous savoir ?" },
+            { dir: "INBOUND", text: "Vous livrez à Dakar ?" },
+        ];
+        let t = now - turns.length * 60_000;
+        for (const turn of turns) {
+            await ctx.db.insert("messages", {
+                organizationId: orgId, conversationId,
+                contactId: turn.dir === "INBOUND" ? contactId : undefined,
+                senderId: turn.dir === "OUTBOUND" ? user._id : undefined,
+                type: "TEXT", content: turn.text, direction: turn.dir,
+                status: "DELIVERED", createdAt: t, updatedAt: t,
+            });
+            t += 60_000;
+        }
+        return { ok: true, skipped: false, conversationId };
+    },
+});

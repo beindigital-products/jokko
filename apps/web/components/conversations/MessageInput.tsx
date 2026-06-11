@@ -72,6 +72,7 @@ import {
 } from '@/lib/dashboard/mentions'
 import { replyAuthorLabel, replyPreviewText } from '@/lib/dashboard/reply'
 import { cn } from '@/lib/utils'
+import { useComposerStore } from '@/lib/stores/composer-store'
 import type { Message } from '@/hooks/useMessages'
 import { toast } from 'sonner'
 
@@ -150,6 +151,10 @@ export function MessageInput({
     const fileInputRef = useRef<HTMLInputElement>(null)
     const emojiPickerRef = useRef<HTMLDivElement>(null)
 
+    // AI reply-draft injected from the Copilot panel (sibling component) via the
+    // composer store, scoped to this conversation.
+    const clearInjection = useComposerStore((s) => s.clearInjection)
+
     // Compose mode : 'reply' = WhatsApp message to the contact, 'note' =
     // team-only internal note (with @mentions, never sent to WhatsApp).
     const [mode, setMode] = useState<'reply' | 'note'>('reply')
@@ -193,6 +198,27 @@ export function MessageInput({
             }
         }
     }, [])
+
+    // Consume an AI draft pushed from the Copilot — only for this conversation.
+    // Transient store subscription so we react to the injection *event*
+    // imperatively (fires once per draft, no re-render coupling). A draft is a
+    // customer-facing reply, so force 'reply' mode (never an internal note).
+    useEffect(() => {
+        return useComposerStore.subscribe((state, prev) => {
+            const inj = state.injection
+            if (!inj || inj === prev.injection || inj.conversationId !== conversationId) return
+            setMode('reply')
+            setMessage((m) => (m.trim() ? `${m.trim()} ${inj.text}` : inj.text))
+            clearInjection()
+            requestAnimationFrame(() => {
+                const el = textareaRef.current
+                if (el) {
+                    el.focus()
+                    el.setSelectionRange(el.value.length, el.value.length)
+                }
+            })
+        })
+    }, [conversationId, clearInjection])
 
     // Close emoji picker when clicking outside
     useEffect(() => {

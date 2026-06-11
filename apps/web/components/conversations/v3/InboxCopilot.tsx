@@ -1,12 +1,13 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import { toast } from "sonner"
-import { useQuery } from "convex/react"
+import { useAction, useQuery } from "convex/react"
 
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 import { CopilotPanel, type CopilotAttribute } from "@/components/dashboard/inbox"
+import { useComposerStore } from "@/lib/stores/composer-store"
 import {
     avatarColorFromString,
     initialsFromName,
@@ -19,11 +20,10 @@ interface InboxCopilotProps {
 }
 
 /**
- * InboxCopilot — wired right column (v3 CopilotPanel). Pulls the rich
- * contact via contacts.get and presents structured attributes. The AI
- * "draft" block is a stub entry point (Q1=a) : the button is present and
- * wired to a placeholder until the assist action lands in a dedicated
- * phase.
+ * InboxCopilot — wired right column (v3 CopilotPanel). Pulls the rich contact
+ * via contacts.get and presents structured attributes, plus the AI reply-draft
+ * assist: "Générer un brouillon" → ai.generateReplyDraft (PRO+, human-in-the-loop)
+ * → "Insérer" hands the draft to the composer through the composer store.
  */
 export function InboxCopilot({ conversationId, onClose }: InboxCopilotProps) {
     const conversation = useQuery(api.conversations.getById, {
@@ -34,6 +34,11 @@ export function InboxCopilot({ conversationId, onClose }: InboxCopilotProps) {
         api.contacts.get,
         contactId ? { id: contactId as Id<"contacts"> } : "skip",
     )
+
+    const generateReplyDraft = useAction(api.ai.generateReplyDraft)
+    const injectDraft = useComposerStore((s) => s.injectDraft)
+    const [draft, setDraft] = useState<string | null>(null)
+    const [draftPending, setDraftPending] = useState(false)
 
     const name = contact?.name || conversation?.contact?.name || conversation?.contact?.phoneNumber || "Contact"
     const phone = contact?.phone || conversation?.contact?.phoneNumber || ""
@@ -60,6 +65,36 @@ export function InboxCopilot({ conversationId, onClose }: InboxCopilotProps) {
         return out
     }, [contact, conversation])
 
+    const handleGenerateDraft = async () => {
+        if (draftPending) return
+        setDraftPending(true)
+        try {
+            const res = await generateReplyDraft({
+                conversationId: conversationId as Id<"conversations">,
+            })
+            if (res?.draft) {
+                setDraft(res.draft)
+            } else {
+                toast.error("Brouillon indisponible", {
+                    description: res?.error ?? "Réessayez dans un instant.",
+                })
+            }
+        } catch (e) {
+            // requirePlanFeature throws a French message (essai terminé / plan requis).
+            const msg = e instanceof Error ? e.message : "Erreur inconnue"
+            toast.error("Génération impossible", { description: msg })
+        } finally {
+            setDraftPending(false)
+        }
+    }
+
+    const handleInsert = () => {
+        if (!draft) return
+        injectDraft(conversationId, draft)
+        setDraft(null)
+        toast.success("Brouillon inséré dans la zone de saisie")
+    }
+
     if (!conversation) {
         return (
             <aside className="h-full w-full overflow-y-auto border-l border-[var(--ink-200)] p-4">
@@ -84,12 +119,11 @@ export function InboxCopilot({ conversationId, onClose }: InboxCopilotProps) {
                       }
                     : undefined
             }
-            // AI assist entry point — stub for now (wired in a later phase).
-            onGenerateDraft={() =>
-                toast("Assistant IA — bientôt disponible", {
-                    description: "La génération de brouillon arrive prochainement.",
-                })
-            }
+            draft={draft ?? undefined}
+            draftPending={draftPending}
+            onGenerateDraft={handleGenerateDraft}
+            onRegenerate={handleGenerateDraft}
+            onInsert={handleInsert}
         />
     )
 }
