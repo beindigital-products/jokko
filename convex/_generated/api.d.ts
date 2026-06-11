@@ -73,6 +73,7 @@ import type * as flows from "../flows.js";
 import type * as http from "../http.js";
 import type * as invitations from "../invitations.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_callPricing from "../lib/callPricing.js";
 import type * as lib_email from "../lib/email.js";
 import type * as lib_encryption from "../lib/encryption.js";
 import type * as lib_encryptionMigration from "../lib/encryptionMigration.js";
@@ -82,6 +83,7 @@ import type * as lib_planFeatures from "../lib/planFeatures.js";
 import type * as lib_planHelpers from "../lib/planHelpers.js";
 import type * as lib_planLimits from "../lib/planLimits.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
+import type * as lib_registration from "../lib/registration.js";
 import type * as lib_stripePlans from "../lib/stripePlans.js";
 import type * as lib_templateBuilder from "../lib/templateBuilder.js";
 import type * as lib_templateTypes from "../lib/templateTypes.js";
@@ -194,6 +196,7 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   invitations: typeof invitations;
   "lib/auth": typeof lib_auth;
+  "lib/callPricing": typeof lib_callPricing;
   "lib/email": typeof lib_email;
   "lib/encryption": typeof lib_encryption;
   "lib/encryptionMigration": typeof lib_encryptionMigration;
@@ -203,6 +206,7 @@ declare const fullApi: ApiFromModules<{
   "lib/planHelpers": typeof lib_planHelpers;
   "lib/planLimits": typeof lib_planLimits;
   "lib/rateLimits": typeof lib_rateLimits;
+  "lib/registration": typeof lib_registration;
   "lib/stripePlans": typeof lib_stripePlans;
   "lib/templateBuilder": typeof lib_templateBuilder;
   "lib/templateTypes": typeof lib_templateTypes;
@@ -271,5 +275,138 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
-  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  rateLimiter: {
+    lib: {
+      checkRateLimit: FunctionReference<
+        "query",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          count?: number;
+          key?: string;
+          name: string;
+          reserve?: boolean;
+          throws?: boolean;
+        },
+        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
+      >;
+      clearAll: FunctionReference<
+        "mutation",
+        "internal",
+        { before?: number },
+        null
+      >;
+      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
+      getValue: FunctionReference<
+        "query",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          key?: string;
+          name: string;
+          sampleShards?: number;
+        },
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          shard: number;
+          ts: number;
+          value: number;
+        }
+      >;
+      rateLimit: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          count?: number;
+          key?: string;
+          name: string;
+          reserve?: boolean;
+          throws?: boolean;
+        },
+        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
+      >;
+      resetRateLimit: FunctionReference<
+        "mutation",
+        "internal",
+        { key?: string; name: string },
+        null
+      >;
+    };
+    time: {
+      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
+    };
+  };
 };
