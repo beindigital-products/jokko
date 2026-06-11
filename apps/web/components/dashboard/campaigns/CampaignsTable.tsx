@@ -2,7 +2,15 @@ import { CampaignRow } from "./CampaignRow"
 import { CAMPAIGNS_COLS, type CampaignRow as CampaignRowData } from "./types"
 
 /** Campaigns table — mono header + one CampaignRow per broadcast. */
-export function CampaignsTable({ campaigns }: { campaigns: CampaignRowData[] }) {
+export function CampaignsTable({
+    campaigns,
+    onOpen,
+    emptyLabel = "Aucune campagne pour le moment.",
+}: {
+    campaigns: CampaignRowData[]
+    onOpen?: (id: string) => void
+    emptyLabel?: string
+}) {
     return (
         <div className="flex-1 overflow-auto">
             <div className="min-w-[760px]">
@@ -18,9 +26,13 @@ export function CampaignsTable({ campaigns }: { campaigns: CampaignRowData[] }) 
                     <div className="text-right">Lus</div>
                     <div className="text-right">Coût</div>
                 </div>
-                {campaigns.map((c) => (
-                    <CampaignRow key={c.id} campaign={c} />
-                ))}
+                {campaigns.length === 0 ? (
+                    <div className="px-8 py-16 text-center text-[13px] text-[var(--ink-soft)]">
+                        {emptyLabel}
+                    </div>
+                ) : (
+                    campaigns.map((c) => <CampaignRow key={c.id} campaign={c} onOpen={onOpen} />)
+                )}
             </div>
         </div>
     )

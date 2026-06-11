@@ -1,6 +1,7 @@
 import { Icon } from "@/components/dashboard/primitives/Icon"
 import type { WizardState } from "./_shared"
 import { cwFmt } from "./wizard-data"
+import { fcfa } from "@/lib/dashboard/overview-data"
 
 /**
  * StepReview — Étape 6 (Récap). Read-back of every choice (name, category,
@@ -65,10 +66,10 @@ export function StepReview(state: WizardState) {
                 </div>
                 <div className="mt-2 flex flex-wrap items-baseline gap-2">
                     <span className="font-display text-[28px] font-medium tabular-nums tracking-[-0.01em] text-[var(--ink-900)]">
-                        €{cost.toFixed(2)}
+                        {fcfa(cost)}
                     </span>
                     <span className="text-[11px] text-[var(--ink-soft)]">
-                        {cwFmt(eligible)} conv. × €{perConv.toFixed(3)} (Meta {cat} {tpl.lang})
+                        {cwFmt(eligible)} conv. × {fcfa(perConv)} (Meta {cat} {tpl.lang})
                     </span>
                 </div>
                 <div
@@ -76,8 +77,8 @@ export function StepReview(state: WizardState) {
                     style={{ color: ok ? "var(--status-good)" : "var(--status-danger)" }}
                 >
                     {ok
-                        ? `Solde après : €${after.toFixed(2)} · OK`
-                        : `Crédit insuffisant · manque €${(-after).toFixed(2)}`}
+                        ? `Solde après : ${fcfa(after)} · OK`
+                        : `Crédit insuffisant · manque ${fcfa(-after)}`}
                 </div>
             </div>
         </div>

@@ -4,7 +4,6 @@ import { useMemo, useState } from "react"
 
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/dashboard/primitives/Icon"
-import { PageHeader } from "../../shell/PageHeader"
 import { WizardStepper } from "./WizardStepper"
 import { WhatsAppPreview } from "./WhatsAppPreview"
 import { StepName } from "./StepName"
@@ -15,6 +14,7 @@ import { StepSend } from "./StepSend"
 import { StepReview } from "./StepReview"
 import type { WizardState } from "./_shared"
 import { cwFmt } from "./wizard-data"
+import { fcfa } from "@/lib/dashboard/overview-data"
 import type {
     CampaignWizardData,
     SendMode,
@@ -23,14 +23,61 @@ import type {
     WizardStepId,
 } from "./types"
 
+/** Resolved campaign draft the host maps onto `broadcasts.create`. */
+export interface CampaignCreateInput {
+    name: string
+    description: string
+    /** Selected template id (the WizardTemplate.id = real template `_id`). */
+    templateId: string
+    /** Selected audience option id ("all" or a tag id). */
+    segId: string
+    /** Selected sending channel id (the SendingNumber.id = channel `_id`). */
+    numId: string
+    mode: SendMode
+    /** YYYY-MM-DD + HH:MM — only meaningful when `mode === "scheduled"`. */
+    date: string
+    time: string
+}
+
 interface CampaignWizardScreenProps {
     data: CampaignWizardData
+    /** Modal visibility. */
+    open: boolean
+    onOpenChange: (open: boolean) => void
     /** Start the wizard on a given step (Storybook / deep-link). */
     initialStep?: WizardStepId
     /** Owner can pick the sending number; others are locked to the first. */
     role?: "OWNER" | "ADMIN" | "AGENT"
-    /** Called when the campaign is queued (after the success screen's CTAs). */
-    onClose?: () => void
+    /** Persist the campaign (step 6 confirm). Return false to keep the modal open on error. */
+    onCreate?: (input: CampaignCreateInput) => boolean | void | Promise<boolean | void>
+}
+
+/** Centered modal shell (backdrop + bounded paper card). */
+function WizardOverlay({
+    onClose,
+    width,
+    children,
+}: {
+    onClose: () => void
+    width: number
+    children: React.ReactNode
+}) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <button
+                type="button"
+                aria-label="Fermer"
+                onClick={onClose}
+                className="absolute inset-0 bg-[var(--ink-900)]/30 backdrop-blur-[1.5px]"
+            />
+            <div
+                className="relative z-10 flex max-h-[92vh] w-full flex-col overflow-hidden rounded-2xl border border-[var(--ink-200)] bg-[var(--paper-white)] shadow-2xl"
+                style={{ maxWidth: width }}
+            >
+                {children}
+            </div>
+        </div>
+    )
 }
 
 /** Per-step head (eyebrow + title + sub) shown under the page header. */
@@ -77,12 +124,15 @@ const HEADS: Record<WizardStepId, { eb: string; t: string; s: string }> = {
  */
 export function CampaignWizardScreen({
     data,
+    open,
+    onOpenChange,
     initialStep = 1,
     role = "OWNER",
-    onClose,
+    onCreate,
 }: CampaignWizardScreenProps) {
     const [step, setStep] = useState<WizardStepId | "success">(initialStep)
     const [maxStep, setMaxStep] = useState<WizardStepId>(initialStep)
+    const [submitting, setSubmitting] = useState(false)
     const [name, setName] = useState(data.initial.name)
     const [desc, setDesc] = useState(data.initial.desc)
     const [cat, setCat] = useState<TemplateCategory>(data.initial.cat)
@@ -176,6 +226,24 @@ export function CampaignWizardScreen({
         dateLabel,
     }
 
+    if (!open) return null
+    const close = () => onOpenChange(false)
+
+    const confirm = async () => {
+        if (!ok || submitting) return
+        if (!onCreate) {
+            setStep("success")
+            return
+        }
+        setSubmitting(true)
+        try {
+            const res = await onCreate({ name, description: desc, templateId: tplId, segId, numId, mode, date, time })
+            if (res !== false) setStep("success")
+        } finally {
+            setSubmitting(false)
+        }
+    }
+
     // ── Success screen ────────────────────────────────────────────────────
     if (step === "success") {
         const reset = () => {
@@ -183,16 +251,18 @@ export function CampaignWizardScreen({
             setMaxStep(1)
         }
         return (
-            <SuccessScreen
-                mode={mode}
-                name={name}
-                eligible={eligible}
-                cost={cost}
-                dateShort={dateShort}
-                time={time}
-                onReset={reset}
-                onClose={onClose}
-            />
+            <WizardOverlay onClose={close} width={560}>
+                <SuccessScreen
+                    mode={mode}
+                    name={name}
+                    eligible={eligible}
+                    cost={cost}
+                    dateShort={dateShort}
+                    time={time}
+                    onReset={reset}
+                    onClose={close}
+                />
+            </WizardOverlay>
         )
     }
 
@@ -201,12 +271,31 @@ export function CampaignWizardScreen({
         mode === "now" ? "Envoyer maintenant" : `Planifier · ${dateShort} ${time}`
 
     return (
-        <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--paper-white)]">
-            <PageHeader eyebrow={head.eb} title={head.t} description={head.s} />
+        <WizardOverlay onClose={close} width={980}>
+            {/* Modal header */}
+            <div className="flex items-start justify-between gap-4 border-b border-[var(--ink-100)] px-6 pb-4 pt-5">
+                <div className="min-w-0">
+                    <div className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                        {head.eb}
+                    </div>
+                    <h2 className="mt-1 font-editorial text-[24px] leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                        {head.t}
+                    </h2>
+                    <p className="mt-1.5 max-w-[520px] text-[12.5px] leading-relaxed text-[var(--ink-soft)]">{head.s}</p>
+                </div>
+                <button
+                    type="button"
+                    aria-label="Fermer"
+                    onClick={close}
+                    className="-mr-1 rounded-lg p-1.5 text-[var(--ink-400)] transition hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)]"
+                >
+                    <Icon name="close" size={16} />
+                </button>
+            </div>
 
             <WizardStepper current={step} maxStep={maxStep} onStepClick={goStep} />
 
-            <div className="flex-1 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
                 <div className="grid gap-6 px-6 py-5" style={{ gridTemplateColumns: "minmax(0, 1fr) 312px" }}>
                     {/* Left — active step */}
                     <div className="min-w-0">
@@ -225,7 +314,7 @@ export function CampaignWizardScreen({
 
             {/* Footer nav */}
             <div className="flex shrink-0 items-center justify-between gap-2.5 border-t border-[var(--ink-200)] bg-[var(--paper-warm)] px-[18px] py-3.5">
-                <Button variant="ghost" onClick={onClose}>
+                <Button variant="ghost" onClick={close}>
                     Sauvegarder en brouillon
                 </Button>
                 <div className="flex items-center gap-2">
@@ -243,8 +332,8 @@ export function CampaignWizardScreen({
                     ) : (
                         <Button
                             variant={ok ? "accent" : "secondary"}
-                            disabled={!ok}
-                            onClick={() => ok && setStep("success")}
+                            disabled={!ok || submitting}
+                            onClick={confirm}
                         >
                             <Icon name="send" size={16} />
                             {sendCta}
@@ -252,7 +341,7 @@ export function CampaignWizardScreen({
                     )}
                 </div>
             </div>
-        </div>
+        </WizardOverlay>
     )
 }
 
@@ -263,7 +352,7 @@ function SummaryRail({ state, tpl }: { state: WizardState; tpl: CampaignWizardDa
         { k: "Modèle", v: tpl.name, mono: false },
         { k: "Audience", v: cwFmt(eligible), mono: true },
         { k: "Envoi", v: mode === "now" ? "Maintenant" : `${dateShort} · ${time}`, mono: false },
-        { k: "Coût est.", v: `€${cost.toFixed(2)}`, mono: true },
+        { k: "Coût est.", v: fcfa(cost), mono: true },
     ]
     return (
         <div className="flex min-w-0 flex-col gap-3">
@@ -294,7 +383,7 @@ function SummaryRail({ state, tpl }: { state: WizardState; tpl: CampaignWizardDa
                         className="font-mono text-[11.5px] tabular-nums"
                         style={{ color: ok ? "var(--status-good)" : "var(--status-danger)" }}
                     >
-                        €{data.balance.toFixed(2)}
+                        {fcfa(data.balance)}
                     </span>
                 </div>
             </div>
@@ -324,11 +413,11 @@ function SuccessScreen({
 }) {
     const stats = [
         { k: "Audience", v: cwFmt(eligible) },
-        { k: "Coût estimé", v: `€${cost.toFixed(2)}` },
+        { k: "Coût estimé", v: fcfa(cost) },
         { k: "Démarrage", v: mode === "now" ? "Maintenant" : `${dateShort} · ${time}` },
     ]
     return (
-        <div className="flex h-full w-full flex-col items-center justify-center overflow-y-auto bg-[var(--paper-white)] px-6 py-10">
+        <div className="w-full px-9 py-9">
             <div className="w-full max-w-[560px]">
                 <div className="text-center">
                     <div

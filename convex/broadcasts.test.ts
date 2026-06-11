@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
-import { describe, it, expect, beforeEach } from "vitest";
-import { api } from "./_generated/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { modules } from "./test.modules";
 
@@ -584,5 +584,100 @@ describe("Broadcasts", () => {
                 expect(item.sentCount).toBe(0);
             }
         });
+    });
+});
+
+describe("broadcasts — pause / resume (resumable send)", () => {
+    let t: any;
+    let orgId: string;
+    let templateId: string;
+    let asMember: any;
+    let asOutsider: any;
+
+    const mkBroadcast = (status: string, extra: Record<string, any> = {}) =>
+        t.run(async (ctx: any) =>
+            ctx.db.insert("broadcasts", {
+                organizationId: orgId, name: "Promo", templateId,
+                audienceConfig: { type: "ALL" }, status,
+                sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0, failedCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(), ...extra,
+            }),
+        );
+
+    beforeEach(async () => {
+        t = convexTest(schema, modules);
+        const ids = await t.run(async (ctx: any) => {
+            const member = await ctx.db.insert("users", { email: "m@a.com", name: "M" });
+            const outsider = await ctx.db.insert("users", { email: "o@b.com", name: "O" });
+            const org = await ctx.db.insert("organizations", {
+                name: "Org", ownerId: member, plan: "BUSINESS", creditBalance: 1_000_000,
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            await ctx.db.insert("memberships", {
+                userId: member, organizationId: org, role: "OWNER", status: "ONLINE",
+                maxConversations: 10, activeConversations: 0, lastSeenAt: Date.now(), joinedAt: Date.now(),
+            });
+            await ctx.db.insert("userSessions", { userId: member, currentOrganizationId: org, lastActivityAt: Date.now() });
+            const tpl = await ctx.db.insert("templates", {
+                organizationId: org, name: "Welcome", slug: "welcome", type: "TEXT",
+                category: "MARKETING", language: "fr", status: "APPROVED", body: "Bonjour",
+                sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0,
+                clickedCount: 0, convertedCount: 0, failedCount: 0, blockedCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            return { org, member, outsider, tpl };
+        });
+        orgId = ids.org;
+        templateId = ids.tpl;
+        asMember = t.withIdentity({ subject: ids.member, issuer: "test" });
+        asOutsider = t.withIdentity({ subject: ids.outsider, issuer: "test" });
+    });
+
+    // sendBroadcast self-schedules + sendSingleToContact schedules WA sends —
+    // convex-test can't run scheduled actions in teardown, so cancel pending jobs.
+    afterEach(async () => {
+        await t.run(async (ctx: any) => {
+            const jobs = await ctx.db.system.query("_scheduled_functions").collect();
+            for (const j of jobs) if (j.state.kind === "pending") await ctx.scheduler.cancel(j._id);
+        });
+    });
+
+    it("pauseBroadcast: SENDING → PAUSED for a member", async () => {
+        const id = await mkBroadcast("SENDING");
+        await asMember.mutation(api.broadcasts.pauseBroadcast, { id });
+        const b = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(b.status).toBe("PAUSED");
+    });
+
+    it("pauseBroadcast: rejects when the campaign is not SENDING", async () => {
+        const id = await mkBroadcast("DRAFT");
+        await expect(asMember.mutation(api.broadcasts.pauseBroadcast, { id })).rejects.toThrow(/cours d'envoi|pause/i);
+    });
+
+    it("pauseBroadcast: rejects a non-member (cross-tenant)", async () => {
+        const id = await mkBroadcast("SENDING");
+        await expect(asOutsider.mutation(api.broadcasts.pauseBroadcast, { id })).rejects.toThrow(/membre|permission/i);
+    });
+
+    it("resumeBroadcast: PAUSED → SENDING + schedules the continuation", async () => {
+        const id = await mkBroadcast("PAUSED", { sentCount: 50, audienceTotal: 200 });
+        await asMember.mutation(api.broadcasts.resumeBroadcast, { id });
+        const b = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(b.status).toBe("SENDING");
+        const jobs = await t.run(async (ctx: any) => ctx.db.system.query("_scheduled_functions").collect());
+        expect(jobs.some((j: any) => String(j.name).includes("broadcasts"))).toBe(true);
+    });
+
+    it("resumeBroadcast: rejects when the campaign is not PAUSED", async () => {
+        const id = await mkBroadcast("SENDING");
+        await expect(asMember.mutation(api.broadcasts.resumeBroadcast, { id })).rejects.toThrow(/en pause|reprise/i);
+    });
+
+    it("sendBroadcast guard: a PAUSED campaign is a no-op (cursor preserved)", async () => {
+        const id = await mkBroadcast("PAUSED", { sentCount: 50, audienceTotal: 200 });
+        await t.action(internal.broadcasts.sendBroadcast, { broadcastId: id, organizationId: orgId });
+        const b = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(b.status).toBe("PAUSED");
+        expect(b.sentCount).toBe(50);
     });
 });

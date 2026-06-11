@@ -773,6 +773,7 @@ export default defineSchema({
             v.literal("DRAFT"),
             v.literal("SCHEDULED"),
             v.literal("SENDING"),
+            v.literal("PAUSED"),
             v.literal("COMPLETED"),
             v.literal("FAILED"),
             v.literal("CANCELLED")
@@ -780,6 +781,11 @@ export default defineSchema({
 
         scheduledAt: v.optional(v.number()),
         completedAt: v.optional(v.number()),
+
+        // Total audience size locked at send-start — lets the chunked sender
+        // detect completion + cap at the paid count (resume uses sentCount as
+        // the cursor).
+        audienceTotal: v.optional(v.number()),
 
         // Multi-channel WhatsApp
         whatsappChannelId: v.optional(v.id("whatsappChannels")),

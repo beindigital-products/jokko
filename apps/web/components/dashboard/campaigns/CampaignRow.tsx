@@ -3,10 +3,33 @@ import { CampaignStatusPill } from "./CampaignStatusPill"
 import { CAMPAIGNS_COLS, type CampaignRow as CampaignRowData } from "./types"
 
 /** A single broadcast row: name + progress/hint, status, template, stats. */
-export function CampaignRow({ campaign: c }: { campaign: CampaignRowData }) {
+export function CampaignRow({
+    campaign: c,
+    onOpen,
+}: {
+    campaign: CampaignRowData
+    onOpen?: (id: string) => void
+}) {
     return (
         <div
-            className="grid items-start gap-x-5 border-b border-[var(--ink-100)] px-8 py-3.5 transition-colors hover:bg-[var(--paper-warm)]/50"
+            role={onOpen ? "button" : undefined}
+            tabIndex={onOpen ? 0 : undefined}
+            onClick={onOpen ? () => onOpen(c.id) : undefined}
+            onKeyDown={
+                onOpen
+                    ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault()
+                              onOpen(c.id)
+                          }
+                      }
+                    : undefined
+            }
+            className={cn(
+                "grid items-start gap-x-5 border-b border-[var(--ink-100)] px-8 py-3.5 transition-colors hover:bg-[var(--paper-warm)]/50",
+                onOpen &&
+                    "cursor-pointer focus:outline-none focus-visible:bg-[var(--paper-warm)] focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-[var(--accent)]",
+            )}
             style={{ gridTemplateColumns: CAMPAIGNS_COLS, minHeight: 72 }}
         >
             <div className="min-w-0">

@@ -11,9 +11,10 @@ const meta = {
     title: "Flows/Campaign Wizard",
     component: CampaignWizardScreen,
     parameters: { layout: "fullscreen" },
+    args: { open: true, onOpenChange: () => {} },
     decorators: [
         (Story) => (
-            <div style={{ width: "100%", height: 900 }}>
+            <div style={{ width: "100%", height: 900, background: "var(--paper-warm)" }}>
                 <Story />
             </div>
         ),

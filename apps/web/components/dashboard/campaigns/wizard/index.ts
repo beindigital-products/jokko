@@ -1,4 +1,5 @@
 export { CampaignWizardScreen } from "./CampaignWizardScreen"
+export type { CampaignCreateInput } from "./CampaignWizardScreen"
 export { WizardStepper } from "./WizardStepper"
 export { WhatsAppPreview } from "./WhatsAppPreview"
 export { StepName } from "./StepName"

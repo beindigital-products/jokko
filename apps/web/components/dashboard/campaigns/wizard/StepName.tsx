@@ -12,8 +12,8 @@ interface CatOption {
 }
 
 const CATS: CatOption[] = [
-    { id: "Marketing", icon: "flag", title: "Marketing", desc: "Promos, nouveautés, réactivation", price: "€0.032" },
-    { id: "Utility", icon: "doc", title: "Utility", desc: "Confirmations, rappels, suivi", price: "€0.011" },
+    { id: "Marketing", icon: "flag", title: "Marketing", desc: "Promos, nouveautés, réactivation", price: "60 FCFA" },
+    { id: "Utility", icon: "doc", title: "Utility", desc: "Confirmations, rappels, suivi", price: "20 FCFA" },
     {
         id: "Auth",
         icon: "lock",
