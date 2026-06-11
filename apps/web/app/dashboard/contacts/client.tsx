@@ -612,6 +612,7 @@ export function ContactsPageClient() {
                     }
                 />
             </div>
+            <div className="-mx-3 sm:-mx-4 lg:-mx-6">
             <ContactsView
                 contacts={contacts}
                 tags={tags}
@@ -633,6 +634,7 @@ export function ContactsPageClient() {
                 canDelete={canDelete}
                 canExport={canExport}
             />
+            </div>
 
             {/* Contact Detail Drawer (Sheet) */}
             <Sheet open={!!selectedContactId} onOpenChange={(open) => !open && setSelectedContactId(null)}>

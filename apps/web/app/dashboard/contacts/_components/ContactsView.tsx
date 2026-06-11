@@ -163,7 +163,7 @@ export function ContactsView({
     const hasFilters = !!search || !!activeTag
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 px-4 sm:px-8">
             {/* Toolbar */}
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
                 <div className="flex flex-1 flex-wrap items-center gap-2">
@@ -312,13 +312,15 @@ export function ContactsView({
                     ) : null}
                 </Empty>
             ) : view === "table" ? (
-                <ContactsTable
-                    entries={entries}
-                    selectedIds={selected}
-                    onToggleSelect={toggleSelect}
-                    onRowClick={openContact}
-                    onRowMore={openContact}
-                />
+                <div className="-mx-4 sm:-mx-8">
+                    <ContactsTable
+                        entries={entries}
+                        selectedIds={selected}
+                        onToggleSelect={toggleSelect}
+                        onRowClick={openContact}
+                        onRowMore={openContact}
+                    />
+                </div>
             ) : (
                 <ContactsGrid
                     entries={entries}

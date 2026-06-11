@@ -1,6 +1,6 @@
 "use client"
 
-import { ContactRow } from "./ContactRow"
+import { ContactRow, CONTACTS_COLS } from "./ContactRow"
 import type { ContactTag } from "./ContactRow"
 import type { AvatarColor } from "../primitives/Avatar"
 
@@ -23,8 +23,11 @@ interface ContactsTableProps {
     onRowMore?: (id: string) => void
 }
 
-const COLUMNS = ["", "NOM", "TÉLÉPHONE · EMAIL", "TAGS", "AJOUTÉ"]
-
+/**
+ * ContactsTable — v3 contacts list. Same grid table look as the Campaigns /
+ * Templates lists (mono uppercase header on paper-warm, px-8 gutters, ink-100
+ * row dividers, paper-warm hover) so every list screen reads identically.
+ */
 export function ContactsTable({
     entries,
     selectedIds,
@@ -34,39 +37,41 @@ export function ContactsTable({
 }: ContactsTableProps) {
     return (
         <div className="overflow-x-auto">
-        <table className="w-full min-w-[680px]">
-            <thead>
-                <tr className="border-y border-[var(--ink-200)]">
-                    {COLUMNS.map((h) => (
-                        <th
-                            key={h || "select"}
-                            className="px-2 py-2.5 text-left font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]"
-                        >
-                            {h}
-                        </th>
-                    ))}
-                    <th />
-                </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--ink-100)]">
-                {entries.map((e) => (
-                    <ContactRow
-                        key={e.id}
-                        name={e.name}
-                        initials={e.initials}
-                        color={e.color}
-                        phone={e.phone}
-                        email={e.email}
-                        tags={e.tags}
-                        lastExchange={e.lastExchange}
-                        selected={selectedIds?.has(e.id)}
-                        onToggleSelect={(sel) => onToggleSelect?.(e.id, sel)}
-                        onRowClick={() => onRowClick?.(e.id)}
-                        onMore={() => onRowMore?.(e.id)}
-                    />
-                ))}
-            </tbody>
-        </table>
+            <div className="min-w-[720px]">
+                <div
+                    className="grid items-center gap-x-5 border-b border-[var(--ink-200)] bg-[var(--paper-warm)] px-8 font-mono text-[10.5px] font-medium uppercase tracking-[0.08em] text-[var(--ink-soft)]"
+                    style={{ gridTemplateColumns: CONTACTS_COLS, height: 38 }}
+                >
+                    <div />
+                    <div>Nom</div>
+                    <div>Téléphone · Email</div>
+                    <div>Tags</div>
+                    <div>Ajouté</div>
+                    <div />
+                </div>
+                {entries.length === 0 ? (
+                    <div className="px-8 py-16 text-center text-[13px] text-[var(--ink-soft)]">
+                        Aucun contact.
+                    </div>
+                ) : (
+                    entries.map((e) => (
+                        <ContactRow
+                            key={e.id}
+                            name={e.name}
+                            initials={e.initials}
+                            color={e.color}
+                            phone={e.phone}
+                            email={e.email}
+                            tags={e.tags}
+                            lastExchange={e.lastExchange}
+                            selected={selectedIds?.has(e.id)}
+                            onToggleSelect={(sel) => onToggleSelect?.(e.id, sel)}
+                            onRowClick={() => onRowClick?.(e.id)}
+                            onMore={() => onRowMore?.(e.id)}
+                        />
+                    ))
+                )}
+            </div>
         </div>
     )
 }
