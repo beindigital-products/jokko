@@ -1,4 +1,5 @@
 import type { Metadata } from "next"
+import { Suspense } from "react"
 import ResetPasswordContent from "./content"
 
 export const metadata: Metadata = {
@@ -7,5 +8,11 @@ export const metadata: Metadata = {
 }
 
 export default function ResetPasswordPage() {
-  return <ResetPasswordContent />
+  // ResetPasswordContent reads useSearchParams(); it must sit under a Suspense
+  // boundary or Next.js fails to prerender this public page (CSR bailout).
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordContent />
+    </Suspense>
+  )
 }
