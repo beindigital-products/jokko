@@ -34,7 +34,9 @@ export default function BootRoute() {
         if (firstLaunchSeen === null || auth.isLoading) return;
 
         if (!auth.isAuthenticated) {
-            router.replace(firstLaunchSeen ? "/auth/sign-in" : "/auth/sign-up");
+            // First launch → editorial Welcome (funnels into auth). Returning,
+            // signed-out users skip straight to sign-in.
+            router.replace(firstLaunchSeen ? "/auth/sign-in" : "/welcome");
             return;
         }
 
