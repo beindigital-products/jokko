@@ -43,6 +43,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
     const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
     const [forwarding, setForwarding] = useState<ConversationMessage | null>(null);
+    const [voiceActive, setVoiceActive] = useState(false);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
         api.conversations.getById,
@@ -471,18 +472,22 @@ export function MobileConversationScreen({ conversationId }: Props) {
 
                     {/* Composer */}
                     <View style={[styles.composer, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
-                        <MediaPicker disabled={!typedConversationId || isSending} onPicked={(payload) => void sendMedia(payload)} />
-                        <TemplatePicker disabled={!typedConversationId || isSending} onSelect={(templateId) => void sendTemplateMessage(templateId)} />
-                        <TextInput
-                            value={draft}
-                            onChangeText={setDraft}
-                            placeholder="Répondre par WhatsApp"
-                            placeholderTextColor={colors.mute}
-                            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.rule, color: colors.ink, fontFamily: font.sans }]}
-                            multiline
-                            maxLength={2000}
-                        />
-                        {draft.trim().length > 0 ? (
+                        {!voiceActive ? (
+                            <>
+                                <MediaPicker disabled={!typedConversationId || isSending} onPicked={(payload) => void sendMedia(payload)} />
+                                <TemplatePicker disabled={!typedConversationId || isSending} onSelect={(templateId) => void sendTemplateMessage(templateId)} />
+                                <TextInput
+                                    value={draft}
+                                    onChangeText={setDraft}
+                                    placeholder="Répondre par WhatsApp"
+                                    placeholderTextColor={colors.mute}
+                                    style={[styles.input, { backgroundColor: colors.card, borderColor: colors.rule, color: colors.ink, fontFamily: font.sans }]}
+                                    multiline
+                                    maxLength={2000}
+                                />
+                            </>
+                        ) : null}
+                        {!voiceActive && draft.trim().length > 0 ? (
                             <Pressable
                                 accessibilityRole="button"
                                 disabled={!canSend}
@@ -491,9 +496,10 @@ export function MobileConversationScreen({ conversationId }: Props) {
                             >
                                 {isSending ? <ActivityIndicator color={colors.paper} /> : <Icon name="send" size={18} color={colors.paper} strokeWidth={2} />}
                             </Pressable>
-                        ) : (
-                            <VoiceNoteRecorder disabled={!typedConversationId} onSend={sendVoiceNote} />
-                        )}
+                        ) : null}
+                        {voiceActive || draft.trim().length === 0 ? (
+                            <VoiceNoteRecorder disabled={!typedConversationId} onSend={sendVoiceNote} onActiveChange={setVoiceActive} />
+                        ) : null}
                     </View>
                 </>
             )}
