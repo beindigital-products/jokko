@@ -28,11 +28,13 @@ type Props = {
     message: ConversationMessage;
     replyTo?: ConversationMessage | null;
     onRetry?: (messageId: Id<"messages">) => void;
+    onEdit?: (message: ConversationMessage) => void;
+    onDelete?: (messageId: Id<"messages">) => void;
     onReplyRequest?: (message: ConversationMessage) => void;
     onReactionRequest?: (message: ConversationMessage) => void;
 };
 
-export function MessageBubble({ message, replyTo, onRetry, onReplyRequest, onReactionRequest }: Props) {
+export function MessageBubble({ message, replyTo, onRetry, onEdit, onDelete, onReplyRequest, onReactionRequest }: Props) {
     const theme = useTheme();
     const { colors, font } = theme;
     const outbound = message.direction === "OUTBOUND";
@@ -49,8 +51,8 @@ export function MessageBubble({ message, replyTo, onRetry, onReplyRequest, onRea
             style={[
                 styles.bubble,
                 {
-                    backgroundColor: outbound ? colors.bubbleOut : colors.bubbleIn,
-                    borderColor: failed ? colors.hot : colors.rule,
+                    backgroundColor: failed ? tint(colors.hot, 0.07) : outbound ? colors.bubbleOut : colors.bubbleIn,
+                    borderColor: failed ? tint(colors.hot, 0.4) : colors.rule,
                     borderWidth: outbound && !failed ? 0 : StyleSheet.hairlineWidth,
                     padding: isMedia && message.type === "IMAGE" ? 4 : undefined,
                     paddingHorizontal: isMedia && message.type === "IMAGE" ? 4 : 13,
@@ -61,28 +63,28 @@ export function MessageBubble({ message, replyTo, onRetry, onReplyRequest, onRea
             ]}
         >
             {replyTo ? <ReplyQuote message={replyTo} outbound={outbound} theme={theme} /> : null}
-            <BubbleContent message={message} outbound={outbound} theme={theme} />
-            <View style={[styles.meta, isMedia && message.type === "IMAGE" ? styles.metaMedia : null]}>
-                {message.isStarred ? <Icon name="star" size={10} color={fg} strokeWidth={2} /> : null}
-                <Text style={{ fontFamily: font.mono, fontSize: 9.5, color: fg, opacity: 0.55 }}>
-                    {formatMessageTime(message.timestamp)}
-                </Text>
-                {outbound ? <StatusIcon status={message.status} color={fg} /> : null}
-            </View>
-            {failed && onRetry ? (
-                <Pressable
-                    accessibilityRole="button"
-                    onPress={() => onRetry(message.id)}
-                    style={({ pressed }) => [
-                        styles.retryButton,
-                        { backgroundColor: colors.hot },
-                        pressed && styles.pressed,
-                    ]}
-                >
-                    <Icon name="rotate" size={13} color="#fff" strokeWidth={2} />
-                    <Text style={[styles.retryText, { fontFamily: font.sansSemibold }]}>Réessayer</Text>
-                </Pressable>
-            ) : null}
+            <BubbleContent message={message} outbound={outbound} theme={theme} failed={failed} />
+            {failed ? (
+                <View style={styles.failedMeta}>
+                    <View style={styles.failedTag}>
+                        <View style={[styles.failedBadge, { backgroundColor: colors.hot }]}>
+                            <Text style={styles.failedBadgeMark}>!</Text>
+                        </View>
+                        <Text style={{ fontSize: 11.5, fontFamily: font.sansMedium, color: colors.hot }}>Échec d'envoi</Text>
+                    </View>
+                    <Text style={{ fontFamily: font.mono, fontSize: 9.5, color: colors.mute }}>
+                        {formatMessageTime(message.timestamp)}
+                    </Text>
+                </View>
+            ) : (
+                <View style={[styles.meta, isMedia && message.type === "IMAGE" ? styles.metaMedia : null]}>
+                    {message.isStarred ? <Icon name="star" size={10} color={fg} strokeWidth={2} /> : null}
+                    <Text style={{ fontFamily: font.mono, fontSize: 9.5, color: fg, opacity: 0.55 }}>
+                        {formatMessageTime(message.timestamp)}
+                    </Text>
+                    {outbound ? <StatusIcon status={message.status} color={fg} /> : null}
+                </View>
+            )}
         </Pressable>
     );
 
@@ -96,6 +98,38 @@ export function MessageBubble({ message, replyTo, onRetry, onReplyRequest, onRea
                 ) : (
                     bubble
                 )}
+                {failed && (onRetry || onEdit || onDelete) ? (
+                    <View style={styles.failedActions}>
+                        {onRetry ? (
+                            <Pressable
+                                accessibilityRole="button"
+                                onPress={() => onRetry(message.id)}
+                                style={({ pressed }) => [styles.chip, { backgroundColor: colors.ink }, pressed && styles.pressed]}
+                            >
+                                <Icon name="rotate" size={13} color={colors.paper} strokeWidth={2.2} />
+                                <Text style={[styles.chipText, { color: colors.paper, fontFamily: font.sansMedium }]}>Réessayer</Text>
+                            </Pressable>
+                        ) : null}
+                        {onEdit && message.type === "TEXT" ? (
+                            <Pressable
+                                accessibilityRole="button"
+                                onPress={() => onEdit(message)}
+                                style={({ pressed }) => [styles.chip, styles.chipGhost, { borderColor: colors.rule }, pressed && styles.pressed]}
+                            >
+                                <Text style={[styles.chipText, { color: colors.ink3, fontFamily: font.sansMedium }]}>Modifier</Text>
+                            </Pressable>
+                        ) : null}
+                        {onDelete ? (
+                            <Pressable
+                                accessibilityRole="button"
+                                onPress={() => onDelete(message.id)}
+                                style={({ pressed }) => [styles.chip, styles.chipGhost, { borderColor: "transparent" }, pressed && styles.pressed]}
+                            >
+                                <Text style={[styles.chipText, { color: colors.hot, fontFamily: font.sansMedium }]}>Supprimer</Text>
+                            </Pressable>
+                        ) : null}
+                    </View>
+                ) : null}
                 {reactions.length > 0 ? <ReactionsChip reactions={reactions} outbound={outbound} theme={theme} /> : null}
             </View>
         </View>
@@ -128,10 +162,11 @@ function ReactionsChip({
     );
 }
 
-function BubbleContent({ message, outbound, theme }: { message: ConversationMessage; outbound: boolean; theme: JokkoTheme }) {
+function BubbleContent({ message, outbound, theme, failed }: { message: ConversationMessage; outbound: boolean; theme: JokkoTheme; failed?: boolean }) {
     const { colors, font } = theme;
-    const fg = outbound ? colors.bubbleOutInk : colors.ink;
-    const tileBg = outbound ? "rgba(242,239,232,0.10)" : colors.paper2;
+    // The failed bubble is light (hot-tinted), so its text stays dark ink.
+    const fg = failed ? colors.ink : outbound ? colors.bubbleOutInk : colors.ink;
+    const tileBg = outbound && !failed ? "rgba(242,239,232,0.10)" : colors.paper2;
 
     if (message.type === "IMAGE" && message.mediaUrl) {
         return (
@@ -308,16 +343,20 @@ const styles = StyleSheet.create({
         borderWidth: StyleSheet.hairlineWidth,
     },
     reactionEmoji: { fontSize: 12, lineHeight: 16 },
-    retryButton: {
-        marginTop: 6,
+    failedMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 8 },
+    failedTag: { flexDirection: "row", alignItems: "center", gap: 6 },
+    failedBadge: { width: 14, height: 14, borderRadius: 7, alignItems: "center", justifyContent: "center" },
+    failedBadgeMark: { color: "#fff", fontSize: 9, fontWeight: "700", lineHeight: 11 },
+    failedActions: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", alignItems: "center", gap: 8, marginTop: 8 },
+    chip: {
+        height: 32,
         flexDirection: "row",
         alignItems: "center",
-        gap: 5,
-        paddingHorizontal: 9,
-        paddingVertical: 5,
+        gap: 6,
+        paddingHorizontal: 12,
         borderRadius: 999,
-        alignSelf: "flex-start",
     },
-    retryText: { color: "#fff", fontSize: 12 },
+    chipGhost: { borderWidth: StyleSheet.hairlineWidth },
+    chipText: { fontSize: 12.5 },
     pressed: { opacity: 0.7 },
 });

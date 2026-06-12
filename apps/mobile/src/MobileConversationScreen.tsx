@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
-import { Avatar, Btn, Icon, NavButton, useTheme, type IconName } from "@jokko/ui-mobile";
+import { Avatar, Btn, Icon, NavButton, tint, useTheme, type IconName } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { MediaPicker } from "./conversation/MediaPicker";
@@ -48,6 +48,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const sendMessage = useMutation(api.messages.send);
     const sendTemplate = useMutation(api.templates.mutations.sendToConversation);
     const retryMessage = useMutation(api.messages.retry);
+    const removeMessage = useMutation(api.messages.remove);
     const reactToMessage = useMutation(api.messages.react);
     const assignToMe = useMutation(api.conversations.assignToMe);
     const resolveConversation = useMutation(api.conversations.resolve);
@@ -71,6 +72,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     // 24h, free-form replies are blocked — only approved templates can re-open it.
     const windowExpiresAt = conversation?.windowExpiresAt;
     const windowExpired = typeof windowExpiresAt === "number" && Date.now() > windowExpiresAt;
+    const failedCount = messages.reduce((count, message) => count + (message.status === "FAILED" ? 1 : 0), 0);
 
     // Keep the thread pinned to the newest message: jump to the bottom on first
     // load, then auto-follow each new message (or the 24h notice) at the end.
@@ -184,6 +186,35 @@ export function MobileConversationScreen({ conversationId }: Props) {
         }
     };
 
+    const handleRetryAll = () => {
+        for (const message of messages) {
+            if (message.status === "FAILED") void handleRetry(message.id);
+        }
+    };
+
+    // Edit a failed message: pull its text back into the composer and drop the
+    // failed copy so the corrected message sends fresh.
+    const handleEditFailed = (message: ConversationMessage) => {
+        setDraft((message.content ?? "").trim());
+        if (message.replyToId) setReplyingTo(messagesById.get(message.replyToId) ?? null);
+        void removeMessage({ messageId: message.id }).catch(() => undefined);
+    };
+
+    const handleDeleteFailed = (messageId: Id<"messages">) => {
+        Alert.alert("Supprimer le message", "Ce message en échec sera retiré du fil.", [
+            { text: "Annuler", style: "cancel" },
+            {
+                text: "Supprimer",
+                style: "destructive",
+                onPress: () => {
+                    void removeMessage({ messageId }).catch((removeError) =>
+                        Alert.alert("Supprimer", removeError instanceof Error ? removeError.message : "Suppression impossible"),
+                    );
+                },
+            },
+        ]);
+    };
+
     const runConversationAction = async (action: () => Promise<unknown>, label: string, thenLeave = false) => {
         if (!typedConversationId) return;
         setMenuOpen(false);
@@ -233,6 +264,8 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 message={message}
                 replyTo={message.replyToId ? messagesById.get(message.replyToId) ?? null : null}
                 onRetry={handleRetry}
+                onEdit={handleEditFailed}
+                onDelete={handleDeleteFailed}
                 onReplyRequest={setReplyingTo}
                 onReactionRequest={setReactingTo}
             />,
@@ -312,6 +345,18 @@ export function MobileConversationScreen({ conversationId }: Props) {
             </View>
 
             {error ? <Text style={[styles.errorText, { color: colors.hot, fontFamily: font.sans }]}>{error}</Text> : null}
+
+            {failedCount > 0 ? (
+                <View style={[styles.failedBanner, { backgroundColor: tint(colors.hot, 0.08), borderColor: tint(colors.hot, 0.25) }]}>
+                    <Icon name="offline" size={16} color={colors.hot} strokeWidth={1.8} />
+                    <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: colors.ink2, fontFamily: font.sans }}>
+                        {failedCount > 1 ? `${failedCount} messages en attente.` : "1 message en attente."} Connexion limitée.
+                    </Text>
+                    <Pressable onPress={handleRetryAll} hitSlop={8}>
+                        <Text style={{ fontSize: 12, fontFamily: font.sansSemibold, color: colors.accentInk }}>Tout réessayer</Text>
+                    </Pressable>
+                </View>
+            ) : null}
 
             {windowExpired ? (
                 /* 24h service window expired — free-form locked, only templates re-open it. */
@@ -506,6 +551,17 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     windowNoticeHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+    failedBanner: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        marginHorizontal: 12,
+        marginBottom: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 9,
+        borderRadius: 12,
+        borderWidth: StyleSheet.hairlineWidth,
+    },
     gate: {
         paddingHorizontal: 14,
         paddingTop: 12,
