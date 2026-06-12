@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { enqueueConversationEvent } from "./crm/enqueue";
+import { formatConversationPreview } from "./lib/messagePreview";
 
 // Gérer un message entrant (internal only — called from http.ts webhook handler)
 export const handleIncomingMessage = internalMutation({
@@ -252,17 +253,7 @@ export const handleIncomingMessage = internalMutation({
         }
 
         // 6. Mettre à jour la conversation
-        const MEDIA_PREVIEW: Record<string, string> = {
-            AUDIO: "🎵 Audio",
-            IMAGE: "📷 Photo",
-            VIDEO: "🎥 Vidéo",
-            DOCUMENT: "📄 Document",
-            STICKER: "🎭 Sticker",
-        };
-        const mediaLabel = MEDIA_PREVIEW[type];
-        const preview = mediaLabel
-            ? (content && !content.startsWith("[") ? `${mediaLabel} — ${content}` : mediaLabel)
-            : (content || `[${type}]`);
+        const preview = formatConversationPreview({ type, content });
         await ctx.db.patch(conversation._id, {
             lastMessageAt: Date.now(),
             lastMessageDirection: "INBOUND",

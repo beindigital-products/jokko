@@ -1,9 +1,10 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { requireMembership, requirePermission } from "./lib/auth";
 import { canSeeAllConversations } from "./lib/permissions";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { enqueueConversationEvent } from "./crm/enqueue";
+import { formatConversationPreview } from "./lib/messagePreview";
 
 // ============================================
 // Queries
@@ -573,5 +574,36 @@ export const getOrCreate = mutation({
         });
 
         return conversationId;
+    },
+});
+
+/**
+ * Maintenance: re-derive every conversation's `preview` from its last message
+ * using the current `formatConversationPreview` rules. Useful after changing the
+ * preview format (e.g. audio → "Message vocal (m:ss)") so existing rows update
+ * without waiting for a new message. Internal-only; run via the dashboard/CLI.
+ */
+export const refreshPreviews = internalMutation({
+    args: { organizationId: v.id("organizations") },
+    handler: async (ctx, args) => {
+        const conversations = await ctx.db
+            .query("conversations")
+            .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+            .collect();
+        let updated = 0;
+        for (const conversation of conversations) {
+            const lastMessage = await ctx.db
+                .query("messages")
+                .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
+                .order("desc")
+                .first();
+            if (!lastMessage) continue;
+            const preview = formatConversationPreview({ type: lastMessage.type, content: lastMessage.content });
+            if (preview !== conversation.preview) {
+                await ctx.db.patch(conversation._id, { preview });
+                updated += 1;
+            }
+        }
+        return { updated, total: conversations.length };
     },
 });

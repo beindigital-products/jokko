@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireMembership, requirePermission } from "./lib/auth";
 import { createNotification } from "./notifications";
+import { formatConversationPreview } from "./lib/messagePreview";
 import { paginationOptsValidator } from "convex/server";
 
 // ============================================
@@ -234,7 +235,7 @@ export const send = mutation({
         await ctx.db.patch(args.conversationId, {
             lastMessageAt: Date.now(),
             lastMessageDirection: "OUTBOUND",
-            preview: args.content || (args.type === "TEXT" ? args.content : `[${args.type}]`),
+            preview: formatConversationPreview({ type: args.type, content: args.content }),
             updatedAt: Date.now(),
         });
 
