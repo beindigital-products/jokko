@@ -3,6 +3,7 @@ import { api } from "@/convex/_generated/api";
 import { useState, useMemo } from "react";
 import { useCurrentOrg } from "./use-current-org";
 import { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 export type ConversationFilter = 'all' | 'unread' | 'unassigned' | 'archived' | 'mine';
 
@@ -123,15 +124,30 @@ export function useConversations() {
     };
 
     const assignToMe = async (id: string) => {
-        await assignToMeMutation({ id: id as Id<"conversations"> });
+        try {
+            await assignToMeMutation({ id: id as Id<"conversations"> });
+        } catch (error) {
+            console.error("assignToMe failed:", error);
+            toast.error(error instanceof Error ? error.message : "Impossible de s'auto-assigner");
+        }
     };
 
     const togglePin = async (id: string) => {
-        await togglePinMutation({ id: id as Id<"conversations"> });
+        try {
+            await togglePinMutation({ id: id as Id<"conversations"> });
+        } catch (error) {
+            console.error("togglePin failed:", error);
+            toast.error(error instanceof Error ? error.message : "Impossible d'épingler la conversation");
+        }
     };
 
     const blockContact = async (contactId: string) => {
-        await toggleBlockMutation({ id: contactId as Id<"contacts"> });
+        try {
+            await toggleBlockMutation({ id: contactId as Id<"contacts"> });
+        } catch (error) {
+            console.error("blockContact failed:", error);
+            toast.error(error instanceof Error ? error.message : "Impossible de bloquer/débloquer le contact");
+        }
     }
 
     const markAsRead = async (id: string) => {

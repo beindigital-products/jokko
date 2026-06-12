@@ -445,7 +445,7 @@ export function ContactsPageClient() {
         id: t._id,
         name: t.name,
         color: t.color || '#808080',
-        contactCount: 0 // TODO: Implement count
+        contactCount: 0
     }));
 
     // Use paginated query for contacts
@@ -493,9 +493,9 @@ export function ContactsPageClient() {
         } catch (error) {
             console.error(error);
             if (isContactMutationError(error) && error.data?.code === 'DUPLICATE_CONTACT') {
-                alert(`Contact existant: ${error.data.message}`);
+                toast.error(`Contact existant: ${error.data.message}`);
             } else {
-                alert(`Erreur: ${getErrorMessage(error)}`);
+                toast.error(`Erreur: ${getErrorMessage(error)}`);
             }
         }
     };
@@ -511,7 +511,7 @@ export function ContactsPageClient() {
             // Success
         } catch (error) {
             console.error(error);
-            alert(`Erreur: ${getErrorMessage(error)}`);
+            toast.error(`Erreur: ${getErrorMessage(error)}`);
         }
     };
 
@@ -531,7 +531,7 @@ export function ContactsPageClient() {
             // Success
         } catch (error) {
             console.error(error);
-            alert(`Erreur: ${getErrorMessage(error)}`);
+            toast.error(`Erreur: ${getErrorMessage(error)}`);
         }
     };
 
@@ -541,7 +541,7 @@ export function ContactsPageClient() {
             router.push(`/dashboard/conversations/${conversationId}`);
         } catch (error) {
             console.error("Failed to start conversation:", error);
-            alert("Impossible de démarrer la conversation.");
+            toast.error("Impossible de démarrer la conversation.");
         }
     };
 
@@ -600,7 +600,7 @@ export function ContactsPageClient() {
             setBulkDeleteIds(null);
         } catch (error) {
             console.error(error);
-            alert(`Erreur lors de la suppression: ${getErrorMessage(error)}`);
+            toast.error(`Erreur lors de la suppression: ${getErrorMessage(error)}`);
         }
     };
 
@@ -620,7 +620,7 @@ export function ContactsPageClient() {
             );
         } catch (error) {
             console.error(error);
-            alert(`Erreur lors de l'ajout du tag: ${getErrorMessage(error)}`);
+            toast.error(`Erreur lors de l'ajout du tag: ${getErrorMessage(error)}`);
         }
     };
 

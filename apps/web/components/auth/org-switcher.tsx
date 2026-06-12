@@ -26,8 +26,6 @@ import { useCurrentOrg } from "@/hooks/use-current-org";
 
 export function OrgSwitcher() {
     const { currentOrg, allOrgs, switchOrg } = useCurrentOrg();
-    // Note: renamed allOrgs -> organizations in previous step? checked hook: it returns allOrgs. 
-    // Let's use allOrgs.
 
     if (!currentOrg) return null;
 

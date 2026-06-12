@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useMutation, useAction } from 'convex/react';
+import { toast } from 'sonner';
 import { api } from '@/convex/_generated/api';
 import { TemplateType, TemplateTypeConfig } from '@/convex/lib/templateTypes';
 import { validateTemplate } from '@/convex/lib/templateValidation';
@@ -152,7 +153,7 @@ export const useTemplateBuilder = ({
         } catch (error) {
             console.error(error);
             const message = error instanceof Error ? error.message : String(error);
-            alert("Erreur lors de l'enregistrement: " + message);
+            toast.error("Erreur lors de l'enregistrement: " + message);
         } finally {
             setLoading(false);
         }
@@ -163,23 +164,23 @@ export const useTemplateBuilder = ({
 
         // Final Validation Check before publish
         if (!validationResult.valid) {
-            alert("Veuillez corriger les erreurs avant d'envoyer à WhatsApp.");
+            toast.error("Veuillez corriger les erreurs avant d'envoyer à WhatsApp.");
             return;
         }
 
         if (validationResult.warnings.length > 0) {
-            const confirm = window.confirm("Ce template contient des avertissements. Voulez-vous vraiment l'envoyer ? Il risque d'être rejeté.");
-            if (!confirm) return;
+            toast.error("Ce template contient des avertissements. Veuillez les corriger avant l'envoi pour éviter un rejet.");
+            return;
         }
 
         setIsPublishing(true);
         try {
             await submitToMetaAction({ templateId: initialData._id });
-            alert("Template envoyé pour validation à WhatsApp !");
+            toast.success("Template envoyé pour validation à WhatsApp !");
         } catch (error) {
             console.error(error);
             const message = error instanceof Error ? error.message : String(error);
-            alert("Erreur lors de l'envoi à WhatsApp: " + message);
+            toast.error("Erreur lors de l'envoi à WhatsApp: " + message);
         } finally {
             setIsPublishing(false);
         }

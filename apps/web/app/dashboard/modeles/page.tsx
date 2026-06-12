@@ -19,6 +19,7 @@ import { mapTemplatesData, type TemplateDoc } from '@/lib/dashboard/templates-da
 import { TemplateBuilder } from '@/components/templates/TemplateBuilder';
 import { usePermission } from '@/hooks/use-permission';
 import { useComposerStore } from '@/lib/stores/composer-store';
+import { toast } from 'sonner';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -108,13 +109,13 @@ export default function TemplatesPage() {
                     await submitToMeta({ templateId: id });
                 } catch (error) {
                     console.error('submitToMeta failed', error);
-                    alert(`Brouillon créé. La soumission à Meta a échoué : ${getErrorMessage(error)}`);
+                    toast.error(`Brouillon créé. La soumission à Meta a échoué : ${getErrorMessage(error)}`);
                 }
             }
             return true;
         } catch (error) {
             console.error(error);
-            alert(`Erreur : ${getErrorMessage(error)}`);
+            toast.error(`Erreur : ${getErrorMessage(error)}`);
             return false;
         }
     };
@@ -123,10 +124,10 @@ export default function TemplatesPage() {
         setSyncing(true);
         try {
             const res = await syncFromMeta();
-            if (res?.message) alert(res.message);
+            if (res?.message) toast.success(res.message);
         } catch (error) {
             console.error(error);
-            alert(`Synchronisation impossible : ${getErrorMessage(error)}`);
+            toast.error(`Synchronisation impossible : ${getErrorMessage(error)}`);
         } finally {
             setSyncing(false);
         }
@@ -144,7 +145,7 @@ export default function TemplatesPage() {
             setToDelete(null);
         } catch (error) {
             console.error(error);
-            alert(`Suppression impossible : ${getErrorMessage(error)}`);
+            toast.error(`Suppression impossible : ${getErrorMessage(error)}`);
         }
     };
 

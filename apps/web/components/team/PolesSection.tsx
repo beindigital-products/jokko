@@ -39,6 +39,7 @@ import { useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
@@ -123,7 +124,7 @@ export function PolesSection({
             await removePole({ id: deletingPole.id })
         } catch (error) {
             console.error('Delete pole error:', error)
-            alert("Erreur lors de la suppression")
+            toast.error("Erreur lors de la suppression")
         } finally {
             setDeleteLoading(false)
             setDeletingPole(null)

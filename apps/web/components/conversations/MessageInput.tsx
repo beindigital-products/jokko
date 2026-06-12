@@ -455,10 +455,8 @@ export function MessageInput({
                 ? `Limite: ${formatFileSize(maxSize)} (les videos seront comprimees automatiquement)`
                 : `Limite WhatsApp pour les ${type === 'image' ? 'images' : 'documents'}: ${formatFileSize(maxSize)}`
 
-            alert(
-                `Le fichier est trop volumineux (${formatFileSize(file.size)}).\n\n` +
-                `${limitInfo}\n\n` +
-                `Veuillez choisir un fichier plus petit.`
+            toast.error(
+                `Le fichier est trop volumineux (${formatFileSize(file.size)}). ${limitInfo} Veuillez choisir un fichier plus petit.`
             )
             // Reset the input
             if (fileInputRef.current) {
@@ -474,7 +472,6 @@ export function MessageInput({
             newAttachment.preview = URL.createObjectURL(file)
         }
 
-        console.log('[MessageInput] File selected:', { type, fileName: file.name, size: file.size })
         setAttachment(newAttachment)
     }
 
@@ -512,7 +509,7 @@ export function MessageInput({
             }, 1000)
         } catch (error) {
             console.error('[MessageInput] Failed to start recording:', error)
-            alert('Impossible d\'acceder au microphone. Verifiez les permissions.')
+            toast.error('Impossible d\'acceder au microphone. Verifiez les permissions.')
         }
     }
 

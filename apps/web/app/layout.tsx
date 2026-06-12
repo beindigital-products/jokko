@@ -104,7 +104,6 @@ export default function RootLayout({
                   version: 'v22.0'
                 });
                 window.__FB_INITIALIZED__ = true;
-                console.log('[FB] SDK initialized globally');
               };
               (function(d, s, id) {
                 var fjs = d.getElementsByTagName(s)[0];

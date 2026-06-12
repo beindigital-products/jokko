@@ -21,14 +21,11 @@ export default function DashboardLayout({
 
     // 1. Auth & Onboarding Redirect
     useEffect(() => {
-        console.log(`[DashboardLayout] Auth check: user=${user !== undefined ? (user ? 'present' : 'null') : 'loading'}`);
         if (user === null) {
-            console.log(`[DashboardLayout] Redirecting to /auth/sign-in (user is null)`);
             router.push('/auth/sign-in');
             return;
         }
         if (user && user.onboardingCompleted !== true) {
-            console.log(`[DashboardLayout] Redirecting to /onboarding (onboarding not completed)`);
             router.push('/onboarding');
             return;
         }
@@ -39,11 +36,9 @@ export default function DashboardLayout({
     useEffect(() => {
         if (sessionData === null && user && user.onboardingCompleted === true) {
             if (sessionRetries >= 3) {
-                console.log(`[DashboardLayout] Session init failed after retries, redirecting to onboarding`);
                 router.push('/onboarding');
                 return;
             }
-            console.log(`[DashboardLayout] Initializing session (attempt ${sessionRetries + 1})...`);
             ensureSession()
                 .then((result) => {
                     if (!result) {

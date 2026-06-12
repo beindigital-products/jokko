@@ -171,13 +171,6 @@ export function AssignToMemberModal({
 
         setIsSubmitting(true)
         try {
-            // We need to find the User ID for the selected Member (which is Membership ID currently)
-            // Wait, I need User ID.
-            // I'll update key mapping below.
-
-            // Actually, let's fix the mapping in useMemo above or update listMembers.
-            // For now, assume I fix listMembers to return userId.
-
             await assignTo(conversationId, selectedMemberId, note || undefined);
         } finally {
             setIsSubmitting(false)

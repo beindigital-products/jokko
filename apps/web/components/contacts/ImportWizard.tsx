@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils';
 import Papa from 'papaparse';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { toast } from 'sonner';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'complete';
 
@@ -153,7 +154,7 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
             error: (err) => {
                 console.error("Parse error", err);
                 setIsLoading(false);
-                alert("Erreur lors de la lecture du fichier");
+                toast.error("Erreur lors de la lecture du fichier");
             }
         });
 
@@ -183,7 +184,7 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
         } catch (err) {
             console.error("Import failed", err);
             const message = err instanceof Error ? err.message : "Erreur inconnue";
-            alert("Erreur lors de l'import: " + message);
+            toast.error("Erreur lors de l'import: " + message);
         } finally {
             setIsLoading(false);
         }
