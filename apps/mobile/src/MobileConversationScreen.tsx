@@ -343,12 +343,23 @@ export function MobileConversationScreen({ conversationId }: Props) {
         }
     };
 
-    const callContact = () => {
+    const callContact = async () => {
         if (!contactPhone) {
             Alert.alert("Appel", "Aucun numéro disponible pour ce contact.");
             return;
         }
-        void Linking.openURL(`tel:${contactPhone.replace(/[^\d+]/g, "")}`);
+        const url = `tel:${contactPhone.replace(/[^\d+]/g, "")}`;
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (!supported) {
+                // Simulators have no dialer; real devices do.
+                Alert.alert("Appel indisponible", "Les appels téléphoniques ne sont pas disponibles sur cet appareil.");
+                return;
+            }
+            await Linking.openURL(url);
+        } catch {
+            Alert.alert("Appel", "Impossible de lancer l'appel.");
+        }
     };
 
     // Photos & videos open in the in-app full-screen viewer; documents open in
@@ -420,7 +431,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
                         </Text>
                     </View>
                 </Pressable>
-                <NavButton icon="phone" onPress={callContact} />
+                <NavButton icon="phone" onPress={() => void callContact()} />
                 <NavButton icon="more-v" onPress={() => setMenuOpen(true)} />
             </View>
 
