@@ -37,8 +37,8 @@ export default function TabsLayout() {
             >
                 <Tabs.Screen name="inbox/index" options={{ title: "Inbox", tabBarIcon: tabIcon("inbox") }} />
                 <Tabs.Screen name="contacts/index" options={{ title: "Contacts", tabBarIcon: tabIcon("users") }} />
-                <Tabs.Screen name="notifications/index" options={{ title: "Activité", tabBarIcon: tabIcon("bell") }} />
                 <Tabs.Screen name="hub/index" options={{ title: "Hub", tabBarIcon: tabIcon("hub") }} />
+                <Tabs.Screen name="notifications/index" options={{ title: "Activité", tabBarIcon: tabIcon("bell") }} />
                 <Tabs.Screen name="settings/index" options={{ title: "Réglages", tabBarIcon: tabIcon("cog") }} />
             </Tabs>
         </SafeAreaView>
