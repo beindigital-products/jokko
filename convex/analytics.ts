@@ -159,12 +159,16 @@ export const getDashboardStats = query({
             }
         }
 
-        // 3. Aggregate Current Assignments
-        // For "Conversations handled", we can use the messages we processed (if agent sent a message, they handled it).
-        // OR we can use current assignments from `conversations` table.
-        // Let's use Current Assignments for the "Assignations" column as users expect "What is currently on their plate".
-        // But "conversations qu'ils ont eu à gérer" (handled) -> Messages logic is better?
-        // Let's add "Handled" (Active via messages) AND "Assigned" (Currently assigned).
+        // 3. Aggregate Conversations scoped to the requested period.
+        // We use createdAt to count conversations *opened* during the period,
+        // which is consistent with messages being scoped by createdAt. This gives
+        // a coherent "activity during the period" picture (vs lastMessageAt which
+        // would measure conversations *active* during the period — a different, less
+        // comparable metric).
+        //
+        // conversations has no compound (org, createdAt) index; we collect the org
+        // slice then filter in memory. This is the same pattern used for agent
+        // assignment counts and is acceptable given paged analytics queries.
 
         let totalConversations = 0;
         let openConversations = 0;
@@ -176,9 +180,12 @@ export const getDashboardStats = query({
             .collect();
 
         for (const conv of conversations) {
-            totalConversations++;
-            if (conv.status === 'OPEN') openConversations++;
-            else closedConversations++;
+            // Scope KPIs to the selected period (createdAt).
+            if (conv.createdAt >= start && conv.createdAt <= end) {
+                totalConversations++;
+                if (conv.status === 'OPEN') openConversations++;
+                else closedConversations++;
+            }
 
             if (conv.assignedTo && agentsMap.has(conv.assignedTo)) {
                 const agent = agentsMap.get(conv.assignedTo);
@@ -276,15 +283,21 @@ export const getDashboardStats = query({
         }
 
         // ── Trends (compare with previous period of same duration) ──
+        // `messages` is fetched with gte(start), so it contains ONLY the current
+        // period. To compute the previous period we issue a separate bounded query
+        // on [prevStart, start) rather than trying to filter the current slice
+        // (which would always yield 0 matches and produce a spurious +100% trend).
         const periodDuration = end - start;
         const prevStart = start - periodDuration;
 
-        let prevTotalMessages = 0;
-        for (const msg of messages) {
-            if (msg.createdAt >= prevStart && msg.createdAt < start) {
-                prevTotalMessages++;
-            }
-        }
+        const prevMessages = await ctx.db
+            .query("messages")
+            .withIndex("by_org_created", (q) =>
+                q.eq("organizationId", organizationId).gte("createdAt", prevStart).lt("createdAt", start),
+            )
+            .collect();
+
+        const prevTotalMessages = prevMessages.length;
 
         let currentNewConvs = 0;
         let prevNewConvs = 0;

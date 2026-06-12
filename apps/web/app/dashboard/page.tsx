@@ -37,7 +37,6 @@ export default function DashboardPage() {
 
     const me = useQuery(api.users.me)
     const stats = useQuery(api.analytics.getAppDashboardStats)
-    const overview = useQuery(api.analytics.getDashboardOverview)
     const presence = useQuery(
         api.presence.listWithPresence,
         orgId ? { organizationId: orgId } : "skip",
@@ -53,7 +52,7 @@ export default function DashboardPage() {
     const onboarding = useQuery(api.dashboard.getOnboardingChecklist)
 
     // Essential queries gate the skeleton. Everything else degrades to empty.
-    const loading = stats === undefined || overview === undefined
+    const loading = stats === undefined
 
     const data = buildOverviewData({
         me,
