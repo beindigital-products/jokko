@@ -3,7 +3,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import Svg, { Circle, Defs, Pattern, Rect } from "react-native-svg";
 import { useRouter } from "expo-router";
-import { Btn, ThemeProvider, Wordmark, useTheme } from "@jokko/ui-mobile";
+import { Btn, Screen, ThemeProvider, Wordmark, useTheme } from "@jokko/ui-mobile";
 
 /**
  * First-run welcome — the editorial dark hero from the design bundle
@@ -13,7 +13,9 @@ import { Btn, ThemeProvider, Wordmark, useTheme } from "@jokko/ui-mobile";
 export function WelcomeScreen() {
   return (
     <ThemeProvider dark>
-      <WelcomeInner />
+      <Screen>
+        <WelcomeInner />
+      </Screen>
     </ThemeProvider>
   );
 }
@@ -23,7 +25,7 @@ function WelcomeInner() {
   const { colors, font } = useTheme();
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.paper }]}>
+    <View style={styles.root}>
       <StatusBar style="light" />
       <DotField color="rgba(242,239,232,0.06)" />
 

@@ -1,7 +1,7 @@
-import { KeyboardAvoidingView, Platform, StatusBar, StyleSheet, View } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet, View } from "react-native";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 import { useFonts } from "expo-font";
 import {
   JetBrainsMono_500Medium,
@@ -48,19 +48,19 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
         <MobileAppProviders>
+          {/* Edge-to-edge: each screen paints its own background to all four
+              edges and applies safe-area insets via the <Screen> primitive, so
+              dark/full-bleed screens never show white safe-area bands. */}
           <KeyboardAvoidingView
             style={styles.root}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <SafeAreaView style={styles.root}>
-              <StatusBar barStyle="dark-content" />
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  contentStyle: { backgroundColor: theme.paper.white },
-                }}
-              />
-            </SafeAreaView>
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: theme.paper.white },
+              }}
+            />
           </KeyboardAvoidingView>
         </MobileAppProviders>
       </SafeAreaProvider>

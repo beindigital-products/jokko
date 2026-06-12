@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Linking from "expo-linking";
+import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { Btn, Field, Icon, Micro, NavButton, useTheme } from "@jokko/ui-mobile";
+import { Btn, Field, Icon, Micro, NavButton, Screen, useTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import { validatePassword } from "./lib/password-validation";
 
@@ -100,7 +101,8 @@ export function PasswordResetScreen({ mode, initialEmail = "", initialCode = "" 
   const isRequest = mode === "request";
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.paper }]}>
+    <Screen>
+      <StatusBar style="auto" />
       <View style={styles.header}>
         <View style={styles.headerTop}>
           <NavButton icon="chevron-left" onPress={() => router.replace("/auth/sign-in")} />
@@ -112,7 +114,7 @@ export function PasswordResetScreen({ mode, initialEmail = "", initialCode = "" 
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollFlex} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Text style={[styles.intro, { color: colors.ink3, fontFamily: font.sans }]}>
           {isRequest
             ? "Indiquez l'e-mail associé à votre compte. Nous vous enverrons un lien de réinitialisation valide 30 minutes."
@@ -206,7 +208,7 @@ export function PasswordResetScreen({ mode, initialEmail = "", initialCode = "" 
           </Pressable>
         )}
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -240,7 +242,7 @@ function resetConfirmError(error: unknown): string {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  scrollFlex: { flex: 1 },
   header: { paddingHorizontal: 24, paddingTop: 8 },
   headerTop: { height: 44, flexDirection: "row", alignItems: "center", marginBottom: 18, marginLeft: -8 },
   title: { fontSize: 40, lineHeight: 42, letterSpacing: -0.8 },

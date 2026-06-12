@@ -1,5 +1,6 @@
 // ── Jokko v2 design system (mobile) ──────────────────────────────────────────
 export { ThemeProvider, useTheme, getTheme, type JokkoTheme } from "./theme";
+export { Screen } from "./Screen";
 export { Icon, type IconName } from "./Icon";
 export { ICONS } from "./icons-data";
 export {

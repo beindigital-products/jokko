@@ -11,10 +11,11 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
+import { StatusBar } from "expo-status-bar";
 import { useRouter } from "expo-router";
 import { useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { Btn, Field, Icon, Micro, NavButton, Wordmark, useTheme } from "@jokko/ui-mobile";
+import { Btn, Field, Icon, Micro, Screen, Wordmark, useTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import { validatePassword } from "./lib/password-validation";
 
@@ -168,7 +169,8 @@ export function AuthScreen({ mode, redirectTo, inviteToken }: Props) {
   const busy = status !== "idle";
 
   return (
-    <View style={[styles.root, { backgroundColor: colors.paper }]}>
+    <Screen>
+      <StatusBar style="auto" />
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
@@ -182,6 +184,7 @@ export function AuthScreen({ mode, redirectTo, inviteToken }: Props) {
       </View>
 
       <ScrollView
+        style={styles.scrollFlex}
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -319,7 +322,7 @@ export function AuthScreen({ mode, redirectTo, inviteToken }: Props) {
           </Pressable>
         </View>
       </View>
-    </View>
+    </Screen>
   );
 }
 
@@ -351,7 +354,7 @@ function getAuthErrorMessage(error: unknown, mode: AuthMode): string {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  scrollFlex: { flex: 1 },
   header: { paddingHorizontal: 24, paddingTop: 8 },
   headerTop: { height: 44, flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
   title: { fontSize: 40, lineHeight: 42, letterSpacing: -0.8 },

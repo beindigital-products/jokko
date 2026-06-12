@@ -1,5 +1,10 @@
+import { Screen } from "@jokko/ui-mobile";
 import { NotificationsSettingsScreen } from "../../src/NotificationsSettingsScreen";
 
 export default function NotificationsSettingsRoute() {
-    return <NotificationsSettingsScreen />;
+    return (
+        <Screen>
+            <NotificationsSettingsScreen />
+        </Screen>
+    );
 }

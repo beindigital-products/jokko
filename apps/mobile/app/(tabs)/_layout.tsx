@@ -1,5 +1,6 @@
 import type { ComponentProps } from "react";
 import { Tabs } from "expo-router";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { theme } from "@jokko/tokens";
 
@@ -15,6 +16,7 @@ const tabs: Record<string, { title: string; icon: IconName; activeIcon: IconName
 
 export default function TabsLayout() {
     return (
+        <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: theme.surface.raised }}>
         <Tabs
             screenOptions={({ route }) => {
                 const item = tabs[route.name] ?? tabs.inbox;
@@ -48,5 +50,6 @@ export default function TabsLayout() {
             <Tabs.Screen name="hub" />
             <Tabs.Screen name="settings" />
         </Tabs>
+        </SafeAreaView>
     );
 }
