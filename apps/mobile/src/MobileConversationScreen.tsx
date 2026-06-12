@@ -57,6 +57,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [forwarding, setForwarding] = useState<ConversationMessage | null>(null);
     const [voiceActive, setVoiceActive] = useState(false);
     const [staged, setStaged] = useState<StagedMedia[]>([]);
+    const [uploading, setUploading] = useState<(StagedMedia & { progress: number })[]>([]);
     const stagedKey = useRef(0);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
@@ -101,7 +102,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const newestId = messages.length > 0 ? messages[messages.length - 1].id : null;
     useEffect(() => {
         if (newestId && didInitialScroll.current) scrollRef.current?.scrollToEnd({ animated: true });
-    }, [newestId, windowExpired]);
+    }, [newestId, windowExpired, uploading.length]);
 
     const contactName = conversation?.contact?.name || conversation?.contact?.phoneNumber || "Contact inconnu";
     const contactPhone = conversation?.contact?.phoneNumber;
@@ -249,35 +250,39 @@ export function MobileConversationScreen({ conversationId }: Props) {
         });
     };
 
-    const uploadAndSend = async (item: StagedMedia, caption: string | undefined) => {
-        const uploadUrl = await generateUploadUrl({});
-        const storageId = await uploadFileToConvex(uploadUrl, item.uri, item.mediaType);
-        await sendMessage({
-            conversationId: typedConversationId!,
-            content: caption,
-            type: item.type,
-            mediaStorageId: storageId as Id<"_storage">,
-            mediaType: item.mediaType,
-            fileName: item.fileName,
-            fileSize: item.fileSize,
-            isForwarded: false,
-        });
-    };
-
     const submitStaged = async () => {
         if (!typedConversationId || staged.length === 0 || isSending) return;
         const items = staged;
         const caption = draft.trim();
         setError(null);
         setIsSending(true);
+        // Move attachments into the "uploading" tray rendered at the foot of the thread.
+        setStaged([]);
+        setDraft("");
+        setUploading(items.map((item) => ({ ...item, progress: 0 })));
         try {
             // Caption rides with the first attachment, like WhatsApp.
             for (let i = 0; i < items.length; i++) {
-                await uploadAndSend(items[i], i === 0 && caption ? caption : undefined);
+                const item = items[i];
+                const uploadUrl = await generateUploadUrl({});
+                const storageId = await uploadFileToConvex(uploadUrl, item.uri, item.mediaType, (fraction) => {
+                    setUploading((current) => current.map((u) => (u.key === item.key ? { ...u, progress: fraction } : u)));
+                });
+                await sendMessage({
+                    conversationId: typedConversationId,
+                    content: i === 0 && caption ? caption : undefined,
+                    type: item.type,
+                    mediaStorageId: storageId as Id<"_storage">,
+                    mediaType: item.mediaType,
+                    fileName: item.fileName,
+                    fileSize: item.fileSize,
+                    isForwarded: false,
+                });
+                // The real message now arrives via the live query — drop the placeholder.
+                setUploading((current) => current.filter((u) => u.key !== item.key));
             }
-            setStaged([]);
-            setDraft("");
         } catch (uploadError) {
+            setUploading([]);
             Alert.alert("Pièce jointe", uploadError instanceof Error ? uploadError.message : "Erreur d'envoi");
         } finally {
             setIsSending(false);
@@ -434,6 +439,31 @@ export function MobileConversationScreen({ conversationId }: Props) {
                     ) : (
                         renderedThread
                     )}
+                    {uploading.map((item) => (
+                        <View key={item.key} style={styles.uploadRow}>
+                            <View style={[styles.uploadBubble, { backgroundColor: colors.bubbleOut }]}>
+                                {item.type === "IMAGE" ? (
+                                    <Image source={{ uri: item.uri }} style={styles.uploadThumb} resizeMode="cover" />
+                                ) : (
+                                    <View style={styles.uploadDoc}>
+                                        <Icon name={item.type === "VIDEO" ? "video" : "doc"} size={18} color={colors.bubbleOutInk} strokeWidth={1.6} />
+                                        <Text numberOfLines={1} style={{ flex: 1, fontSize: 13.5, color: colors.bubbleOutInk, fontFamily: font.sansMedium }}>
+                                            {item.fileName}
+                                        </Text>
+                                    </View>
+                                )}
+                                <View style={[styles.progressTrack, { backgroundColor: "rgba(242,239,232,0.25)" }]}>
+                                    <View style={{ height: "100%", borderRadius: 999, width: `${Math.round(item.progress * 100)}%`, backgroundColor: colors.paper }} />
+                                </View>
+                                <View style={styles.uploadMeta}>
+                                    <Text style={{ fontFamily: font.mono, fontSize: 10, color: colors.bubbleOutInk, opacity: 0.75 }}>
+                                        Envoi · {Math.round(item.progress * 100)}%
+                                    </Text>
+                                    <ActivityIndicator size="small" color={colors.bubbleOutInk} />
+                                </View>
+                            </View>
+                        </View>
+                    ))}
                     {windowExpired ? (
                         <View style={[styles.windowNotice, { backgroundColor: colors.card, borderColor: colors.rule }]}>
                             <View style={styles.windowNoticeHead}>
@@ -735,6 +765,12 @@ const styles = StyleSheet.create({
     stagedThumb: { width: "100%", height: "100%" },
     stagedTile: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
     stagedClose: { position: "absolute", top: 3, right: 3, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+    uploadRow: { flexDirection: "row", justifyContent: "flex-end" },
+    uploadBubble: { maxWidth: "82%", minWidth: 200, padding: 10, gap: 8, borderRadius: 18, borderBottomRightRadius: 6 },
+    uploadThumb: { width: 200, height: 150, borderRadius: 12 },
+    uploadDoc: { flexDirection: "row", alignItems: "center", gap: 8 },
+    progressTrack: { height: 4, borderRadius: 999, overflow: "hidden" },
+    uploadMeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     replyBar: {
         flexDirection: "row",
         alignItems: "center",
