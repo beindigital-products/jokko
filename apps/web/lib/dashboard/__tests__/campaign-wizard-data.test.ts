@@ -52,6 +52,12 @@ describe("mapWizardTemplate", () => {
     it("returns null for non-broadcastable categories (AUTHENTICATION)", () => {
         expect(mapWizardTemplate(tpl({ category: "AUTHENTICATION" }))).toBeNull()
     })
+
+    it("yields an empty variable mapping for a body without {{N}} tokens", () => {
+        // The send engine then sends the template with empty components (as-is).
+        const w = mapWizardTemplate(tpl({ body: "Bonjour, votre commande est confirmée." }))!
+        expect(w.vars).toEqual([])
+    })
 })
 
 describe("buildCampaignWizardData", () => {

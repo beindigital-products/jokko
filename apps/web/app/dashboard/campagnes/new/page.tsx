@@ -90,6 +90,27 @@ export default function NewBroadcastPage() {
         return templates.find(t => t._id === templateId) ?? null;
     }, [templateId, templates]);
 
+    // Default variable mapping derived from the selected template's {{N}} tokens:
+    // first token → contact first name, the rest → empty fixed value. The send
+    // engine resolves these per recipient into WhatsApp components, so variabled
+    // templates aren't sent with empty placeholders. (The v3 wizard lets users
+    // override the mapping; this legacy page uses defaults.)
+    const templateVariables = useMemo(() => {
+        const body = selectedTemplate?.body ?? '';
+        const tokens: string[] = [];
+        const re = /\{\{(\d+)\}\}/g;
+        let m: RegExpExecArray | null;
+        while ((m = re.exec(body)) !== null) {
+            const tok = `{{${m[1]}}}`;
+            if (!tokens.includes(tok)) tokens.push(tok);
+        }
+        return tokens.map((token, i) =>
+            i === 0
+                ? { token, src: 'first' as const }
+                : { token, src: 'fixed' as const, fixed: '' },
+        );
+    }, [selectedTemplate]);
+
     const toggleTag = (tagId: string) => {
         setSelectedTags(prev =>
             prev.includes(tagId)
@@ -136,10 +157,15 @@ export default function NewBroadcastPage() {
                 name,
                 templateId: templateId as Id<"templates">,
                 whatsappChannelId: channelId ? channelId as Id<"whatsappChannels"> : undefined,
-                audienceConfig: {
-                    type: audienceType,
-                    countries: audienceType === 'COUNTRIES' ? selectedCountries : undefined
-                },
+                // Reuse the validated audience memo so a "par tags" campaign keeps
+                // its `tags` filter (rebuilding the object here previously dropped
+                // them → the campaign was sent to every contact).
+                audienceConfig,
+                // Default per-recipient variable mapping derived from the template
+                // body so {{N}} placeholders aren't sent empty (first token →
+                // contact first name, the rest blank). The v3 wizard lets users
+                // customise this mapping; this page sends sensible defaults.
+                templateVariables,
                 scheduledAt: scheduled,
             });
 

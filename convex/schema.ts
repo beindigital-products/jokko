@@ -787,6 +787,21 @@ export default defineSchema({
         // the cursor).
         audienceTotal: v.optional(v.number()),
 
+        // Per-template variable mapping ({{N}} → contact field or fixed value),
+        // resolved per-recipient at send-time into WhatsApp template components.
+        // `token` is the placeholder ("{{1}}"), `src` a contact field
+        // ("first" | "last" | "company" | "city") or "fixed", and `fixed` the
+        // literal value when `src === "fixed"`. Ordered to match {{1}},{{2}}…
+        templateVariables: v.optional(
+            v.array(
+                v.object({
+                    token: v.string(),
+                    src: v.string(),
+                    fixed: v.optional(v.string()),
+                }),
+            ),
+        ),
+
         // Multi-channel WhatsApp
         whatsappChannelId: v.optional(v.id("whatsappChannels")),
         teamId: v.optional(v.id("teams")),

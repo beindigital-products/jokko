@@ -37,6 +37,8 @@ export interface CampaignCreateInput {
     /** YYYY-MM-DD + HH:MM — only meaningful when `mode === "scheduled"`. */
     date: string
     time: string
+    /** Variable mapping ({{N}} → contact field / fixed value) for the template. */
+    vars: TemplateVar[]
 }
 
 interface CampaignWizardScreenProps {
@@ -237,7 +239,7 @@ export function CampaignWizardScreen({
         }
         setSubmitting(true)
         try {
-            const res = await onCreate({ name, description: desc, templateId: tplId, segId, numId, mode, date, time })
+            const res = await onCreate({ name, description: desc, templateId: tplId, segId, numId, mode, date, time, vars })
             if (res !== false) setStep("success")
         } finally {
             setSubmitting(false)

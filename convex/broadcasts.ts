@@ -7,6 +7,82 @@ import { requirePermission } from "./lib/auth";
 import { requirePlanFeature } from "./lib/planFeatures";
 import { getMessageCostFCFA, calculateBroadcastCost } from "@jokko/core/whatsapp-pricing";
 
+// Per-template variable mapping ({{N}} → contact field or fixed value). Shared
+// validator for `create` / `update` and the table schema. `src` is a contact
+// field ("first" | "last" | "company" | "city") or "fixed".
+const templateVariablesValidator = v.array(
+    v.object({
+        token: v.string(),
+        src: v.string(),
+        fixed: v.optional(v.string()),
+    }),
+);
+
+type TemplateVariable = { token: string; src: string; fixed?: string };
+
+/**
+ * Resolve a saved variable mapping into WhatsApp template `components` for one
+ * contact. Tokens are sorted by their {{N}} index so the body parameters land in
+ * order. `src` reads a contact field (with sensible fallbacks); "fixed" uses the
+ * stored literal. Returns `[]` when there are no variables (Meta then sends the
+ * template as-is). Header variables aren't collected by the wizard yet, so only
+ * a "body" component is produced.
+ */
+function buildTemplateComponents(
+    vars: TemplateVariable[] | undefined,
+    contact: { name?: string; firstName?: string; lastName?: string; company?: string; city?: string },
+): Array<Record<string, unknown>> {
+    if (!vars || vars.length === 0) return [];
+
+    const firstNameOf = () => {
+        if (contact.firstName && contact.firstName.trim()) return contact.firstName.trim();
+        if (contact.name && contact.name.trim()) return contact.name.trim().split(/\s+/)[0];
+        return "";
+    };
+    const lastNameOf = () => {
+        if (contact.lastName && contact.lastName.trim()) return contact.lastName.trim();
+        if (contact.name && contact.name.trim()) {
+            const parts = contact.name.trim().split(/\s+/);
+            return parts.length > 1 ? parts.slice(1).join(" ") : "";
+        }
+        return "";
+    };
+
+    const resolve = (vr: TemplateVariable): string => {
+        switch (vr.src) {
+            case "fixed":
+                return vr.fixed ?? "";
+            case "first":
+                return firstNameOf();
+            case "last":
+                return lastNameOf();
+            case "company":
+                return contact.company?.trim() ?? "";
+            case "city":
+                return contact.city?.trim() ?? "";
+            default:
+                // Unknown source → fall back to the literal if present, else the
+                // contact's first name (best-effort, never undefined).
+                return (vr.fixed && vr.fixed.trim()) || firstNameOf();
+        }
+    };
+
+    // Keep the WhatsApp body parameters in {{1}},{{2}}… order regardless of the
+    // order the mapping was stored in.
+    const tokenIndex = (token: string): number => {
+        const m = /\{\{(\d+)\}\}/.exec(token);
+        return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
+    };
+    const ordered = [...vars].sort((a, b) => tokenIndex(a.token) - tokenIndex(b.token));
+
+    return [
+        {
+            type: "body",
+            parameters: ordered.map((vr) => ({ type: "text", text: resolve(vr) })),
+        },
+    ];
+}
+
 // List broadcasts for the current organization
 export const list = query({
     args: {
@@ -155,6 +231,7 @@ export const create = mutation({
             tags: v.optional(v.array(v.id("tags"))),
             countries: v.optional(v.array(v.string())),
         }),
+        templateVariables: v.optional(templateVariablesValidator),
     },
     handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
@@ -210,6 +287,7 @@ export const create = mutation({
             name: args.name,
             templateId: args.templateId,
             audienceConfig: args.audienceConfig,
+            templateVariables: args.templateVariables,
             whatsappChannelId: args.whatsappChannelId,
             status: args.scheduledAt ? "SCHEDULED" : "DRAFT",
             scheduledAt: args.scheduledAt,
@@ -255,6 +333,7 @@ export const update = mutation({
             tags: v.optional(v.array(v.id("tags"))),
             countries: v.optional(v.array(v.string())),
         })),
+        templateVariables: v.optional(templateVariablesValidator),
         whatsappChannelId: v.optional(v.id("whatsappChannels")),
     },
     handler: async (ctx, args) => {
@@ -296,6 +375,7 @@ export const update = mutation({
         if (args.scheduledAt !== undefined) updates.scheduledAt = args.scheduledAt;
         if (args.status !== undefined) updates.status = args.status;
         if (args.audienceConfig !== undefined) updates.audienceConfig = args.audienceConfig;
+        if (args.templateVariables !== undefined) updates.templateVariables = args.templateVariables;
         if (args.whatsappChannelId !== undefined) updates.whatsappChannelId = args.whatsappChannelId;
 
         const statusChanged = args.status && args.status !== broadcast.status;
@@ -517,9 +597,13 @@ export const sendBroadcast = internalAction({
 
         const total = broadcast.audienceTotal ?? targetContacts.length;
 
-        // 4. Send this chunk (capped at the locked audience total).
+        // 4. Send this chunk (capped at the locked audience total). Resolve the
+        //    saved variable mapping into per-recipient WhatsApp components so
+        //    templates with {{N}} placeholders carry real values.
         const chunk = targetContacts.slice(cursor, Math.min(cursor + CHUNK, total));
+        const vars = broadcast.templateVariables as TemplateVariable[] | undefined;
         for (const contact of chunk) {
+            const components = buildTemplateComponents(vars, contact);
             await ctx.runMutation(internal.broadcasts.sendSingleToContact, {
                 broadcastId: args.broadcastId,
                 organizationId: args.organizationId,
@@ -527,7 +611,7 @@ export const sendBroadcast = internalAction({
                 phone: contact.phone,
                 templateName: broadcast.template.name,
                 languageCode: broadcast.template.language,
-                components: [],
+                components,
                 whatsappChannelId: broadcast.whatsappChannelId,
             });
         }

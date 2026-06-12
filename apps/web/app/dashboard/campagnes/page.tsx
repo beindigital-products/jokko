@@ -136,6 +136,14 @@ export default function CampaignsPage() {
             const scheduledAt =
                 input.mode === "scheduled" ? new Date(`${input.date}T${input.time}`).getTime() : undefined;
 
+            // Persist the template variable mapping so it can be resolved into
+            // real WhatsApp components per recipient at send-time.
+            const templateVariables = input.vars.map((v) => ({
+                token: v.token,
+                src: v.src as string,
+                fixed: v.fixed,
+            }));
+
             if (editingId) {
                 // Editing a draft: persist via update, then schedule/send.
                 await updateBroadcast({
@@ -144,6 +152,7 @@ export default function CampaignsPage() {
                     templateId: input.templateId as Id<"templates">,
                     whatsappChannelId: input.numId ? (input.numId as Id<"whatsappChannels">) : undefined,
                     audienceConfig,
+                    templateVariables,
                     scheduledAt,
                     status: input.mode === "scheduled" ? "SCHEDULED" : "SENDING",
                 });
@@ -153,6 +162,7 @@ export default function CampaignsPage() {
                     templateId: input.templateId as Id<"templates">,
                     whatsappChannelId: input.numId ? (input.numId as Id<"whatsappChannels">) : undefined,
                     audienceConfig,
+                    templateVariables,
                     scheduledAt,
                 });
 
