@@ -162,22 +162,11 @@ export const createRecord = internalMutation({
         invitedBySubject: v.string() // We pass the sub from identity to resolve user
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx); // Use this if called from client
-        // But if called from action, we might have lost context? 
-        // No, getAuthUserId relies on headers. 
-        // If called via `ctx.runMutation` from an action, the auth headers might not propagate unless configured.
-        // Actually, best practice is to trust the Action if it's internal.
-
-        // Let's rely on finding the user by their subject if possible, OR just trust `getAuthUserId` if it works.
-        // If `ctx.runMutation` is authenticated as the user who triggered the action, it works.
-
-        let inviterId = await getAuthUserId(ctx);
-        if (!inviterId) {
-            // Fallback: This gets tricky. For now let's hope auth propagates or we query user by subject if we stored it.
-            // Since we don't have a "by_subject" index on users shown in schema (only email), skipping complex resolution.
-            // We'll throw if direct auth fails.
-            throw new Error("Could not resolve inviter");
-        }
+        // SECURITY: only a member with members:invite (OWNER/ADMIN) may invite.
+        // create() is a public action that previously only checked authentication,
+        // so any authenticated AGENT could invite by calling it directly. The auth
+        // context propagates through ctx.runMutation, so this enforces it server-side.
+        const { userId: inviterId } = await requirePermission(ctx, args.organizationId, "members:invite");
 
         // Plan limit: block new invitations if the agent quota is already saturated.
         await assertWithinLimit(ctx, args.organizationId, "agents");

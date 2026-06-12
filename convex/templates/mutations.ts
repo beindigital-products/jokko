@@ -185,36 +185,20 @@ export const deleteTemplate = mutation({
     },
 });
 
-export const updateStatus = mutation({
+// INTERNAL — only the trusted Meta-sync actions (submitToMeta / syncFromMeta)
+// may change a template's status. Was a PUBLIC mutation: any member could force
+// the local status (APPROVED included) without going through Meta's review.
+export const updateStatus = internalMutation({
     args: {
         id: v.id("templates"),
         status: v.string(), // "PENDING", "APPROVED", "REJECTED"
         metaTemplateId: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
-        // This is called by internal action so we might skip rigorous auth check 
-        // IF we trust the action. But actions are client callable?
-        // Wait, submitToMeta is an action.
-        // If I make this a public mutation, users can call it.
-        // I should check auth.
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Unauthorized");
-
-        // Verify ownership
         const template = await ctx.db.get(args.id);
         if (!template) throw new Error("Template not found");
 
-        // We really should verify organization, but for simplicity assuming userId check roughly covers basic auth.
-        // Better:
-        const session = await ctx.db
-            .query("userSessions")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .first();
-        if (!session || !session.currentOrganizationId || template.organizationId !== session.currentOrganizationId) {
-            throw new Error("Unauthorized");
-        }
-
-        const patch: any = {
+        const patch: Record<string, unknown> = {
             status: args.status,
             updatedAt: Date.now(),
         };
