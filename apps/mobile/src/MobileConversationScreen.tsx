@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Linking,
+    Modal,
     Pressable,
     ScrollView,
     StyleSheet,
@@ -9,10 +11,9 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
-import { theme } from "@jokko/tokens";
+import { Avatar, Btn, Icon, NavButton, useTheme, type IconName } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import { MediaPicker } from "./conversation/MediaPicker";
@@ -29,10 +30,12 @@ type Props = {
 
 export function MobileConversationScreen({ conversationId }: Props) {
     const router = useRouter();
+    const { colors, font } = useTheme();
     const [draft, setDraft] = useState("");
     const [error, setError] = useState<string | null>(null);
     const [isSending, setIsSending] = useState(false);
     const [isMutating, setIsMutating] = useState(false);
+    const [menuOpen, setMenuOpen] = useState(false);
     const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
     const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
     const typedConversationId = conversationId as Id<"conversations"> | null;
@@ -47,30 +50,24 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const reactToMessage = useMutation(api.messages.react);
     const assignToMe = useMutation(api.conversations.assignToMe);
     const resolveConversation = useMutation(api.conversations.resolve);
+    const reopenConversation = useMutation(api.conversations.reopen);
     const archiveConversation = useMutation(api.conversations.archive);
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
-    const {
-        results,
-        status,
-        loadMore,
-    } = usePaginatedQuery(
+    const { results, status, loadMore } = usePaginatedQuery(
         api.messages.list,
         typedConversationId ? { conversationId: typedConversationId } : "skip",
         { initialNumItems: 30 },
     );
 
-    const messages = useMemo(
-        () => ((results ?? []) as ConversationMessage[]).slice().reverse(),
-        [results],
-    );
+    const messages = useMemo(() => ((results ?? []) as ConversationMessage[]).slice().reverse(), [results]);
     const messagesById = useMemo(() => {
         const map = new Map<string, ConversationMessage>();
         for (const message of messages) map.set(message.id, message);
         return map;
     }, [messages]);
 
-    const contactName =
-        conversation?.contact?.name || conversation?.contact?.phoneNumber || "Contact inconnu";
+    const contactName = conversation?.contact?.name || conversation?.contact?.phoneNumber || "Contact inconnu";
+    const contactPhone = conversation?.contact?.phoneNumber;
     const canSend = draft.trim().length > 0 && !isSending && Boolean(typedConversationId);
     const showShortcutPopover = draft.startsWith("/") && !draft.includes(" ");
 
@@ -81,22 +78,14 @@ export function MobileConversationScreen({ conversationId }: Props) {
 
     const submitText = async () => {
         if (!typedConversationId || !canSend) return;
-
         const content = draft.trim();
         const replyToId = replyingTo?.id;
         setDraft("");
         setReplyingTo(null);
         setError(null);
         setIsSending(true);
-
         try {
-            await sendMessage({
-                conversationId: typedConversationId,
-                content,
-                type: "TEXT",
-                replyToId,
-                isForwarded: false,
-            });
+            await sendMessage({ conversationId: typedConversationId, content, type: "TEXT", replyToId, isForwarded: false });
         } catch {
             setDraft(content);
             if (replyToId) setReplyingTo(replyingTo);
@@ -106,15 +95,8 @@ export function MobileConversationScreen({ conversationId }: Props) {
         }
     };
 
-    const sendVoiceNote = async ({
-        uri,
-        durationMillis,
-    }: {
-        uri: string;
-        durationMillis: number;
-    }) => {
+    const sendVoiceNote = async ({ uri, durationMillis }: { uri: string; durationMillis: number }) => {
         if (!typedConversationId) return;
-
         try {
             const uploadUrl = await generateUploadUrl({});
             const storageId = await uploadFileToConvex(uploadUrl, uri, "audio/m4a");
@@ -128,9 +110,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 isForwarded: false,
             });
         } catch (uploadError) {
-            const message =
-                uploadError instanceof Error ? uploadError.message : "Erreur d'envoi";
-            Alert.alert("Note vocale", message);
+            Alert.alert("Note vocale", uploadError instanceof Error ? uploadError.message : "Erreur d'envoi");
         }
     };
 
@@ -141,11 +121,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
         try {
             await reactToMessage({ messageId: target.id, emoji });
         } catch (reactionError) {
-            const message =
-                reactionError instanceof Error
-                    ? reactionError.message
-                    : "Réaction impossible";
-            Alert.alert("Réaction", message);
+            Alert.alert("Réaction", reactionError instanceof Error ? reactionError.message : "Réaction impossible");
         }
     };
 
@@ -156,23 +132,13 @@ export function MobileConversationScreen({ conversationId }: Props) {
         try {
             await sendTemplate({ conversationId: typedConversationId, templateId });
         } catch (templateError) {
-            const message =
-                templateError instanceof Error
-                    ? templateError.message
-                    : "Envoi du modèle impossible";
-            Alert.alert("Modèle WhatsApp", message);
+            Alert.alert("Modèle WhatsApp", templateError instanceof Error ? templateError.message : "Envoi du modèle impossible");
         } finally {
             setIsSending(false);
         }
     };
 
-    const sendMedia = async (payload: {
-        uri: string;
-        type: "IMAGE" | "VIDEO" | "DOCUMENT";
-        mediaType: string;
-        fileName: string;
-        fileSize?: number;
-    }) => {
+    const sendMedia = async (payload: { uri: string; type: "IMAGE" | "VIDEO" | "DOCUMENT"; mediaType: string; fileName: string; fileSize?: number }) => {
         if (!typedConversationId) return;
         setError(null);
         setIsSending(true);
@@ -189,9 +155,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 isForwarded: false,
             });
         } catch (uploadError) {
-            const message =
-                uploadError instanceof Error ? uploadError.message : "Erreur d'envoi";
-            Alert.alert("Pièce jointe", message);
+            Alert.alert("Pièce jointe", uploadError instanceof Error ? uploadError.message : "Erreur d'envoi");
         } finally {
             setIsSending(false);
         }
@@ -201,204 +165,127 @@ export function MobileConversationScreen({ conversationId }: Props) {
         try {
             await retryMessage({ messageId });
         } catch (retryError) {
-            const message =
-                retryError instanceof Error ? retryError.message : "Réessai impossible";
-            Alert.alert("Réessayer", message);
+            Alert.alert("Réessayer", retryError instanceof Error ? retryError.message : "Réessai impossible");
         }
     };
 
-    const handleAssignToMe = async () => {
+    const runConversationAction = async (action: () => Promise<unknown>, label: string, thenLeave = false) => {
         if (!typedConversationId) return;
+        setMenuOpen(false);
         setIsMutating(true);
         try {
-            await assignToMe({ id: typedConversationId });
-        } catch (assignError) {
-            const message =
-                assignError instanceof Error ? assignError.message : "Attribution impossible";
-            Alert.alert("M'attribuer", message);
+            await action();
+            if (thenLeave) router.replace("/inbox");
+        } catch (actionError) {
+            Alert.alert(label, actionError instanceof Error ? actionError.message : `${label} impossible`);
         } finally {
             setIsMutating(false);
         }
     };
 
-    const handleResolve = async () => {
-        if (!typedConversationId) return;
-        setIsMutating(true);
-        try {
-            await resolveConversation({ id: typedConversationId });
-        } catch (resolveError) {
-            const message =
-                resolveError instanceof Error ? resolveError.message : "Résolution impossible";
-            Alert.alert("Résoudre", message);
-        } finally {
-            setIsMutating(false);
+    const callContact = () => {
+        if (!contactPhone) {
+            Alert.alert("Appel", "Aucun numéro disponible pour ce contact.");
+            return;
         }
-    };
-
-    const handleArchive = async () => {
-        if (!typedConversationId) return;
-        setIsMutating(true);
-        try {
-            await archiveConversation({ id: typedConversationId });
-            router.replace("/inbox");
-        } catch (archiveError) {
-            const message =
-                archiveError instanceof Error ? archiveError.message : "Archivage impossible";
-            Alert.alert("Archiver", message);
-        } finally {
-            setIsMutating(false);
-        }
+        void Linking.openURL(`tel:${contactPhone.replace(/[^\d+]/g, "")}`);
     };
 
     if (!conversationId) {
-        return (
-            <ConversationState
-                title="Conversation introuvable"
-                body="Retourne à l'inbox et sélectionne une conversation."
-                onBack={() => router.replace("/inbox")}
-            />
-        );
+        return <ConversationState title="Conversation introuvable" body="Retourne à l'inbox et sélectionne une conversation." onBack={() => router.replace("/inbox")} />;
     }
-
     if (conversation === undefined || status === "LoadingFirstPage") {
-        return (
-            <View style={styles.loading}>
-                <ActivityIndicator color={theme.accent.primary} />
-            </View>
-        );
+        return <View style={[styles.center, { backgroundColor: colors.paper }]}><ActivityIndicator color={colors.accent} /></View>;
     }
-
     if (conversation === null) {
-        return (
-            <ConversationState
-                title="Accès impossible"
-                body="Cette conversation n'existe pas ou n'est pas visible pour ton rôle."
-                onBack={() => router.replace("/inbox")}
-            />
-        );
+        return <ConversationState title="Accès impossible" body="Cette conversation n'existe pas ou n'est pas visible pour ton rôle." onBack={() => router.replace("/inbox")} />;
     }
 
     const isResolved = conversation.status === "RESOLVED" || conversation.status === "ARCHIVED";
     const canAssignToMe = !conversation.assignedTo && conversation.status !== "ARCHIVED";
 
+    const renderedThread: React.ReactNode[] = [];
+    let lastDay = "";
+    for (const message of messages) {
+        const day = dayKey(message.timestamp);
+        if (day !== lastDay) {
+            lastDay = day;
+            renderedThread.push(<DaySep key={`sep-${day}`} label={dayLabel(message.timestamp)} />);
+        }
+        renderedThread.push(
+            <MessageBubble
+                key={message.id}
+                message={message}
+                replyTo={message.replyToId ? messagesById.get(message.replyToId) ?? null : null}
+                onRetry={handleRetry}
+                onReplyRequest={setReplyingTo}
+                onReactionRequest={setReactingTo}
+            />,
+        );
+    }
+
     return (
-        <View style={styles.root}>
-            <View style={styles.header}>
+        <View style={[styles.root, { backgroundColor: colors.paper }]}>
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: colors.rule2 }]}>
+                <NavButton icon="chevron-left" onPress={() => router.replace("/inbox")} />
                 <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Retour inbox"
-                    onPress={() => router.replace("/inbox")}
-                    hitSlop={10}
-                    style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-                >
-                    <Ionicons name="chevron-back" size={20} color={theme.ink[900]} />
-                </Pressable>
-                <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Voir le contact"
+                    style={styles.headerText}
                     onPress={() => {
                         const contactId = conversation.contact?._id;
                         if (contactId) router.push(`/contacts/${contactId}`);
                     }}
-                    style={styles.headerText}
                 >
-                    <Text style={styles.contactName} numberOfLines={1}>{contactName}</Text>
-                    <Text style={styles.headerMeta} numberOfLines={1}>
-                        {conversation.channel} · {conversation.status}
-                    </Text>
-                </Pressable>
-                {conversation.unreadCount > 0 ? (
-                    <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadText}>{conversation.unreadCount}</Text>
-                    </View>
-                ) : null}
-            </View>
-
-            <View style={styles.actionsRow}>
-                {canAssignToMe ? (
-                    <ActionChip
-                        icon="person-add-outline"
-                        label="M'attribuer"
-                        disabled={isMutating}
-                        onPress={handleAssignToMe}
-                    />
-                ) : null}
-                {!isResolved ? (
-                    <ActionChip
-                        icon="checkmark-circle-outline"
-                        label="Résoudre"
-                        disabled={isMutating}
-                        onPress={handleResolve}
-                    />
-                ) : null}
-                <ActionChip
-                    icon="archive-outline"
-                    label="Archiver"
-                    disabled={isMutating}
-                    onPress={handleArchive}
-                />
-            </View>
-
-            <ScrollView
-                contentContainerStyle={styles.messagesContent}
-                keyboardShouldPersistTaps="handled"
-            >
-                {status === "CanLoadMore" ? (
-                    <Pressable
-                        accessibilityRole="button"
-                        onPress={() => loadMore(30)}
-                        style={({ pressed }) => [styles.loadMore, pressed && styles.pressed]}
-                    >
-                        <Text style={styles.loadMoreText}>Charger les messages précédents</Text>
-                    </Pressable>
-                ) : null}
-
-                {messages.length === 0 ? (
-                    <View style={styles.threadEmpty}>
-                        <Text style={styles.threadEmptyTitle}>Aucun message</Text>
-                        <Text style={styles.threadEmptyBody}>
-                            Le fil se remplira dès le premier message entrant.
+                    <Avatar name={contactName} size={36} status="online" />
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text numberOfLines={1} style={{ fontSize: 15, fontFamily: font.sansSemibold, color: colors.ink, letterSpacing: -0.15 }}>
+                            {contactName}
+                        </Text>
+                        <Text numberOfLines={1} style={{ fontSize: 11.5, color: isResolved ? colors.mute : colors.good, marginTop: 1, fontFamily: font.sans }}>
+                            {isResolved ? statusLabel(conversation.status) : `en ligne · ${conversation.channel}`}
                         </Text>
                     </View>
-                ) : (
-                    messages.map((message) => (
-                        <MessageBubble
-                            key={message.id}
-                            message={message}
-                            replyTo={
-                                message.replyToId
-                                    ? messagesById.get(message.replyToId) ?? null
-                                    : null
-                            }
-                            onRetry={handleRetry}
-                            onReplyRequest={setReplyingTo}
-                            onReactionRequest={setReactingTo}
-                        />
-                    ))
-                )}
-            </ScrollView>
+                </Pressable>
+                <NavButton icon="phone" onPress={callContact} />
+                <NavButton icon="more-v" onPress={() => setMenuOpen(true)} />
+            </View>
 
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {/* Body */}
+            <View style={[styles.body, { backgroundColor: colors.paper2 }]}>
+                <ScrollView contentContainerStyle={styles.thread} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                    {status === "CanLoadMore" ? (
+                        <Pressable onPress={() => loadMore(30)} style={({ pressed }) => [styles.loadMore, { backgroundColor: colors.card, borderColor: colors.rule }, pressed && styles.pressed]}>
+                            <Text style={{ fontSize: 12, fontFamily: font.sansMedium, color: colors.mute }}>Charger les messages précédents</Text>
+                        </Pressable>
+                    ) : null}
+                    {messages.length === 0 ? (
+                        <View style={styles.threadEmpty}>
+                            <Text style={{ fontSize: 17, fontFamily: font.display, color: colors.ink }}>Aucun message</Text>
+                            <Text style={{ marginTop: 6, maxWidth: 260, textAlign: "center", fontSize: 14, lineHeight: 20, color: colors.mute, fontFamily: font.sans }}>
+                                Le fil se remplira dès le premier message entrant.
+                            </Text>
+                        </View>
+                    ) : (
+                        renderedThread
+                    )}
+                </ScrollView>
+            </View>
 
+            {error ? <Text style={[styles.errorText, { color: colors.hot, fontFamily: font.sans }]}>{error}</Text> : null}
+
+            {/* Reply morph */}
             {replyingTo ? (
-                <View style={styles.replyBanner}>
-                    <View style={styles.replyBannerBar} />
-                    <View style={styles.replyBannerText}>
-                        <Text style={styles.replyBannerAuthor}>
+                <View style={[styles.replyBar, { backgroundColor: colors.paper2, borderLeftColor: colors.accent }]}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={{ fontSize: 11.5, fontFamily: font.sansSemibold, color: colors.accentInk }}>
                             {replyingTo.direction === "OUTBOUND" ? "Vous" : contactName}
                         </Text>
-                        <Text style={styles.replyBannerContent} numberOfLines={1}>
+                        <Text numberOfLines={1} style={{ fontSize: 12.5, color: colors.ink3, marginTop: 2, fontFamily: font.sans }}>
                             {(replyingTo.content ?? "").trim() || `[${replyingTo.type}]`}
                         </Text>
                     </View>
-                    <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Annuler la réponse"
-                        onPress={() => setReplyingTo(null)}
-                        hitSlop={10}
-                        style={({ pressed }) => [styles.replyBannerClose, pressed && styles.pressed]}
-                    >
-                        <Ionicons name="close" size={18} color={theme.ink[700]} />
+                    <Pressable onPress={() => setReplyingTo(null)} hitSlop={10}>
+                        <Icon name="close" size={16} color={colors.mute} />
                     </Pressable>
                 </View>
             ) : null}
@@ -406,120 +293,117 @@ export function MobileConversationScreen({ conversationId }: Props) {
             {showShortcutPopover ? (
                 <ShortcutPopover
                     query={draft}
-                    onSelect={(suggestion) => {
-                        const replacement = suggestion.text ?? suggestion.shortcut;
-                        setDraft(`${replacement} `);
-                    }}
+                    onSelect={(suggestion) => setDraft(`${suggestion.text ?? suggestion.shortcut} `)}
                 />
             ) : null}
 
-            <View style={styles.composer}>
-                <MediaPicker
-                    disabled={!typedConversationId || isSending}
-                    onPicked={(payload) => void sendMedia(payload)}
-                />
-                <TemplatePicker
-                    disabled={!typedConversationId || isSending}
-                    onSelect={(templateId) => void sendTemplateMessage(templateId)}
-                />
+            {/* Composer */}
+            <View style={[styles.composer, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
+                <MediaPicker disabled={!typedConversationId || isSending} onPicked={(payload) => void sendMedia(payload)} />
+                <TemplatePicker disabled={!typedConversationId || isSending} onSelect={(templateId) => void sendTemplateMessage(templateId)} />
                 <TextInput
                     value={draft}
                     onChangeText={setDraft}
                     placeholder="Répondre par WhatsApp"
-                    placeholderTextColor={theme.ink[500]}
-                    style={styles.input}
+                    placeholderTextColor={colors.mute}
+                    style={[styles.input, { backgroundColor: colors.card, borderColor: colors.rule, color: colors.ink, fontFamily: font.sans }]}
                     multiline
                     maxLength={2000}
                 />
                 {draft.trim().length > 0 ? (
                     <Pressable
                         accessibilityRole="button"
-                        accessibilityLabel="Envoyer le message"
                         disabled={!canSend}
                         onPress={submitText}
-                        style={({ pressed }) => [
-                            styles.sendButton,
-                            !canSend && styles.sendButtonDisabled,
-                            pressed && canSend && styles.pressed,
-                        ]}
+                        style={({ pressed }) => [styles.sendButton, { backgroundColor: colors.ink, opacity: !canSend ? 0.45 : pressed ? 0.8 : 1 }]}
                     >
-                        {isSending ? (
-                            <ActivityIndicator color="#fff" />
-                        ) : (
-                            <Ionicons name="send" size={18} color="#fff" />
-                        )}
+                        {isSending ? <ActivityIndicator color={colors.paper} /> : <Icon name="send" size={18} color={colors.paper} strokeWidth={2} />}
                     </Pressable>
                 ) : (
                     <VoiceNoteRecorder disabled={!typedConversationId} onSend={sendVoiceNote} />
                 )}
             </View>
 
-            <ReactionPicker
-                visible={reactingTo !== null}
-                onSelect={(emoji) => void submitReaction(emoji)}
-                onClose={() => setReactingTo(null)}
-            />
+            <ReactionPicker visible={reactingTo !== null} onSelect={(emoji) => void submitReaction(emoji)} onClose={() => setReactingTo(null)} />
+
+            {/* Actions menu */}
+            <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
+                <Pressable style={styles.menuScrim} onPress={() => setMenuOpen(false)}>
+                    <View style={[styles.menuSheet, { backgroundColor: colors.paper }]}>
+                        <View style={[styles.menuHandle, { backgroundColor: colors.rule }]} />
+                        {canAssignToMe ? (
+                            <MenuRow icon="user" label="M'attribuer" disabled={isMutating} onPress={() => runConversationAction(() => assignToMe({ id: typedConversationId! }), "M'attribuer")} />
+                        ) : null}
+                        {isResolved ? (
+                            <MenuRow icon="rotate" label="Rouvrir" disabled={isMutating} onPress={() => runConversationAction(() => reopenConversation({ id: typedConversationId! }), "Rouvrir")} />
+                        ) : (
+                            <MenuRow icon="circle-check" label="Résoudre" disabled={isMutating} onPress={() => runConversationAction(() => resolveConversation({ id: typedConversationId! }), "Résoudre")} />
+                        )}
+                        <MenuRow icon="user" label="Voir le contact" onPress={() => { setMenuOpen(false); const id = conversation.contact?._id; if (id) router.push(`/contacts/${id}`); }} />
+                        <MenuRow icon="archive" label="Archiver" danger disabled={isMutating} onPress={() => runConversationAction(() => archiveConversation({ id: typedConversationId! }), "Archiver", true)} />
+                    </View>
+                </Pressable>
+            </Modal>
         </View>
     );
 }
 
-function ActionChip({
-    icon,
-    label,
-    onPress,
-    disabled,
-}: {
-    icon: React.ComponentProps<typeof Ionicons>["name"];
-    label: string;
-    onPress: () => void;
-    disabled?: boolean;
-}) {
+function DaySep({ label }: { label: string }) {
+    const { colors, font } = useTheme();
     return (
-        <Pressable
-            accessibilityRole="button"
-            disabled={disabled}
-            onPress={onPress}
-            style={({ pressed }) => [
-                styles.actionChip,
-                disabled && styles.disabled,
-                pressed && !disabled && styles.pressed,
-            ]}
-        >
-            <Ionicons name={icon} size={14} color={theme.ink[900]} />
-            <Text style={styles.actionChipText}>{label}</Text>
+        <View style={styles.daySep}>
+            <Text style={{ fontFamily: font.mono, fontSize: 10.5, letterSpacing: 0.7, textTransform: "uppercase", color: colors.mute, backgroundColor: colors.paper2, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, overflow: "hidden" }}>
+                {label}
+            </Text>
+        </View>
+    );
+}
+
+function MenuRow({ icon, label, onPress, danger, disabled }: { icon: IconName; label: string; onPress: () => void; danger?: boolean; disabled?: boolean }) {
+    const { colors, font } = useTheme();
+    const fg = danger ? colors.hot : colors.ink;
+    return (
+        <Pressable onPress={onPress} disabled={disabled} style={({ pressed }) => [styles.menuRow, { borderBottomColor: colors.rule2, opacity: disabled ? 0.5 : pressed ? 0.6 : 1 }]}>
+            <Icon name={icon} size={20} color={fg} strokeWidth={1.7} />
+            <Text style={{ flex: 1, fontSize: 15.5, fontFamily: font.sansMedium, color: fg }}>{label}</Text>
         </Pressable>
     );
 }
 
-function ConversationState({
-    title,
-    body,
-    onBack,
-}: {
-    title: string;
-    body: string;
-    onBack: () => void;
-}) {
+function ConversationState({ title, body, onBack }: { title: string; body: string; onBack: () => void }) {
+    const { colors, font } = useTheme();
     return (
-        <View style={styles.stateRoot}>
-            <View style={styles.stateIcon}>
-                <Ionicons
-                    name="chatbubble-ellipses-outline"
-                    size={28}
-                    color={theme.accent.primary}
-                />
+        <View style={[styles.center, { backgroundColor: colors.paper, paddingHorizontal: 32 }]}>
+            <View style={[styles.stateIcon, { backgroundColor: colors.paper2, borderColor: colors.rule }]}>
+                <Icon name="inbox" size={26} color={colors.ink3} />
             </View>
-            <Text style={styles.stateTitle}>{title}</Text>
-            <Text style={styles.stateBody}>{body}</Text>
-            <Pressable
-                accessibilityRole="button"
-                onPress={onBack}
-                style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
-            >
-                <Text style={styles.primaryActionText}>Retour à l'inbox</Text>
-            </Pressable>
+            <Text style={{ fontSize: 20, fontFamily: font.display, color: colors.ink, marginTop: 18, letterSpacing: -0.4, textAlign: "center" }}>{title}</Text>
+            <Text style={{ marginTop: 8, maxWidth: 300, fontSize: 14, lineHeight: 20, color: colors.mute, textAlign: "center", fontFamily: font.sans }}>{body}</Text>
+            <Btn tone="primary" size="md" iconRight="arrow-right" onPress={onBack} style={{ marginTop: 22 }}>Retour à l'inbox</Btn>
         </View>
     );
+}
+
+function statusLabel(status: string): string {
+    if (status === "RESOLVED") return "Résolue";
+    if (status === "ARCHIVED") return "Archivée";
+    return status;
+}
+
+function dayKey(timestamp: number): string {
+    const d = new Date(timestamp);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(timestamp: number): string {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const day = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+    const diff = Math.round((startToday - day) / 86_400_000);
+    if (diff === 0) return "Aujourd'hui";
+    if (diff === 1) return "Hier";
+    return date.toLocaleDateString("fr-FR", { weekday: "long", day: "2-digit", month: "long" });
 }
 
 function formatSeconds(durationMillis: number): string {
@@ -530,259 +414,63 @@ function formatSeconds(durationMillis: number): string {
 }
 
 const styles = StyleSheet.create({
-    root: {
-        flex: 1,
-        backgroundColor: theme.surface.default,
-    },
+    root: { flex: 1 },
+    center: { flex: 1, alignItems: "center", justifyContent: "center" },
     header: {
-        minHeight: 72,
         flexDirection: "row",
         alignItems: "center",
-        gap: theme.spacing.md,
-        paddingHorizontal: theme.spacing.lg,
-        paddingVertical: theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.ink[300],
-        backgroundColor: theme.surface.default,
+        gap: 6,
+        paddingLeft: 4,
+        paddingRight: 8,
+        paddingTop: 4,
+        paddingBottom: 10,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: theme.radius.md,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    headerText: {
-        flex: 1,
-        minWidth: 0,
-    },
-    contactName: {
-        fontSize: 18,
-        lineHeight: 24,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    headerMeta: {
-        marginTop: 2,
-        fontSize: 12,
-        lineHeight: 17,
-        fontWeight: "800",
-        color: theme.ink[500],
-        textTransform: "uppercase",
-    },
-    unreadBadge: {
-        minWidth: 28,
-        height: 28,
-        borderRadius: 14,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: theme.spacing.xs,
-        backgroundColor: theme.accent.primary,
-    },
-    unreadText: {
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: "800",
-    },
-    actionsRow: {
-        flexDirection: "row",
-        gap: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.lg,
-        paddingTop: theme.spacing.sm,
-    },
-    actionChip: {
+    headerText: { flex: 1, minWidth: 0, flexDirection: "row", alignItems: "center", gap: 10 },
+    body: { flex: 1 },
+    thread: { padding: 14, gap: 8, flexGrow: 1 },
+    daySep: { alignItems: "center", paddingVertical: 8 },
+    loadMore: { alignSelf: "center", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, marginBottom: 6 },
+    threadEmpty: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 60 },
+    errorText: { paddingHorizontal: 18, paddingTop: 8, fontSize: 13, lineHeight: 18 },
+    replyBar: {
         flexDirection: "row",
         alignItems: "center",
-        gap: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.md,
+        gap: 10,
+        marginHorizontal: 12,
+        marginTop: 8,
+        paddingLeft: 12,
+        paddingRight: 12,
         paddingVertical: 8,
-        borderRadius: theme.radius.pill,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        backgroundColor: theme.surface.raised,
-    },
-    actionChipText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    messagesContent: {
-        flexGrow: 1,
-        padding: theme.spacing.lg,
-        gap: theme.spacing.sm,
-    },
-    loadMore: {
-        minHeight: 38,
-        alignSelf: "center",
-        justifyContent: "center",
-        paddingHorizontal: theme.spacing.md,
-        borderRadius: theme.radius.pill,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        backgroundColor: theme.surface.raised,
-    },
-    loadMoreText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: theme.ink[500],
-    },
-    threadEmpty: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: theme.spacing.xxl,
-    },
-    threadEmptyTitle: {
-        fontSize: 18,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    threadEmptyBody: {
-        marginTop: theme.spacing.sm,
-        maxWidth: 280,
-        textAlign: "center",
-        fontSize: 14,
-        lineHeight: 20,
-        color: theme.ink[500],
-    },
-    errorText: {
-        paddingHorizontal: theme.spacing.lg,
-        paddingTop: theme.spacing.sm,
-        fontSize: 13,
-        lineHeight: 18,
-        color: theme.semantic.danger,
-        fontWeight: "700",
-    },
-    replyBanner: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-        marginHorizontal: theme.spacing.lg,
-        marginTop: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
-        borderRadius: theme.radius.md,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        backgroundColor: theme.surface.raised,
-    },
-    replyBannerBar: {
-        width: 3,
-        alignSelf: "stretch",
-        borderRadius: 2,
-        backgroundColor: theme.accent.primary,
-    },
-    replyBannerText: { flex: 1, minWidth: 0 },
-    replyBannerAuthor: {
-        fontSize: 11,
-        fontWeight: "800",
-        color: theme.accent.primary,
-        textTransform: "uppercase",
-    },
-    replyBannerContent: {
-        marginTop: 2,
-        fontSize: 13,
-        color: theme.ink[700],
-    },
-    replyBannerClose: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
+        borderRadius: 12,
+        borderLeftWidth: 3,
     },
     composer: {
         flexDirection: "row",
         alignItems: "flex-end",
-        gap: theme.spacing.sm,
-        padding: theme.spacing.lg,
-        borderTopWidth: 1,
-        borderTopColor: theme.ink[300],
-        backgroundColor: theme.surface.default,
+        gap: 8,
+        paddingHorizontal: 12,
+        paddingTop: 8,
+        paddingBottom: 10,
+        borderTopWidth: StyleSheet.hairlineWidth,
     },
     input: {
         flex: 1,
-        minHeight: 46,
+        minHeight: 44,
         maxHeight: 118,
-        borderRadius: theme.radius.lg,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        backgroundColor: theme.surface.raised,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
-        fontSize: 15,
-        lineHeight: 20,
-        color: theme.ink[900],
-    },
-    sendButton: {
-        width: 46,
-        height: 46,
-        borderRadius: 23,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.ink[900],
-    },
-    sendButtonDisabled: {
-        opacity: 0.45,
-    },
-    stateRoot: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: theme.spacing.xl,
-        backgroundColor: theme.surface.default,
-    },
-    stateIcon: {
-        width: 68,
-        height: 68,
         borderRadius: 22,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        marginBottom: theme.spacing.lg,
+        borderWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 14,
+        paddingTop: 11,
+        paddingBottom: 11,
+        fontSize: 15.5,
+        lineHeight: 20,
     },
-    stateTitle: {
-        fontSize: 24,
-        fontWeight: "800",
-        color: theme.ink[900],
-        textAlign: "center",
-    },
-    stateBody: {
-        marginTop: theme.spacing.sm,
-        marginBottom: theme.spacing.xl,
-        maxWidth: 320,
-        fontSize: 15,
-        lineHeight: 22,
-        color: theme.ink[500],
-        textAlign: "center",
-    },
-    primaryAction: {
-        minHeight: 50,
-        alignSelf: "stretch",
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.ink[900],
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: theme.spacing.lg,
-    },
-    primaryActionText: {
-        color: "#fff",
-        fontSize: 15,
-        fontWeight: "800",
-    },
-    loading: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.default,
-    },
-    disabled: { opacity: 0.5 },
-    pressed: {
-        opacity: 0.65,
-    },
+    sendButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+    stateIcon: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+    menuScrim: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(10,10,10,0.4)" },
+    menuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36, paddingTop: 8 },
+    menuHandle: { width: 36, height: 5, borderRadius: 3, alignSelf: "center", marginBottom: 6 },
+    menuRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingHorizontal: 22, paddingVertical: 16, borderBottomWidth: StyleSheet.hairlineWidth },
+    pressed: { opacity: 0.7 },
 });

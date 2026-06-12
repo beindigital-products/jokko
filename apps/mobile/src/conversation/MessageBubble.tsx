@@ -1,6 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { theme } from "@jokko/tokens";
+import { Icon, useTheme, type IconName, type JokkoTheme } from "@jokko/ui-mobile";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { SwipeToReply } from "./SwipeToReply";
 
@@ -27,16 +26,14 @@ type Props = {
     onReactionRequest?: (message: ConversationMessage) => void;
 };
 
-export function MessageBubble({
-    message,
-    replyTo,
-    onRetry,
-    onReplyRequest,
-    onReactionRequest,
-}: Props) {
+export function MessageBubble({ message, replyTo, onRetry, onReplyRequest, onReactionRequest }: Props) {
+    const theme = useTheme();
+    const { colors, font } = theme;
     const outbound = message.direction === "OUTBOUND";
     const failed = message.status === "FAILED";
     const reactions = message.reactions ?? [];
+    const isMedia = ["IMAGE", "VIDEO", "AUDIO", "DOCUMENT", "STICKER"].includes(message.type);
+    const fg = outbound ? colors.bubbleOutInk : colors.ink;
 
     const bubble = (
         <Pressable
@@ -45,26 +42,38 @@ export function MessageBubble({
             android_disableSound
             style={[
                 styles.bubble,
-                outbound ? styles.bubbleOutbound : styles.bubbleInbound,
-                failed && styles.bubbleFailed,
+                {
+                    backgroundColor: outbound ? colors.bubbleOut : colors.bubbleIn,
+                    borderColor: failed ? colors.hot : colors.rule,
+                    borderWidth: outbound && !failed ? 0 : StyleSheet.hairlineWidth,
+                    padding: isMedia && message.type === "IMAGE" ? 4 : undefined,
+                    paddingHorizontal: isMedia && message.type === "IMAGE" ? 4 : 13,
+                    paddingVertical: isMedia && message.type === "IMAGE" ? 4 : 9,
+                    borderBottomRightRadius: outbound ? 6 : 18,
+                    borderBottomLeftRadius: outbound ? 18 : 6,
+                },
             ]}
         >
-            {replyTo ? <ReplyQuote message={replyTo} outbound={outbound} /> : null}
-            <BubbleContent message={message} outbound={outbound} />
-            <View style={styles.meta}>
-                <Text style={[styles.time, outbound && styles.timeOutbound]}>
+            {replyTo ? <ReplyQuote message={replyTo} outbound={outbound} theme={theme} /> : null}
+            <BubbleContent message={message} outbound={outbound} theme={theme} />
+            <View style={[styles.meta, isMedia && message.type === "IMAGE" ? styles.metaMedia : null]}>
+                <Text style={{ fontFamily: font.mono, fontSize: 9.5, color: fg, opacity: 0.55 }}>
                     {formatMessageTime(message.timestamp)}
                 </Text>
-                {outbound ? <StatusIcon status={message.status} /> : null}
+                {outbound ? <StatusIcon status={message.status} color={fg} /> : null}
             </View>
             {failed && onRetry ? (
                 <Pressable
                     accessibilityRole="button"
                     onPress={() => onRetry(message.id)}
-                    style={({ pressed }) => [styles.retryButton, pressed && styles.pressed]}
+                    style={({ pressed }) => [
+                        styles.retryButton,
+                        { backgroundColor: colors.hot },
+                        pressed && styles.pressed,
+                    ]}
                 >
-                    <Ionicons name="refresh" size={14} color="#fff" />
-                    <Text style={styles.retryText}>Réessayer</Text>
+                    <Icon name="rotate" size={13} color="#fff" strokeWidth={2} />
+                    <Text style={[styles.retryText, { fontFamily: font.sansSemibold }]}>Réessayer</Text>
                 </Pressable>
             ) : null}
         </Pressable>
@@ -74,18 +83,13 @@ export function MessageBubble({
         <View style={[styles.row, outbound && styles.rowOutbound]}>
             <View style={styles.column}>
                 {onReplyRequest ? (
-                    <SwipeToReply
-                        direction={outbound ? "left" : "right"}
-                        onTrigger={() => onReplyRequest(message)}
-                    >
+                    <SwipeToReply direction={outbound ? "left" : "right"} onTrigger={() => onReplyRequest(message)}>
                         {bubble}
                     </SwipeToReply>
                 ) : (
                     bubble
                 )}
-                {reactions.length > 0 ? (
-                    <ReactionsChip reactions={reactions} outbound={outbound} />
-                ) : null}
+                {reactions.length > 0 ? <ReactionsChip reactions={reactions} outbound={outbound} theme={theme} /> : null}
             </View>
         </View>
     );
@@ -94,51 +98,40 @@ export function MessageBubble({
 function ReactionsChip({
     reactions,
     outbound,
+    theme,
 }: {
     reactions: NonNullable<ConversationMessage["reactions"]>;
     outbound: boolean;
+    theme: JokkoTheme;
 }) {
+    const { colors, font } = theme;
     const counts = reactions.reduce<Map<string, number>>((acc, r) => {
         acc.set(r.emoji, (acc.get(r.emoji) ?? 0) + 1);
         return acc;
     }, new Map());
-
     return (
-        <View
-            style={[
-                styles.reactionsRow,
-                outbound ? styles.reactionsRowOutbound : styles.reactionsRowInbound,
-            ]}
-        >
+        <View style={[styles.reactionsRow, outbound ? styles.reactionsRowOutbound : styles.reactionsRowInbound]}>
             {Array.from(counts.entries()).map(([emoji, count]) => (
-                <View key={emoji} style={styles.reactionPill}>
+                <View key={emoji} style={[styles.reactionPill, { backgroundColor: colors.bubbleIn, borderColor: colors.rule }]}>
                     <Text style={styles.reactionEmoji}>{emoji}</Text>
-                    {count > 1 ? <Text style={styles.reactionCount}>{count}</Text> : null}
+                    {count > 1 ? <Text style={{ fontSize: 11, fontFamily: font.sansSemibold, color: colors.ink3 }}>{count}</Text> : null}
                 </View>
             ))}
         </View>
     );
 }
 
-function BubbleContent({
-    message,
-    outbound,
-}: {
-    message: ConversationMessage;
-    outbound: boolean;
-}) {
-    const textColor = outbound ? styles.bubbleTextOutbound : null;
+function BubbleContent({ message, outbound, theme }: { message: ConversationMessage; outbound: boolean; theme: JokkoTheme }) {
+    const { colors, font } = theme;
+    const fg = outbound ? colors.bubbleOutInk : colors.ink;
+    const tileBg = outbound ? "rgba(242,239,232,0.10)" : colors.paper2;
 
     if (message.type === "IMAGE" && message.mediaUrl) {
         return (
-            <View style={styles.mediaWrap}>
-                <Image
-                    source={{ uri: message.mediaUrl }}
-                    style={styles.mediaImage}
-                    resizeMode="cover"
-                />
+            <View style={{ gap: 4 }}>
+                <Image source={{ uri: message.mediaUrl }} style={[styles.mediaImage, { backgroundColor: colors.paper2 }]} resizeMode="cover" />
                 {message.content ? (
-                    <Text style={[styles.bubbleText, textColor, styles.captionText]}>
+                    <Text style={[styles.text, { color: fg, fontFamily: font.sans, paddingHorizontal: 8, paddingTop: 4 }]}>
                         {message.content}
                     </Text>
                 ) : null}
@@ -146,46 +139,33 @@ function BubbleContent({
         );
     }
 
-    if (message.type === "VIDEO") {
+    if (message.type === "AUDIO" || message.type === "VIDEO") {
+        const icon: IconName = message.type === "AUDIO" ? "mic" : "video";
+        const label = message.type === "AUDIO" ? message.content?.trim() || "Note vocale" : "Vidéo";
         return (
-            <View style={[styles.mediaTile, outbound && styles.mediaTileOutbound]}>
-                <Ionicons
-                    name="videocam"
-                    size={20}
-                    color={outbound ? "#fff" : theme.accent.primary}
-                />
-                <Text style={[styles.mediaTileText, textColor]}>Vidéo</Text>
-            </View>
-        );
-    }
-
-    if (message.type === "AUDIO") {
-        return (
-            <View style={[styles.mediaTile, outbound && styles.mediaTileOutbound]}>
-                <Ionicons
-                    name="mic"
-                    size={20}
-                    color={outbound ? "#fff" : theme.accent.primary}
-                />
-                <Text style={[styles.mediaTileText, textColor]}>Note vocale</Text>
+            <View style={[styles.mediaTile, { backgroundColor: tileBg }]}>
+                <View style={[styles.mediaTileIcon, { backgroundColor: outbound ? "rgba(242,239,232,0.12)" : colors.card }]}>
+                    <Icon name={icon} size={18} color={outbound ? fg : colors.accentInk} strokeWidth={1.8} />
+                </View>
+                <Text style={[styles.mediaTileText, { color: fg, fontFamily: font.sansMedium }]} numberOfLines={1}>
+                    {label}
+                </Text>
             </View>
         );
     }
 
     if (message.type === "DOCUMENT") {
         return (
-            <View style={[styles.mediaTile, outbound && styles.mediaTileOutbound]}>
-                <Ionicons
-                    name="document-text"
-                    size={20}
-                    color={outbound ? "#fff" : theme.accent.primary}
-                />
-                <View style={styles.docText}>
-                    <Text style={[styles.mediaTileText, textColor]} numberOfLines={1}>
+            <View style={[styles.mediaTile, { backgroundColor: tileBg }]}>
+                <View style={[styles.mediaTileIcon, { backgroundColor: outbound ? "rgba(242,239,232,0.12)" : colors.card }]}>
+                    <Icon name="doc" size={18} color={outbound ? fg : colors.accentInk} strokeWidth={1.6} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.mediaTileText, { color: fg, fontFamily: font.sansMedium }]} numberOfLines={1}>
                         {message.fileName ?? "Document"}
                     </Text>
                     {message.fileSize ? (
-                        <Text style={[styles.mediaSubText, outbound && styles.mediaSubTextOutbound]}>
+                        <Text style={{ fontFamily: font.mono, fontSize: 11, color: fg, opacity: 0.6, marginTop: 2 }}>
                             {formatBytes(message.fileSize)}
                         </Text>
                     ) : null}
@@ -195,82 +175,58 @@ function BubbleContent({
     }
 
     const content = (message.content ?? "").trim();
-    if (!content) {
-        return <Text style={[styles.bubbleText, textColor]}>{`[${message.type}]`}</Text>;
-    }
-    return <Text style={[styles.bubbleText, textColor]}>{content}</Text>;
+    return (
+        <Text style={[styles.text, { color: fg, fontFamily: font.sans }]}>{content || `[${message.type}]`}</Text>
+    );
 }
 
-function ReplyQuote({
-    message,
-    outbound,
-}: {
-    message: ConversationMessage;
-    outbound: boolean;
-}) {
-    const preview = (message.content ?? "").trim() || `[${message.type}]`;
+function ReplyQuote({ message, outbound, theme }: { message: ConversationMessage; outbound: boolean; theme: JokkoTheme }) {
+    const { colors, font } = theme;
+    const fg = outbound ? colors.bubbleOutInk : colors.ink3;
+    const preview = (message.content ?? "").trim() || mediaLabelFor(message.type);
     return (
         <View
             style={[
                 styles.replyQuote,
-                outbound ? styles.replyQuoteOutbound : styles.replyQuoteInbound,
+                {
+                    borderLeftColor: outbound ? colors.paper : colors.accent,
+                    backgroundColor: outbound ? "rgba(242,239,232,0.10)" : colors.paper2,
+                },
             ]}
         >
-            <Text
-                style={[
-                    styles.replyAuthor,
-                    outbound ? styles.replyAuthorOutbound : null,
-                ]}
-            >
+            <Text style={{ fontSize: 11.5, fontFamily: font.sansSemibold, color: fg, opacity: 0.85 }}>
                 {message.direction === "OUTBOUND" ? "Vous" : "Contact"}
             </Text>
-            <Text
-                numberOfLines={2}
-                style={[
-                    styles.replyContent,
-                    outbound ? styles.replyContentOutbound : null,
-                ]}
-            >
+            <Text numberOfLines={2} style={{ fontSize: 12.5, color: fg, opacity: 0.85, marginTop: 2, fontFamily: font.sans }}>
                 {preview}
             </Text>
         </View>
     );
 }
 
-function StatusIcon({ status }: { status: string }) {
-    if (status === "READ") {
-        return (
-            <View style={styles.statusIconRow}>
-                <Ionicons name="checkmark-done" size={14} color="#7DB3FF" />
-            </View>
-        );
+function StatusIcon({ status, color }: { status: string; color: string }) {
+    if (status === "READ") return <Icon name="check-double" size={12} color="#4D9CFF" strokeWidth={2.4} />;
+    if (status === "DELIVERED") return <Icon name="check-double" size={12} color={color} strokeWidth={2.4} />;
+    if (status === "SENT") return <Icon name="check" size={11} color={color} strokeWidth={2.4} />;
+    if (status === "FAILED") return <Text style={{ color: "#FF5B5B", fontSize: 11 }}>✕</Text>;
+    return <Icon name="clock" size={11} color={color} strokeWidth={2} />;
+}
+
+function mediaLabelFor(type: string): string {
+    switch (type.toUpperCase()) {
+        case "AUDIO":
+            return "Message vocal";
+        case "IMAGE":
+            return "Photo";
+        case "VIDEO":
+            return "Vidéo";
+        case "DOCUMENT":
+            return "Document";
+        case "STICKER":
+            return "Sticker";
+        default:
+            return "Message";
     }
-    if (status === "DELIVERED") {
-        return (
-            <View style={styles.statusIconRow}>
-                <Ionicons name="checkmark-done" size={14} color="#D7D3CC" />
-            </View>
-        );
-    }
-    if (status === "SENT") {
-        return (
-            <View style={styles.statusIconRow}>
-                <Ionicons name="checkmark" size={14} color="#D7D3CC" />
-            </View>
-        );
-    }
-    if (status === "FAILED") {
-        return (
-            <View style={styles.statusIconRow}>
-                <Ionicons name="alert-circle" size={14} color="#F87171" />
-            </View>
-        );
-    }
-    return (
-        <View style={styles.statusIconRow}>
-            <Ionicons name="time-outline" size={14} color="#D7D3CC" />
-        </View>
-    );
 }
 
 function formatMessageTime(timestamp: number): string {
@@ -289,130 +245,42 @@ const styles = StyleSheet.create({
     row: { flexDirection: "row", justifyContent: "flex-start" },
     rowOutbound: { justifyContent: "flex-end" },
     column: { maxWidth: "82%" },
-    reactionsRow: {
-        marginTop: -6,
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: 4,
+    bubble: {
+        maxWidth: "100%",
+        borderTopLeftRadius: 18,
+        borderTopRightRadius: 18,
     },
-    reactionsRowInbound: { justifyContent: "flex-start", paddingLeft: theme.spacing.sm },
-    reactionsRowOutbound: { justifyContent: "flex-end", paddingRight: theme.spacing.sm },
+    text: { fontSize: 15, lineHeight: 20, letterSpacing: -0.1 },
+    meta: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 4, marginTop: 3 },
+    metaMedia: { paddingHorizontal: 8, paddingBottom: 4 },
+    mediaImage: { width: 224, height: 224, borderRadius: 14 },
+    mediaTile: { flexDirection: "row", alignItems: "center", gap: 10, padding: 8, borderRadius: 12, minWidth: 180 },
+    mediaTileIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+    mediaTileText: { fontSize: 13.5 },
+    replyQuote: { borderLeftWidth: 2.5, paddingLeft: 10, paddingRight: 8, paddingVertical: 5, borderRadius: 8, marginBottom: 6 },
+    reactionsRow: { marginTop: -6, flexDirection: "row", flexWrap: "wrap", gap: 4 },
+    reactionsRowInbound: { justifyContent: "flex-start", paddingLeft: 8 },
+    reactionsRowOutbound: { justifyContent: "flex-end", paddingRight: 8 },
     reactionPill: {
         flexDirection: "row",
         alignItems: "center",
         gap: 2,
-        paddingHorizontal: 6,
+        paddingHorizontal: 7,
         paddingVertical: 2,
-        borderRadius: 10,
-        backgroundColor: theme.surface.default,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
+        borderRadius: 999,
+        borderWidth: StyleSheet.hairlineWidth,
     },
     reactionEmoji: { fontSize: 12, lineHeight: 16 },
-    reactionCount: { fontSize: 11, fontWeight: "700", color: theme.ink[700] },
-    bubble: {
-        maxWidth: "82%",
-        borderRadius: theme.radius.lg,
-        paddingHorizontal: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
-        borderWidth: 1,
-        gap: theme.spacing.xs,
-    },
-    bubbleInbound: {
-        backgroundColor: theme.surface.raised,
-        borderColor: theme.ink[300],
-    },
-    bubbleOutbound: {
-        backgroundColor: theme.ink[900],
-        borderColor: theme.ink[900],
-    },
-    bubbleFailed: {
-        borderColor: theme.semantic.danger,
-    },
-    bubbleText: {
-        fontSize: 15,
-        lineHeight: 21,
-        color: theme.ink[900],
-    },
-    bubbleTextOutbound: { color: "#fff" },
-    captionText: { marginTop: theme.spacing.xs },
-    mediaWrap: { gap: theme.spacing.xs },
-    mediaImage: {
-        width: 220,
-        height: 220,
-        borderRadius: theme.radius.md,
-        backgroundColor: theme.surface.sunken,
-    },
-    mediaTile: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-        paddingVertical: theme.spacing.xs,
-    },
-    mediaTileOutbound: {},
-    mediaTileText: {
-        fontSize: 14,
-        fontWeight: "700",
-        color: theme.ink[900],
-    },
-    mediaSubText: {
-        marginTop: 2,
-        fontSize: 12,
-        color: theme.ink[500],
-    },
-    mediaSubTextOutbound: { color: "#D7D3CC" },
-    docText: { flex: 1, minWidth: 0 },
-    replyQuote: {
-        borderLeftWidth: 3,
-        paddingLeft: theme.spacing.sm,
-        paddingVertical: 4,
-        borderRadius: 4,
-    },
-    replyQuoteInbound: {
-        borderLeftColor: theme.accent.primary,
-        backgroundColor: theme.surface.sunken,
-    },
-    replyQuoteOutbound: {
-        borderLeftColor: "#7DB3FF",
-        backgroundColor: "rgba(255,255,255,0.08)",
-    },
-    replyAuthor: {
-        fontSize: 11,
-        fontWeight: "800",
-        color: theme.accent.primary,
-    },
-    replyAuthorOutbound: { color: "#7DB3FF" },
-    replyContent: {
-        marginTop: 2,
-        fontSize: 12,
-        color: theme.ink[700],
-    },
-    replyContentOutbound: { color: "#D7D3CC" },
-    meta: {
-        flexDirection: "row",
-        justifyContent: "flex-end",
-        gap: theme.spacing.sm,
-        marginTop: theme.spacing.xs,
-        alignItems: "center",
-    },
-    time: { fontSize: 11, color: theme.ink[500], fontWeight: "700" },
-    timeOutbound: { color: "#D7D3CC" },
-    statusIconRow: { flexDirection: "row", alignItems: "center" },
     retryButton: {
-        marginTop: theme.spacing.xs,
+        marginTop: 6,
         flexDirection: "row",
         alignItems: "center",
-        gap: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.sm,
-        paddingVertical: 6,
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.semantic.danger,
+        gap: 5,
+        paddingHorizontal: 9,
+        paddingVertical: 5,
+        borderRadius: 999,
         alignSelf: "flex-start",
     },
-    retryText: {
-        color: "#fff",
-        fontSize: 12,
-        fontWeight: "800",
-    },
+    retryText: { color: "#fff", fontSize: 12 },
     pressed: { opacity: 0.7 },
 });
