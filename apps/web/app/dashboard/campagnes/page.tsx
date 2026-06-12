@@ -126,23 +126,26 @@ export default function CampaignsPage() {
         }
     };
 
+    /** Shared helper: build the common broadcast payload from wizard input. */
+    function buildBroadcastPayload(input: CampaignCreateInput) {
+        const cfg = segToAudienceConfig(input.segId);
+        const audienceConfig =
+            cfg.type === "TAGS"
+                ? { type: "TAGS" as const, tags: (cfg.tags ?? []) as Id<"tags">[] }
+                : { type: "ALL" as const };
+        const scheduledAt =
+            input.mode === "scheduled" ? new Date(`${input.date}T${input.time}`).getTime() : undefined;
+        const templateVariables = input.vars.map((v) => ({
+            token: v.token,
+            src: v.src as string,
+            fixed: v.fixed,
+        }));
+        return { audienceConfig, scheduledAt, templateVariables };
+    }
+
     const handleCreate = async (input: CampaignCreateInput): Promise<boolean> => {
         try {
-            const cfg = segToAudienceConfig(input.segId);
-            const audienceConfig =
-                cfg.type === "TAGS"
-                    ? { type: "TAGS" as const, tags: (cfg.tags ?? []) as Id<"tags">[] }
-                    : { type: "ALL" as const };
-            const scheduledAt =
-                input.mode === "scheduled" ? new Date(`${input.date}T${input.time}`).getTime() : undefined;
-
-            // Persist the template variable mapping so it can be resolved into
-            // real WhatsApp components per recipient at send-time.
-            const templateVariables = input.vars.map((v) => ({
-                token: v.token,
-                src: v.src as string,
-                fixed: v.fixed,
-            }));
+            const { audienceConfig, scheduledAt, templateVariables } = buildBroadcastPayload(input);
 
             if (editingId) {
                 // Editing a draft: persist via update, then schedule/send.
@@ -174,6 +177,40 @@ export default function CampaignsPage() {
             return true;
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Enregistrement de la campagne impossible");
+            return false;
+        }
+    };
+
+    /** Save wizard state as a DRAFT broadcast without sending. */
+    const handleSaveDraft = async (input: CampaignCreateInput): Promise<boolean> => {
+        try {
+            const { audienceConfig, templateVariables } = buildBroadcastPayload(input);
+
+            if (editingId) {
+                // Update existing broadcast and keep it as DRAFT.
+                await updateBroadcast({
+                    id: editingId as Id<"broadcasts">,
+                    name: input.name.trim() || "Campagne",
+                    templateId: input.templateId as Id<"templates">,
+                    whatsappChannelId: input.numId ? (input.numId as Id<"whatsappChannels">) : undefined,
+                    audienceConfig,
+                    templateVariables,
+                    status: "DRAFT",
+                });
+            } else {
+                // Create a new broadcast; it starts as DRAFT by default.
+                await createBroadcast({
+                    name: input.name.trim() || "Campagne",
+                    templateId: input.templateId as Id<"templates">,
+                    whatsappChannelId: input.numId ? (input.numId as Id<"whatsappChannels">) : undefined,
+                    audienceConfig,
+                    templateVariables,
+                });
+            }
+            toast.success("Brouillon enregistré");
+            return true;
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : "Impossible d'enregistrer le brouillon");
             return false;
         }
     };
@@ -218,6 +255,7 @@ export default function CampaignsPage() {
                     data={editWizardData}
                     role={wizardRole}
                     onCreate={handleCreate}
+                    onSaveDraft={handleSaveDraft}
                 />
             ) : null}
         </FeatureGate>

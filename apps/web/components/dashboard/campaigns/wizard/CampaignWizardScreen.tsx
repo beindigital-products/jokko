@@ -52,6 +52,8 @@ interface CampaignWizardScreenProps {
     role?: "OWNER" | "ADMIN" | "AGENT"
     /** Persist the campaign (step 6 confirm). Return false to keep the modal open on error. */
     onCreate?: (input: CampaignCreateInput) => boolean | void | Promise<boolean | void>
+    /** Persist the current wizard state as a DRAFT broadcast, then close. */
+    onSaveDraft?: (input: CampaignCreateInput) => boolean | void | Promise<boolean | void>
 }
 
 /** Centered modal shell (backdrop + bounded paper card). */
@@ -131,10 +133,12 @@ export function CampaignWizardScreen({
     initialStep = 1,
     role = "OWNER",
     onCreate,
+    onSaveDraft,
 }: CampaignWizardScreenProps) {
     const [step, setStep] = useState<WizardStepId | "success">(initialStep)
     const [maxStep, setMaxStep] = useState<WizardStepId>(initialStep)
     const [submitting, setSubmitting] = useState(false)
+    const [savingDraft, setSavingDraft] = useState(false)
     const [name, setName] = useState(data.initial.name)
     const [desc, setDesc] = useState(data.initial.desc)
     const [cat, setCat] = useState<TemplateCategory>(data.initial.cat)
@@ -246,6 +250,22 @@ export function CampaignWizardScreen({
         }
     }
 
+    const saveDraft = async () => {
+        if (savingDraft) return
+        if (!onSaveDraft) {
+            // No handler provided — just close (fallback for Storybook/standalone usage).
+            close()
+            return
+        }
+        setSavingDraft(true)
+        try {
+            const res = await onSaveDraft({ name, description: desc, templateId: tplId, segId, numId, mode, date, time, vars })
+            if (res !== false) close()
+        } finally {
+            setSavingDraft(false)
+        }
+    }
+
     // ── Success screen ────────────────────────────────────────────────────
     if (step === "success") {
         const reset = () => {
@@ -316,8 +336,8 @@ export function CampaignWizardScreen({
 
             {/* Footer nav */}
             <div className="flex shrink-0 items-center justify-between gap-2.5 border-t border-[var(--ink-200)] bg-[var(--paper-warm)] px-[18px] py-3.5">
-                <Button variant="ghost" onClick={close}>
-                    Sauvegarder en brouillon
+                <Button variant="ghost" onClick={saveDraft} disabled={savingDraft}>
+                    {savingDraft ? "Enregistrement…" : "Sauvegarder en brouillon"}
                 </Button>
                 <div className="flex items-center gap-2">
                     {step > 1 ? (
