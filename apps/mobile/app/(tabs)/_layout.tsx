@@ -1,29 +1,24 @@
-import type { ComponentProps } from "react";
 import { Tabs } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon, type IconName } from "@jokko/ui-mobile";
 import { theme } from "@jokko/tokens";
 
-type IconName = ComponentProps<typeof Ionicons>["name"];
-
-const tabs: Record<string, { title: string; icon: IconName; activeIcon: IconName }> = {
-    inbox: { title: "Inbox", icon: "chatbubble-outline", activeIcon: "chatbubble" },
-    contacts: { title: "Contacts", icon: "people-outline", activeIcon: "people" },
-    notifications: { title: "Notifs", icon: "notifications-outline", activeIcon: "notifications" },
-    hub: { title: "Hub", icon: "grid-outline", activeIcon: "grid" },
-    settings: { title: "Plus", icon: "settings-outline", activeIcon: "settings" },
-};
+// v2 design nav icons (stroke-based, drawn by the Icon kit from the exact design
+// paths). Active = accent tint + thicker stroke; inactive = muted + thin stroke.
+// Assigned explicitly per screen (a route.name lookup mismatched and fell back
+// to one icon/label for every tab).
+function tabIcon(name: IconName) {
+    return ({ color, focused }: { color: string; focused: boolean }) => (
+        <Icon name={name} size={23} color={color} strokeWidth={focused ? 2 : 1.6} />
+    );
+}
 
 export default function TabsLayout() {
     return (
         <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: theme.surface.default }}>
-        <Tabs
-            screenOptions={({ route }) => {
-                const item = tabs[route.name] ?? tabs.inbox;
-
-                return {
+            <Tabs
+                screenOptions={{
                     headerShown: false,
-                    tabBarLabel: item.title,
                     tabBarActiveTintColor: theme.accent.primary,
                     tabBarInactiveTintColor: theme.ink[500],
                     tabBarStyle: {
@@ -36,20 +31,16 @@ export default function TabsLayout() {
                     },
                     tabBarLabelStyle: {
                         fontSize: 11,
-                        fontWeight: "800",
+                        fontWeight: "600",
                     },
-                    tabBarIcon: ({ color, focused }) => (
-                        <Ionicons name={focused ? item.activeIcon : item.icon} size={21} color={color} />
-                    ),
-                };
-            }}
-        >
-            <Tabs.Screen name="inbox" />
-            <Tabs.Screen name="contacts" />
-            <Tabs.Screen name="notifications" />
-            <Tabs.Screen name="hub" />
-            <Tabs.Screen name="settings" />
-        </Tabs>
+                }}
+            >
+                <Tabs.Screen name="inbox/index" options={{ title: "Inbox", tabBarIcon: tabIcon("inbox") }} />
+                <Tabs.Screen name="contacts/index" options={{ title: "Contacts", tabBarIcon: tabIcon("users") }} />
+                <Tabs.Screen name="notifications/index" options={{ title: "Activité", tabBarIcon: tabIcon("bell") }} />
+                <Tabs.Screen name="hub/index" options={{ title: "Hub", tabBarIcon: tabIcon("hub") }} />
+                <Tabs.Screen name="settings/index" options={{ title: "Réglages", tabBarIcon: tabIcon("cog") }} />
+            </Tabs>
         </SafeAreaView>
     );
 }
