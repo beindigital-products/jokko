@@ -1,5 +1,10 @@
 import { v } from "convex/values";
 import { mutation } from "./_generated/server";
+import { rateLimiter, isValidEmail } from "./lib/rateLimits";
+
+// Length bound for the public (unauthenticated) marketing free-text inputs.
+// (Email length is bounded inside isValidEmail.)
+const MAX_NAME = 200;
 
 export const join = mutation({
     args: {
@@ -8,9 +13,23 @@ export const join = mutation({
         representativeName: v.string()
     },
     handler: async (ctx, args) => {
+        // Validate + normalize untrusted public input before any DB work.
+        const email = args.email.trim().toLowerCase();
+        if (!isValidEmail(email)) {
+            throw new Error("Adresse email invalide");
+        }
+        const companyName = args.companyName.trim();
+        const representativeName = args.representativeName.trim();
+        if (companyName.length > MAX_NAME || representativeName.length > MAX_NAME) {
+            throw new Error("Champ trop long");
+        }
+
+        // Abuse protection: keyed by normalized email (endpoint is public).
+        await rateLimiter.limit(ctx, "waitingListJoin", { key: email, throws: true });
+
         const existing = await ctx.db
             .query("waitingList")
-            .withIndex("by_email", (q) => q.eq("email", args.email))
+            .withIndex("by_email", (q) => q.eq("email", email))
             .first();
 
         if (existing) {
@@ -18,9 +37,9 @@ export const join = mutation({
         }
 
         await ctx.db.insert("waitingList", {
-            email: args.email,
-            companyName: args.companyName,
-            representativeName: args.representativeName,
+            email,
+            companyName,
+            representativeName,
             status: "PENDING",
             createdAt: Date.now(),
         });
@@ -35,9 +54,17 @@ export const subscribeNewsletter = mutation({
         source: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
+        const email = args.email.trim().toLowerCase();
+        if (!isValidEmail(email)) {
+            throw new Error("Adresse email invalide");
+        }
+        const source = args.source?.trim().slice(0, MAX_NAME) ?? "newsletter";
+
+        await rateLimiter.limit(ctx, "newsletterSubscribe", { key: email, throws: true });
+
         const existing = await ctx.db
             .query("waitingList")
-            .withIndex("by_email", (q) => q.eq("email", args.email))
+            .withIndex("by_email", (q) => q.eq("email", email))
             .first();
 
         if (existing) {
@@ -45,9 +72,9 @@ export const subscribeNewsletter = mutation({
         }
 
         await ctx.db.insert("waitingList", {
-            email: args.email,
+            email,
             companyName: "newsletter",
-            representativeName: args.source ?? "newsletter",
+            representativeName: source,
             status: "NEWSLETTER",
             createdAt: Date.now(),
         });
@@ -55,4 +82,3 @@ export const subscribeNewsletter = mutation({
         return { success: true, alreadySubscribed: false };
     },
 });
-

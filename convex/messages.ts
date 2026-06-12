@@ -275,11 +275,10 @@ export const send = mutation({
                 let mediaUrl: string | null | undefined = args.mediaUrl;
                 if (!mediaUrl && args.mediaStorageId) {
                     mediaUrl = await ctx.storage.getUrl(args.mediaStorageId);
-                    console.log(`[DEBUG] Resolved media URL for storageId ${args.mediaStorageId}: ${mediaUrl}`);
                 }
 
                 if (mediaUrl) {
-                    console.log(`[DEBUG] Scheduling WhatsApp message for type ${args.type} with mimeType ${args.mediaType}`);
+                    // PII: do not log the resolved media URL / payload.
                     await ctx.scheduler.runAfter(0, internal.whatsapp_actions.sendMessage, {
                         messageId,
                         organizationId: conversation.organizationId,
