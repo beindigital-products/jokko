@@ -29,8 +29,15 @@ export function VoiceNoteRecorder({ disabled, onSend }: Props) {
 
     useEffect(() => {
         return () => {
-            if (recorder.isRecording) {
-                void recorder.stop();
+            // On unmount (leaving the conversation) the native recorder may already
+            // be released; touching it then throws NativeSharedObjectNotFound. Guard
+            // every access so the cleanup can never crash the screen.
+            try {
+                if (recorder.isRecording) {
+                    void recorder.stop();
+                }
+            } catch {
+                // recorder already disposed — nothing to stop.
             }
         };
     }, [recorder]);
