@@ -40,6 +40,7 @@ import {
     Trash2,
     Reply,
     Zap, // Icon for shortcuts
+    LayoutTemplate, // Icon for templates
 } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
@@ -63,7 +64,13 @@ import {
 import { useSendMessage } from '@/hooks/useSendMessage'
 import { useTypingIndicator } from '@/hooks/useRealtime'
 import { useTeamMembers } from '@/hooks/useTeamMembers'
-import { MentionPicker } from '@/components/dashboard/inbox'
+import {
+    MentionPicker,
+    TemplatePicker,
+    TemplateVariableForm,
+    type TemplateEntry,
+    type TemplateCategory,
+} from '@/components/dashboard/inbox'
 import {
     resolveMentions,
     detectMentionQuery,
@@ -132,6 +139,65 @@ function formatFileSize(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// ── Template mode helpers ───────────────────────────────────────────────────
+
+/** A Convex `templates` doc, narrowed to what the picker renders. */
+interface TemplateDocLite {
+    _id: string
+    name: string
+    body?: string
+    category?: string
+    language?: string
+    status?: string
+}
+
+/** Map the WhatsApp category enum to the picker's lowercase union. */
+function toPickerCategory(category: string | undefined): TemplateCategory {
+    switch ((category ?? '').toUpperCase()) {
+        case 'AUTHENTICATION':
+            return 'authentication'
+        case 'UTILITY':
+            return 'utility'
+        default:
+            return 'marketing'
+    }
+}
+
+/**
+ * Adapt a Convex template doc to the picker's `TemplateEntry`. The query feeding
+ * the picker only returns APPROVED templates, so status is always "approved".
+ */
+function toTemplateEntry(doc: TemplateDocLite): TemplateEntry {
+    return {
+        id: doc._id,
+        name: doc.name,
+        body: doc.body ?? '',
+        category: toPickerCategory(doc.category),
+        language: doc.language ?? 'fr',
+        status: 'approved',
+    }
+}
+
+/**
+ * Build the WhatsApp Cloud API `components` payload from `{{N}}` body values.
+ * Parameters are ordered by their numeric index. Empty when the template has no
+ * placeholders (sendToConversation then sends the template as-is).
+ */
+function buildTemplateComponents(
+    values: Record<string, string>,
+): Array<Record<string, unknown>> {
+    const indices = Object.keys(values)
+        .filter((k) => values[k]?.trim().length)
+        .sort((a, b) => Number(a) - Number(b))
+    if (indices.length === 0) return []
+    return [
+        {
+            type: 'body',
+            parameters: indices.map((i) => ({ type: 'text', text: values[i].trim() })),
+        },
+    ]
+}
+
 // ============================================
 // COMPONENT
 // ============================================
@@ -183,9 +249,47 @@ export function MessageInput({
     const recorderRef = useRef<Mp3Recorder | null>(null)
     const recordingTimerRef = useRef<NodeJS.Timeout | null>(null)
 
+    // Template mode : pick an APPROVED template, fill its {{N}} variables, and
+    // fire it into this conversation via the existing backend mutation. Lives
+    // alongside reply/note as a transient picker overlay (never a persistent
+    // compose mode), so it touches none of the send / mode-toggle plumbing.
+    const [templateStep, setTemplateStep] = useState<'closed' | 'list' | 'form'>('closed')
+    const [pickedTemplate, setPickedTemplate] = useState<TemplateEntry | null>(null)
+    const [isSendingTemplate, setIsSendingTemplate] = useState(false)
+    const approvedTemplates = useQuery(
+        api.templates.queries.listAll,
+        templateStep !== 'closed' ? {} : 'skip',
+    )
+    const templateEntries = useMemo<TemplateEntry[]>(
+        () => ((approvedTemplates ?? []) as TemplateDocLite[]).map(toTemplateEntry),
+        [approvedTemplates],
+    )
+    const sendTemplate = useMutation(api.templates.mutations.sendToConversation)
+
     const { sendMessage, sendMedia, addInternalNote, isSending } = useSendMessage(conversationId)
     const { sendTyping } = useTypingIndicator(conversationId)
     const getDownloadUrl = useMutation(api.files.getDownloadUrl)
+
+    // Consume a template handed over from /dashboard/modeles ("Utiliser dans
+    // une conv."). The picker opens here regardless of which conversation the
+    // user lands on; selecting the preselected template happens once the
+    // APPROVED list resolves (matched by id below).
+    const templatePreselect = useComposerStore((s) => s.templatePreselect)
+    const clearTemplatePreselect = useComposerStore((s) => s.clearTemplatePreselect)
+    useEffect(() => {
+        if (!templatePreselect) return
+        // Open the picker; the preselect id is matched once the list loads.
+        setTemplateStep((step) => (step === 'closed' ? 'list' : step))
+    }, [templatePreselect])
+    useEffect(() => {
+        if (!templatePreselect || templateStep === 'closed') return
+        const match = templateEntries.find((t) => t.id === templatePreselect.templateId)
+        if (match) {
+            setPickedTemplate(match)
+            setTemplateStep('form')
+            clearTemplatePreselect()
+        }
+    }, [templatePreselect, templateEntries, templateStep, clearTemplatePreselect])
 
     // Cleanup on unmount
     useEffect(() => {
@@ -478,6 +582,34 @@ export function MessageInput({
         }, 0)
     }
 
+    // Reset the template picker to its closed state.
+    const closeTemplatePicker = () => {
+        setTemplateStep('closed')
+        setPickedTemplate(null)
+        if (templatePreselect) clearTemplatePreselect()
+    }
+
+    // Send the picked template (with filled {{N}} variables) to this
+    // conversation. Reuses the real backend mutation; honours local_only demo.
+    const handleSendTemplate = async (values: Record<string, string>) => {
+        if (!pickedTemplate || isSendingTemplate) return
+        setIsSendingTemplate(true)
+        try {
+            await sendTemplate({
+                conversationId: conversationId as Id<'conversations'>,
+                templateId: pickedTemplate.id as Id<'templates'>,
+                components: buildTemplateComponents(values),
+            })
+            toast.success('Modèle envoyé')
+            closeTemplatePicker()
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : 'Erreur inconnue'
+            toast.error(`Échec de l'envoi du modèle : ${msg}`)
+        } finally {
+            setIsSendingTemplate(false)
+        }
+    }
+
     // Send message. `disabled` (blocked contact) gates WhatsApp replies but
     // NOT internal notes — team coordination stays available on blocked contacts.
     const handleSend = async () => {
@@ -709,7 +841,70 @@ export function MessageInput({
                         Visible par l&apos;équipe uniquement · @ pour mentionner
                     </span>
                 ) : null}
+
+                {/* Template trigger — reply context only (templates are
+                    customer-facing; never an internal note). */}
+                {!isNote ? (
+                    <button
+                        type="button"
+                        onClick={() =>
+                            setTemplateStep((step) => (step === 'closed' ? 'list' : 'closed'))
+                        }
+                        disabled={effectiveDisabled}
+                        className={cn(
+                            'ml-auto inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors disabled:opacity-40',
+                            templateStep !== 'closed'
+                                ? 'bg-[var(--accent)] text-white'
+                                : 'text-[var(--ink-soft)] hover:text-[var(--ink-900)]',
+                        )}
+                    >
+                        <LayoutTemplate className="h-3.5 w-3.5" />
+                        Modèle
+                    </button>
+                ) : null}
             </div>
+
+            {/* Template picker / variable form popup (reply mode only) */}
+            <AnimatePresence>
+                {!isNote && templateStep !== 'closed' ? (
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute bottom-full left-4 right-4 mb-2 z-50"
+                    >
+                        {templateStep === 'form' && pickedTemplate ? (
+                            <TemplateVariableForm
+                                template={pickedTemplate}
+                                onCancel={() => {
+                                    setPickedTemplate(null)
+                                    setTemplateStep('list')
+                                }}
+                                onInsert={(_filledBody, values) => {
+                                    if (!isSendingTemplate) handleSendTemplate(values)
+                                }}
+                            />
+                        ) : approvedTemplates === undefined ? (
+                            <div className="flex items-center justify-center gap-2 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-4 py-6 text-[12px] text-[var(--ink-soft)] shadow-sm">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Chargement des modèles…
+                            </div>
+                        ) : templateEntries.length === 0 ? (
+                            <div className="rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-4 py-6 text-center text-[12px] text-[var(--ink-soft)] shadow-sm">
+                                Aucun modèle approuvé. Créez-en un dans Modèles.
+                            </div>
+                        ) : (
+                            <TemplatePicker
+                                templates={templateEntries}
+                                onSelect={(t) => {
+                                    setPickedTemplate(t)
+                                    setTemplateStep('form')
+                                }}
+                            />
+                        )}
+                    </motion.div>
+                ) : null}
+            </AnimatePresence>
 
             {/* @mention popup (note mode) */}
             <AnimatePresence>

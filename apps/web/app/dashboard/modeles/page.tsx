@@ -18,6 +18,7 @@ import type { TemplateCreatePayload } from '@/components/dashboard/templates/Tem
 import { mapTemplatesData, type TemplateDoc } from '@/lib/dashboard/templates-data';
 import { TemplateBuilder } from '@/components/templates/TemplateBuilder';
 import { usePermission } from '@/hooks/use-permission';
+import { useComposerStore } from '@/lib/stores/composer-store';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -69,6 +70,19 @@ export default function TemplatesPage() {
     const [syncing, setSyncing] = useState(false);
 
     const canEdit = usePermission('templates:create');
+    const preselectTemplate = useComposerStore((s) => s.preselectTemplate);
+
+    /**
+     * "Utiliser dans une conv." — hand the template over to the inbox composer
+     * (only APPROVED templates can actually be sent) and jump to the inbox,
+     * where MessageInput auto-opens the template picker pre-selected on it.
+     */
+    const handleUse = (template: TemplateRowData) => {
+        if (template.status === 'approved') {
+            preselectTemplate(template.id);
+        }
+        router.push('/dashboard/conversations');
+    };
 
     const { results, status } = usePaginatedQuery(
         api.templates.queries.list,
@@ -176,7 +190,7 @@ export default function TemplatesPage() {
                     onAdvanced={(type) => setBuilder({ type, templateId: null })}
                     onEdit={handleEdit}
                     onDelete={(template) => setToDelete(template)}
-                    onUse={() => router.push('/dashboard/conversations')}
+                    onUse={handleUse}
                 />
             )}
 

@@ -201,4 +201,19 @@ describe("templates.sendToConversation", () => {
         expect(message.status).toBe("SENT");
         expect(message.externalId).toMatch(/^demo:template:/);
     });
+
+    // Soft-deleted templates (status DELETED) must never resurface in the
+    // /dashboard/modeles list, otherwise they reappear labelled "Brouillon".
+    it("excludes DELETED templates from the list query", async () => {
+        const draftId = await setupTemplate("DRAFT");
+        await setupTemplate("DELETED");
+
+        const result = await asUser.query(api.templates.queries.list, {
+            paginationOpts: { numItems: 50, cursor: null },
+        });
+
+        const ids = result.page.map((t: any) => t._id);
+        expect(ids).toContain(draftId);
+        expect(result.page.every((t: any) => t.status !== "DELETED")).toBe(true);
+    });
 });

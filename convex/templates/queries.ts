@@ -33,25 +33,31 @@ export const list = query({
         const orgId = session.currentOrganizationId;
 
         if (args.search) {
-            // Search by name
+            // Search by name. Exclude soft-deleted templates so they don't
+            // resurface in /dashboard/modeles (status DELETED reads as a draft).
             return await ctx.db
                 .query("templates")
                 .withSearchIndex("search_templates", q =>
                     q.search("name", args.search!)
                         .eq("organizationId", orgId)
                 )
+                .filter(q => q.neq(q.field("status"), "DELETED"))
                 .paginate(args.paginationOpts);
         }
 
         let query = ctx.db
             .query("templates")
-            .withIndex("by_organization", q => q.eq("organizationId", orgId));
+            .withIndex("by_organization", q => q.eq("organizationId", orgId))
+            .filter(q => q.neq(q.field("status"), "DELETED"));
 
         if (args.type) {
             query = ctx.db
                 .query("templates")
-                .withIndex("by_org_and_type", q => q.eq("organizationId", orgId).eq("type", args.type!));
+                .withIndex("by_org_and_type", q => q.eq("organizationId", orgId).eq("type", args.type!))
+                .filter(q => q.neq(q.field("status"), "DELETED"));
         } else if (args.status) {
+            // An explicit status filter already constrains the rows; callers
+            // never request DELETED, so the index alone keeps them out.
             query = ctx.db
                 .query("templates")
                 .withIndex("by_org_and_status", q => q.eq("organizationId", orgId).eq("status", args.status!));
