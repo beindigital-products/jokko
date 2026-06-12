@@ -19,7 +19,9 @@ import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
+import * as WebBrowser from "expo-web-browser";
 import { ForwardSheet } from "./conversation/ForwardSheet";
+import { MediaViewer } from "./conversation/MediaViewer";
 import { GlassReply, type GlassReaction } from "./conversation/GlassReply";
 import { MediaPicker } from "./conversation/MediaPicker";
 import { MessageBubble, type ConversationMessage } from "./conversation/MessageBubble";
@@ -55,6 +57,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
     const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
     const [forwarding, setForwarding] = useState<ConversationMessage | null>(null);
+    const [viewingMedia, setViewingMedia] = useState<ConversationMessage | null>(null);
     const [voiceActive, setVoiceActive] = useState(false);
     const [staged, setStaged] = useState<StagedMedia[]>([]);
     const [uploading, setUploading] = useState<(StagedMedia & { progress: number })[]>([]);
@@ -348,6 +351,17 @@ export function MobileConversationScreen({ conversationId }: Props) {
         void Linking.openURL(`tel:${contactPhone.replace(/[^\d+]/g, "")}`);
     };
 
+    // Photos & videos open in the in-app full-screen viewer; documents open in
+    // the in-app browser sheet (expo-web-browser) — never bounce out to Safari.
+    const handleOpenMedia = (message: ConversationMessage) => {
+        if (!message.mediaUrl) return;
+        if (message.type === "IMAGE" || message.type === "VIDEO") {
+            setViewingMedia(message);
+        } else {
+            void WebBrowser.openBrowserAsync(message.mediaUrl).catch(() => undefined);
+        }
+    };
+
     if (!conversationId) {
         return <ConversationState title="Conversation introuvable" body="Retourne à l'inbox et sélectionne une conversation." onBack={() => router.replace("/inbox")} />;
     }
@@ -379,6 +393,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 onDelete={confirmDelete}
                 onReplyRequest={setReplyingTo}
                 onReactionRequest={openGlassReply}
+                onOpenMedia={handleOpenMedia}
             />,
         );
     }
@@ -621,6 +636,8 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 onPick={(id) => void submitForward(id)}
                 onClose={() => setForwarding(null)}
             />
+
+            <MediaViewer message={viewingMedia} onClose={() => setViewingMedia(null)} />
 
             {/* Actions menu */}
             <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>

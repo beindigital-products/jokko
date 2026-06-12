@@ -1,4 +1,4 @@
-import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon, tint, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { SwipeToReply } from "./SwipeToReply";
@@ -20,10 +20,6 @@ export type ConversationMessage = {
     reactions?: { userId: Id<"users">; emoji: string; createdAt: number }[];
 };
 
-function openMedia(url?: string | null) {
-    if (url) Linking.openURL(url).catch(() => undefined);
-}
-
 type Props = {
     message: ConversationMessage;
     replyTo?: ConversationMessage | null;
@@ -32,9 +28,10 @@ type Props = {
     onDelete?: (messageId: Id<"messages">) => void;
     onReplyRequest?: (message: ConversationMessage) => void;
     onReactionRequest?: (message: ConversationMessage) => void;
+    onOpenMedia?: (message: ConversationMessage) => void;
 };
 
-export function MessageBubble({ message, replyTo, onRetry, onEdit, onDelete, onReplyRequest, onReactionRequest }: Props) {
+export function MessageBubble({ message, replyTo, onRetry, onEdit, onDelete, onReplyRequest, onReactionRequest, onOpenMedia }: Props) {
     const theme = useTheme();
     const { colors, font } = theme;
     const outbound = message.direction === "OUTBOUND";
@@ -63,7 +60,7 @@ export function MessageBubble({ message, replyTo, onRetry, onEdit, onDelete, onR
             ]}
         >
             {replyTo ? <ReplyQuote message={replyTo} outbound={outbound} theme={theme} /> : null}
-            <BubbleContent message={message} outbound={outbound} theme={theme} failed={failed} />
+            <BubbleContent message={message} outbound={outbound} theme={theme} failed={failed} onOpenMedia={onOpenMedia} />
             {failed ? (
                 <View style={styles.failedMeta}>
                     <View style={styles.failedTag}>
@@ -162,7 +159,7 @@ function ReactionsChip({
     );
 }
 
-function BubbleContent({ message, outbound, theme, failed }: { message: ConversationMessage; outbound: boolean; theme: JokkoTheme; failed?: boolean }) {
+function BubbleContent({ message, outbound, theme, failed, onOpenMedia }: { message: ConversationMessage; outbound: boolean; theme: JokkoTheme; failed?: boolean; onOpenMedia?: (message: ConversationMessage) => void }) {
     const { colors, font } = theme;
     // The failed bubble is light (hot-tinted), so its text stays dark ink.
     const fg = failed ? colors.ink : outbound ? colors.bubbleOutInk : colors.ink;
@@ -171,7 +168,7 @@ function BubbleContent({ message, outbound, theme, failed }: { message: Conversa
     if (message.type === "IMAGE" && message.mediaUrl) {
         return (
             <View style={{ gap: 4 }}>
-                <Pressable onPress={() => openMedia(message.mediaUrl)} accessibilityRole="imagebutton" accessibilityLabel="Ouvrir la photo">
+                <Pressable onPress={() => onOpenMedia?.(message)} accessibilityRole="imagebutton" accessibilityLabel="Ouvrir la photo">
                     <Image source={{ uri: message.mediaUrl }} style={[styles.mediaImage, { backgroundColor: colors.paper2 }]} resizeMode="cover" />
                 </Pressable>
                 {message.content ? (
@@ -201,7 +198,7 @@ function BubbleContent({ message, outbound, theme, failed }: { message: Conversa
 
     if (message.type === "VIDEO") {
         return (
-            <Pressable onPress={() => openMedia(message.mediaUrl)} style={[styles.mediaTile, { backgroundColor: tileBg }]}>
+            <Pressable onPress={() => onOpenMedia?.(message)} style={[styles.mediaTile, { backgroundColor: tileBg }]}>
                 <View style={[styles.mediaTileIcon, { backgroundColor: outbound ? "rgba(242,239,232,0.12)" : colors.card }]}>
                     <Icon name="video" size={18} color={outbound ? fg : colors.accentInk} strokeWidth={1.8} />
                 </View>
@@ -217,7 +214,7 @@ function BubbleContent({ message, outbound, theme, failed }: { message: Conversa
         const meta = message.fileSize ? formatBytes(message.fileSize) : null;
         return (
             <Pressable
-                onPress={() => openMedia(message.mediaUrl)}
+                onPress={() => onOpenMedia?.(message)}
                 accessibilityRole="button"
                 accessibilityLabel={`Ouvrir ${message.fileName ?? "le document"}`}
                 style={[styles.docCard, { backgroundColor: tileBg }]}
