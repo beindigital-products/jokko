@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+    computeInboxCounts,
     filterMobileConversations,
     formatConversationTimestamp,
     getConversationDisplayName,
     getConversationInitials,
     getConversationPreview,
+    groupInboxConversations,
+    inboxMessageKind,
     type MobileConversationSearchFields,
 } from "./mobile-inbox";
 
@@ -64,5 +67,41 @@ describe("mobile inbox helpers", () => {
         expect(formatConversationTimestamp(new Date("2026-05-02T10:05:00.000Z").getTime(), now)).toBe("12:05");
         expect(formatConversationTimestamp(new Date("2026-05-01T10:05:00.000Z").getTime(), now)).toBe("Hier");
         expect(formatConversationTimestamp(new Date("2026-04-25T10:05:00.000Z").getTime(), now)).toBe("25/04");
+    });
+});
+
+describe("computeInboxCounts", () => {
+    it("counts all / unread / mine from the full set", () => {
+        expect(computeInboxCounts(conversations, "u1")).toEqual({ all: 3, unread: 1, mine: 1 });
+        expect(computeInboxCounts(conversations, null)).toEqual({ all: 3, unread: 1, mine: 0 });
+        expect(computeInboxCounts([], "u1")).toEqual({ all: 0, unread: 0, mine: 0 });
+    });
+});
+
+describe("groupInboxConversations", () => {
+    it("splits into pinned / today / earlier", () => {
+        const now = new Date("2026-05-02T12:00:00.000Z");
+        const at = (offsetMs: number): number => now.getTime() - offsetMs;
+        const rows: MobileConversationSearchFields[] = [
+            { _id: "pin", isPinned: true, lastMessageAt: at(10 * 86_400_000) },
+            { _id: "today", isPinned: false, lastMessageAt: at(2 * 3_600_000) },
+            { _id: "old", isPinned: false, lastMessageAt: at(5 * 86_400_000) },
+        ];
+        const groups = groupInboxConversations(rows, now);
+        expect(groups.pinned.map((r) => r._id)).toEqual(["pin"]);
+        expect(groups.today.map((r) => r._id)).toEqual(["today"]);
+        expect(groups.earlier.map((r) => r._id)).toEqual(["old"]);
+    });
+});
+
+describe("inboxMessageKind", () => {
+    it("detects voice / doc / image / text from a preview", () => {
+        expect(inboxMessageKind("[AUDIO]")).toBe("voice");
+        expect(inboxMessageKind("Note vocale")).toBe("voice");
+        expect(inboxMessageKind("facture.pdf")).toBe("doc");
+        expect(inboxMessageKind("Photo.jpg")).toBe("image");
+        expect(inboxMessageKind("Bonjour")).toBe("text");
+        expect(inboxMessageKind("")).toBe("text");
+        expect(inboxMessageKind(null)).toBe("text");
     });
 });

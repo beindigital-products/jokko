@@ -1,4 +1,4 @@
-export type MobileInboxFilter = "all" | "unread" | "mine";
+export type MobileInboxFilter = "all" | "unread" | "mine" | "archived";
 
 export type MobileConversationSearchFields = {
     _id: string;
@@ -99,6 +99,57 @@ export function filterMobileConversations<T extends MobileConversationSearchFiel
             }
             return b.lastMessageAt - a.lastMessageAt;
         });
+}
+
+export type InboxCounts = { all: number; unread: number; mine: number };
+
+/** Chip counts computed from the full (non-archived) conversation set. */
+export function computeInboxCounts<T extends MobileConversationSearchFields>(
+    conversations: readonly T[],
+    currentUserId?: string | null,
+): InboxCounts {
+    let unread = 0;
+    let mine = 0;
+    for (const conversation of conversations) {
+        if ((conversation.unreadCount ?? 0) > 0) unread += 1;
+        if (currentUserId && conversation.assignedTo?._id === currentUserId) mine += 1;
+    }
+    return { all: conversations.length, unread, mine };
+}
+
+export type InboxGroups<T> = { pinned: T[]; today: T[]; earlier: T[] };
+
+/**
+ * Splits a (pre-sorted) conversation list into the design's three sections:
+ * Épinglés (pinned), Aujourd'hui (today), Plus tôt (everything older).
+ */
+export function groupInboxConversations<T extends MobileConversationSearchFields>(
+    conversations: readonly T[],
+    now: Date = new Date(),
+): InboxGroups<T> {
+    const startToday = startOfDay(now).getTime();
+    const pinned: T[] = [];
+    const today: T[] = [];
+    const earlier: T[] = [];
+    for (const conversation of conversations) {
+        if (conversation.isPinned) {
+            pinned.push(conversation);
+        } else if (conversation.lastMessageAt >= startToday) {
+            today.push(conversation);
+        } else {
+            earlier.push(conversation);
+        }
+    }
+    return { pinned, today, earlier };
+}
+
+/** Coarse media hint from a message preview, to show a mic/doc/image glyph. */
+export function inboxMessageKind(preview?: string | null): "voice" | "doc" | "image" | "text" {
+    const value = (preview ?? "").toLowerCase();
+    if (/audio|vocal|\bvoc\b|note vocale|🎤/.test(value)) return "voice";
+    if (/\.pdf|document|fichier|\bdoc\b|\.docx?|\.xlsx?/.test(value)) return "doc";
+    if (/image|photo|\.jpe?g|\.png|📷/.test(value)) return "image";
+    return "text";
 }
 
 function normalizeSearch(value: string): string {

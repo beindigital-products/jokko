@@ -1,34 +1,31 @@
-import { useMemo, useState } from "react";
-import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Fragment, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "convex/react";
-import { theme } from "@jokko/tokens";
+import {
+    Avatar,
+    Btn,
+    Icon,
+    Micro,
+    NavBar,
+    NavButton,
+    SectionHead,
+    Skeleton,
+    useTheme,
+    type IconName,
+} from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 import {
+    computeInboxCounts,
     filterMobileConversations,
     formatConversationTimestamp,
     getConversationDisplayName,
-    getConversationInitials,
-    getConversationPreview,
+    groupInboxConversations,
+    inboxMessageKind,
     type MobileConversationSearchFields,
     type MobileInboxFilter,
 } from "./lib/mobile-inbox";
-
-const filters: ReadonlyArray<{ key: MobileInboxFilter; label: string }> = [
-    { key: "all", label: "Toutes" },
-    { key: "unread", label: "Non lues" },
-    { key: "mine", label: "À moi" },
-];
 
 type ConversationRowRecord = MobileConversationSearchFields & {
     _id: Id<"conversations">;
@@ -38,536 +35,458 @@ type ConversationRowRecord = MobileConversationSearchFields & {
     tags?: string[];
 };
 
+const FILTERS: { key: MobileInboxFilter; label: string }[] = [
+    { key: "all", label: "Tout" },
+    { key: "unread", label: "Non lus" },
+    { key: "mine", label: "Assignés à moi" },
+    { key: "archived", label: "Archives" },
+];
+
 export function MobileInboxScreen() {
     const router = useRouter();
+    const { colors } = useTheme();
     const session = useQuery(api.sessions.current);
     const organizations = useQuery(api.organizations.listMine);
     const [filter, setFilter] = useState<MobileInboxFilter>("all");
     const [search, setSearch] = useState("");
+    const [searchOpen, setSearchOpen] = useState(false);
 
     const activeOrganization = session?.organization ?? organizations?.[0] ?? null;
     const currentUserId = session?.membership?.userId ?? null;
-    const conversations = useQuery(
+
+    // The full (non-archived) set drives the all/unread/mine views + chip counts;
+    // archived is loaded on demand. Search + final sort are applied client-side.
+    const allConversations = useQuery(
         api.conversations.list,
-        activeOrganization
-            ? {
-                organizationId: activeOrganization._id,
-                filter,
-                search: search.trim() || undefined,
-            }
+        activeOrganization ? { organizationId: activeOrganization._id, filter: "all" } : "skip",
+    ) as ConversationRowRecord[] | undefined;
+    const archivedConversations = useQuery(
+        api.conversations.list,
+        activeOrganization && filter === "archived"
+            ? { organizationId: activeOrganization._id, filter: "archived" }
             : "skip",
-    );
+    ) as ConversationRowRecord[] | undefined;
 
+    const source = filter === "archived" ? archivedConversations : allConversations;
     const visibleConversations = useMemo(
-        () => filterMobileConversations((conversations ?? []) as ConversationRowRecord[], filter, search, currentUserId),
-        [conversations, currentUserId, filter, search],
+        () => filterMobileConversations((source ?? []) as ConversationRowRecord[], filter, search, currentUserId),
+        [source, filter, search, currentUserId],
     );
-
-    const unreadCount = useMemo(
-        () => (conversations ?? []).reduce((total, conversation) => total + (conversation.unreadCount ?? 0), 0),
-        [conversations],
+    const counts = useMemo(
+        () => computeInboxCounts((allConversations ?? []) as ConversationRowRecord[], currentUserId),
+        [allConversations, currentUserId],
     );
+    const groups = useMemo(() => groupInboxConversations(visibleConversations), [visibleConversations]);
+    const breathingId = groups.today[0]?._id;
 
-    const isLoading = session === undefined || organizations === undefined || conversations === undefined;
+    const isBootstrapping = session === undefined && organizations === undefined;
+    const isListLoading = filter === "archived" ? archivedConversations === undefined : allConversations === undefined;
 
-    if (!activeOrganization && (session === undefined || organizations === undefined)) {
-        return <LoadingState />;
-    }
+    const openConversation = (id: string) =>
+        router.push({ pathname: "/conversations/[id]", params: { id } } as never);
 
     if (!activeOrganization) {
+        if (isBootstrapping) return <InboxLoading />;
         return (
-            <EmptyInboxState
+            <InboxMessage
+                icon="inbox"
                 title="Aucun espace actif"
-                body="Crée ou rejoins un espace Jokko pour ouvrir l'inbox mobile."
-                primaryLabel="Lancer l'onboarding"
-                onPrimary={() => router.replace("/onboarding")}
-                secondaryLabel="Réglages"
-                onSecondary={() => router.push("/settings")}
+                body="Créez ou rejoignez un espace Jokko pour ouvrir l'inbox."
+                cta="Lancer l'onboarding"
+                onCta={() => router.replace("/onboarding")}
             />
         );
     }
 
     return (
-        <View style={styles.root}>
-            <View style={styles.header}>
-                <View style={styles.headerTop}>
-                    <View style={styles.headerTitleBlock}>
-                        <Text style={styles.orgName}>{activeOrganization.name}</Text>
-                        <Text style={styles.title}>Inbox</Text>
+        <View style={[styles.root, { backgroundColor: colors.paper }]}>
+            <NavBar
+                large
+                eyebrow={`${activeOrganization.name} · ${counts.all} ${counts.all === 1 ? "ouverte" : "ouvertes"}`}
+                title="Inbox"
+                right={
+                    <>
+                        <NavButton icon="search" onPress={() => setSearchOpen((open) => !open)} />
+                        <NavButton icon="filter" onPress={() => setSearchOpen((open) => !open)} />
+                    </>
+                }
+            />
+
+            {searchOpen ? (
+                <View style={styles.searchWrap}>
+                    <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.rule }]}>
+                        <Icon name="search" size={18} color={colors.mute} />
+                        <TextInput
+                            value={search}
+                            onChangeText={setSearch}
+                            placeholder="Rechercher un contact, un message…"
+                            placeholderTextColor={colors.mute}
+                            style={[styles.searchInput, { color: colors.ink }]}
+                            autoFocus
+                            returnKeyType="search"
+                        />
+                        {search.length > 0 ? (
+                            <Pressable onPress={() => setSearch("")} hitSlop={8}>
+                                <Icon name="close" size={16} color={colors.mute} />
+                            </Pressable>
+                        ) : null}
                     </View>
-                    <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Ouvrir les réglages"
-                        onPress={() => router.push("/settings")}
-                        hitSlop={10}
-                        style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-                    >
-                        <Ionicons name="settings-outline" size={20} color={theme.ink[900]} />
-                    </Pressable>
                 </View>
+            ) : null}
 
-                <View style={styles.statsRow}>
-                    <StatusPill icon="chatbubbles-outline" label={`${visibleConversations.length} conversations`} />
-                    <StatusPill icon="radio-button-on-outline" label={`${unreadCount} non lues`} accent={unreadCount > 0} />
-                </View>
-
-                <View style={styles.searchBox}>
-                    <Ionicons name="search" size={18} color={theme.ink[500]} />
-                    <TextInput
-                        value={search}
-                        onChangeText={setSearch}
-                        placeholder="Rechercher un contact"
-                        placeholderTextColor={theme.ink[500]}
-                        style={styles.searchInput}
-                        returnKeyType="search"
-                    />
-                </View>
-
-                <View style={styles.filters}>
-                    {filters.map((item) => (
-                        <Pressable
-                            key={item.key}
-                            accessibilityRole="button"
-                            onPress={() => setFilter(item.key)}
-                            style={({ pressed }) => [
-                                styles.filterButton,
-                                filter === item.key && styles.filterButtonActive,
-                                pressed && styles.pressed,
-                            ]}
-                        >
-                            <Text style={[styles.filterText, filter === item.key && styles.filterTextActive]}>
-                                {item.label}
-                            </Text>
-                        </Pressable>
-                    ))}
-                </View>
+            <View style={styles.chipsWrap}>
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.chips}
+                    keyboardShouldPersistTaps="handled"
+                >
+                    {FILTERS.map((item) => {
+                        const count =
+                            item.key === "all"
+                                ? counts.all
+                                : item.key === "unread"
+                                  ? counts.unread
+                                  : item.key === "mine"
+                                    ? counts.mine
+                                    : archivedConversations?.length;
+                        return (
+                            <FilterChip
+                                key={item.key}
+                                label={item.label}
+                                count={count}
+                                active={filter === item.key}
+                                onPress={() => setFilter(item.key)}
+                            />
+                        );
+                    })}
+                </ScrollView>
             </View>
 
-            {isLoading ? (
-                <LoadingState />
+            {isListLoading ? (
+                <InboxSkeleton />
             ) : visibleConversations.length === 0 ? (
-                <EmptyInboxState
-                    title={search ? "Aucun résultat" : "Aucune conversation"}
-                    body={search ? "Essaie un nom, un numéro ou un extrait de message différent." : "Connecte WhatsApp Business ou attends le premier message entrant."}
-                    primaryLabel="Configurer WhatsApp"
-                    onPrimary={() => router.replace("/onboarding")}
-                    secondaryLabel="Voir les réglages"
-                    onSecondary={() => router.push("/settings")}
+                <InboxMessage
+                    icon={search ? "search" : "inbox"}
+                    title={search ? "Aucun résultat" : filter === "archived" ? "Aucune archive" : "Aucune conversation"}
+                    body={
+                        search
+                            ? "Essayez un autre nom, numéro ou extrait de message."
+                            : "Connectez WhatsApp Business ou attendez le premier message entrant."
+                    }
+                    cta={search ? undefined : "Configurer WhatsApp"}
+                    onCta={search ? undefined : () => router.replace("/onboarding")}
                 />
             ) : (
-                <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
-                    {visibleConversations.map((conversation) => (
-                        <ConversationRow
-                            key={conversation._id}
-                            conversation={conversation}
-                            onPress={() => router.push({
-                                pathname: "/conversations/[id]",
-                                params: { id: conversation._id },
-                            } as never)}
-                        />
-                    ))}
+                <ScrollView
+                    contentContainerStyle={styles.list}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    <Section title="Épinglés" rows={groups.pinned} breathingId={breathingId} onOpen={openConversation} />
+                    <Section title="Aujourd'hui" rows={groups.today} breathingId={breathingId} onOpen={openConversation} />
+                    <Section title="Plus tôt" rows={groups.earlier} breathingId={breathingId} onOpen={openConversation} count={false} />
                 </ScrollView>
             )}
         </View>
     );
 }
 
-function LoadingState() {
-    return (
-        <View style={styles.loading}>
-            <ActivityIndicator color={theme.accent.primary} />
-        </View>
-    );
-}
-
-function EmptyInboxState({
+function Section({
     title,
-    body,
-    primaryLabel,
-    secondaryLabel,
-    onPrimary,
-    onSecondary,
+    rows,
+    breathingId,
+    onOpen,
+    count = true,
 }: {
     title: string;
-    body: string;
-    primaryLabel: string;
-    secondaryLabel: string;
-    onPrimary: () => void;
-    onSecondary: () => void;
+    rows: ConversationRowRecord[];
+    breathingId?: string;
+    onOpen: (id: string) => void;
+    count?: boolean;
 }) {
+    if (rows.length === 0) return null;
     return (
-        <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-                <Ionicons name="mail-open-outline" size={28} color={theme.accent.primary} />
-            </View>
-            <Text style={styles.emptyTitle}>{title}</Text>
-            <Text style={styles.emptyBody}>{body}</Text>
-            <Pressable accessibilityRole="button" onPress={onPrimary} style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}>
-                <Text style={styles.primaryActionText}>{primaryLabel}</Text>
-                <Ionicons name="arrow-forward" size={18} color="#fff" />
-            </Pressable>
-            <Pressable accessibilityRole="button" onPress={onSecondary} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}>
-                <Text style={styles.secondaryActionText}>{secondaryLabel}</Text>
-            </Pressable>
-        </View>
+        <Fragment>
+            <SectionHead>{count ? `${title} · ${rows.length}` : title}</SectionHead>
+            {rows.map((conversation) => (
+                <InboxRow
+                    key={conversation._id}
+                    conversation={conversation}
+                    breathing={conversation._id === breathingId}
+                    onPress={() => onOpen(conversation._id)}
+                />
+            ))}
+        </Fragment>
     );
 }
 
-function ConversationRow({ conversation, onPress }: { conversation: ConversationRowRecord; onPress: () => void }) {
-    const unreadCount = conversation.unreadCount ?? 0;
+function InboxRow({
+    conversation,
+    breathing,
+    onPress,
+}: {
+    conversation: ConversationRowRecord;
+    breathing: boolean;
+    onPress: () => void;
+}) {
+    const { colors, font } = useTheme();
+    const unread = conversation.unreadCount ?? 0;
+    const name = getConversationDisplayName(conversation);
+    const time = formatConversationTimestamp(conversation.lastMessageAt);
+    const preview = conversation.preview?.trim() || "Aucun message pour le moment";
     const isOutbound = conversation.lastMessageDirection === "OUTBOUND";
+    const kind = inboxMessageKind(conversation.preview);
+    const assignee = conversation.assignedTo?.user?.name;
+    const kindIcon: IconName | null =
+        kind === "voice" ? "mic" : kind === "doc" ? "doc" : kind === "image" ? "image" : null;
 
     return (
         <Pressable
-            accessibilityRole="button"
             onPress={onPress}
-            style={({ pressed }) => [styles.conversationRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+                styles.row,
+                { borderBottomColor: colors.rule2 },
+                breathing
+                    ? { backgroundColor: colors.accentSoft }
+                    : pressed
+                      ? { backgroundColor: colors.paper2 }
+                      : null,
+            ]}
         >
-            <View style={[styles.avatar, unreadCount > 0 && styles.avatarUnread]}>
-                <Text style={styles.avatarText}>{getConversationInitials(conversation)}</Text>
-            </View>
-            <View style={styles.conversationText}>
-                <View style={styles.conversationTitleRow}>
-                    <Text style={styles.conversationTitle} numberOfLines={1}>
-                        {getConversationDisplayName(conversation)}
-                    </Text>
-                    <Text style={styles.timeText}>{formatConversationTimestamp(conversation.lastMessageAt)}</Text>
-                </View>
-                <View style={styles.previewRow}>
-                    {isOutbound ? <Ionicons name="return-up-forward-outline" size={13} color={theme.ink[500]} /> : null}
-                    <Text style={styles.previewText} numberOfLines={1}>
-                        {getConversationPreview(conversation)}
-                    </Text>
-                </View>
-                <View style={styles.metaLine}>
-                    <Text style={styles.channelText}>{conversation.channel}</Text>
-                    {conversation.assignedTo?.user?.name ? (
-                        <Text style={styles.assigneeText} numberOfLines={1}>
-                            {conversation.assignedTo.user.name}
+            {breathing ? <View style={[styles.breathBar, { backgroundColor: colors.accent }]} /> : null}
+            <Avatar name={name} size={48} />
+            <View style={styles.rowBody}>
+                <View style={styles.rowTop}>
+                    <View style={styles.rowName}>
+                        <Text
+                            numberOfLines={1}
+                            style={{
+                                fontSize: 15.5,
+                                fontFamily: unread > 0 ? font.sansSemibold : font.sansMedium,
+                                color: colors.ink,
+                                letterSpacing: -0.15,
+                            }}
+                        >
+                            {name}
                         </Text>
-                    ) : (
-                        <Text style={styles.assigneeText}>Non assignée</Text>
-                    )}
-                </View>
-            </View>
-            <View style={styles.rowTrailing}>
-                {conversation.isPinned ? <Ionicons name="bookmark" size={14} color={theme.accent.primary} /> : null}
-                {unreadCount > 0 ? (
-                    <View style={styles.unreadBadge}>
-                        <Text style={styles.unreadText}>{unreadCount > 99 ? "99+" : unreadCount}</Text>
+                        {conversation.isPinned ? <Icon name="pin" size={11} color={colors.mute} strokeWidth={2} /> : null}
                     </View>
-                ) : null}
-                <Ionicons name="chevron-forward" size={18} color={theme.ink[500]} />
+                    <Text
+                        style={{
+                            fontFamily: font.mono,
+                            fontSize: 11.5,
+                            color: unread > 0 ? colors.accentInk : colors.mute,
+                        }}
+                    >
+                        {time}
+                    </Text>
+                </View>
+                <View style={styles.rowBottom}>
+                    <View style={styles.previewWrap}>
+                        {isOutbound ? <Icon name="check-double" size={14} color={colors.mute} strokeWidth={2} /> : null}
+                        {kindIcon ? (
+                            <Icon name={kindIcon} size={14} color={kind === "voice" ? colors.accentInk : colors.mute} strokeWidth={2} />
+                        ) : null}
+                        <Text
+                            numberOfLines={1}
+                            style={{
+                                flex: 1,
+                                fontSize: 13.5,
+                                color: unread > 0 ? colors.ink2 : colors.mute,
+                                fontFamily: font.sans,
+                            }}
+                        >
+                            {preview}
+                        </Text>
+                    </View>
+                    <View style={styles.rowTrailing}>
+                        {assignee ? (
+                            <View style={[styles.assignee, { backgroundColor: colors.ink }]}>
+                                <Text style={{ color: colors.paper, fontSize: 9.5, fontFamily: font.sansSemibold }}>
+                                    {assignee[0]?.toUpperCase()}
+                                </Text>
+                            </View>
+                        ) : null}
+                        {unread > 0 ? (
+                            <View style={[styles.unreadBadge, { backgroundColor: colors.accent }]}>
+                                <Text style={{ color: "#fff", fontSize: 10.5, fontFamily: font.monoMedium }}>
+                                    {unread > 99 ? "99+" : unread}
+                                </Text>
+                            </View>
+                        ) : null}
+                    </View>
+                </View>
             </View>
         </Pressable>
     );
 }
 
-function StatusPill({ icon, label, accent = false }: { icon: keyof typeof Ionicons.glyphMap; label: string; accent?: boolean }) {
+function FilterChip({
+    label,
+    count,
+    active,
+    onPress,
+}: {
+    label: string;
+    count?: number;
+    active: boolean;
+    onPress: () => void;
+}) {
+    const { colors, font } = useTheme();
     return (
-        <View style={[styles.statusPill, accent && styles.statusPillAccent]}>
-            <Ionicons name={icon} size={14} color={accent ? theme.accent.primary : theme.ink[500]} />
-            <Text style={[styles.statusPillText, accent && styles.statusPillTextAccent]}>{label}</Text>
+        <Pressable
+            onPress={onPress}
+            accessibilityRole="button"
+            style={[
+                styles.chip,
+                active
+                    ? { backgroundColor: colors.ink }
+                    : { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.rule },
+            ]}
+        >
+            <Text style={{ fontSize: 13, fontFamily: font.sansMedium, color: active ? colors.paper : colors.ink3 }}>
+                {label}
+            </Text>
+            {typeof count === "number" ? (
+                <Text
+                    style={{
+                        fontSize: 12,
+                        fontFamily: font.mono,
+                        color: active ? colors.paper : colors.mute,
+                        opacity: 0.6,
+                    }}
+                >
+                    {count}
+                </Text>
+            ) : null}
+        </Pressable>
+    );
+}
+
+function InboxSkeleton() {
+    const { colors } = useTheme();
+    return (
+        <View style={{ paddingTop: 8 }}>
+            {[0, 1, 2, 3, 4, 5].map((i) => (
+                <View key={i} style={[styles.row, { borderBottomColor: colors.rule2 }]}>
+                    <Skeleton w={48} h={48} r={24} />
+                    <View style={[styles.rowBody, { gap: 8 }]}>
+                        <Skeleton w="55%" h={13} />
+                        <Skeleton w="80%" h={11} />
+                    </View>
+                </View>
+            ))}
+        </View>
+    );
+}
+
+function InboxLoading() {
+    const { colors } = useTheme();
+    return <View style={[styles.center, { backgroundColor: colors.paper }]} />;
+}
+
+function InboxMessage({
+    icon,
+    title,
+    body,
+    cta,
+    onCta,
+}: {
+    icon: IconName;
+    title: string;
+    body: string;
+    cta?: string;
+    onCta?: () => void;
+}) {
+    const { colors, font } = useTheme();
+    return (
+        <View style={[styles.center, { backgroundColor: colors.paper }]}>
+            <View style={[styles.emptyIcon, { backgroundColor: colors.paper2, borderColor: colors.rule }]}>
+                <Icon name={icon} size={26} color={colors.ink3} />
+            </View>
+            <Text style={{ fontSize: 20, fontFamily: font.display, color: colors.ink, marginTop: 18, letterSpacing: -0.4 }}>
+                {title}
+            </Text>
+            <Text
+                style={{
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: colors.mute,
+                    fontFamily: font.sans,
+                    textAlign: "center",
+                    marginTop: 8,
+                    maxWidth: 280,
+                }}
+            >
+                {body}
+            </Text>
+            {cta && onCta ? (
+                <Btn tone="primary" size="md" iconRight="arrow-right" onPress={onCta} style={{ marginTop: 22 }}>
+                    {cta}
+                </Btn>
+            ) : null}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    root: {
-        flex: 1,
-        backgroundColor: theme.surface.default,
-    },
-    header: {
-        paddingHorizontal: theme.spacing.xl,
-        paddingTop: theme.spacing.xl,
-        paddingBottom: theme.spacing.lg,
-        backgroundColor: theme.surface.default,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.ink[300],
-    },
-    headerTop: {
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: theme.spacing.lg,
-    },
-    headerTitleBlock: {
-        flex: 1,
-        minWidth: 0,
-    },
-    orgName: {
-        fontSize: 13,
-        lineHeight: 18,
-        color: theme.accent.primary,
-        fontWeight: "800",
-        textTransform: "uppercase",
-    },
-    title: {
-        marginTop: theme.spacing.xs,
-        fontSize: 32,
-        lineHeight: 38,
-        color: theme.ink[900],
-        fontWeight: "800",
-    },
-    iconButton: {
-        width: 42,
-        height: 42,
-        borderRadius: theme.radius.md,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    statsRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: theme.spacing.sm,
-        marginTop: theme.spacing.lg,
-    },
-    statusPill: {
-        minHeight: 30,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.md,
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    statusPillAccent: {
-        borderColor: theme.accent.primary,
-    },
-    statusPillText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: theme.ink[500],
-    },
-    statusPillTextAccent: {
-        color: theme.accent.primary,
-    },
+    root: { flex: 1 },
+    searchWrap: { paddingHorizontal: 18, paddingBottom: 10 },
     searchBox: {
-        minHeight: 46,
-        marginTop: theme.spacing.lg,
         flexDirection: "row",
         alignItems: "center",
-        gap: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.md,
-        borderRadius: theme.radius.lg,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    searchInput: {
-        flex: 1,
-        minWidth: 0,
-        fontSize: 15,
-        color: theme.ink[900],
-        paddingVertical: theme.spacing.sm,
-    },
-    filters: {
-        flexDirection: "row",
-        gap: theme.spacing.sm,
-        marginTop: theme.spacing.md,
-    },
-    filterButton: {
-        minHeight: 36,
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: theme.radius.pill,
-        paddingHorizontal: theme.spacing.md,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    filterButtonActive: {
-        backgroundColor: theme.ink[900],
-        borderColor: theme.ink[900],
-    },
-    filterText: {
-        fontSize: 13,
-        fontWeight: "800",
-        color: theme.ink[500],
-    },
-    filterTextActive: {
-        color: "#fff",
-    },
-    listContent: {
-        padding: theme.spacing.md,
-    },
-    conversationRow: {
-        minHeight: 92,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.md,
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.sm,
-        borderRadius: theme.radius.lg,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    avatar: {
-        width: 48,
-        height: 48,
-        borderRadius: 18,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.sunken,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    avatarUnread: {
-        borderColor: theme.accent.primary,
-        backgroundColor: "#EEF2FF",
-    },
-    avatarText: {
-        fontSize: 14,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    conversationText: {
-        flex: 1,
-        minWidth: 0,
-    },
-    conversationTitleRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-    },
-    conversationTitle: {
-        flex: 1,
-        minWidth: 0,
-        fontSize: 16,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    timeText: {
-        fontSize: 12,
-        color: theme.ink[500],
-        fontWeight: "700",
-    },
-    previewRow: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.xs,
-        marginTop: 4,
-    },
-    previewText: {
-        flex: 1,
-        minWidth: 0,
-        fontSize: 14,
-        lineHeight: 20,
-        color: theme.ink[500],
-    },
-    metaLine: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-        marginTop: theme.spacing.xs,
-    },
-    channelText: {
-        fontSize: 11,
-        fontWeight: "800",
-        color: theme.accent.primary,
-        textTransform: "uppercase",
-    },
-    assigneeText: {
-        flex: 1,
-        minWidth: 0,
-        fontSize: 11,
-        color: theme.ink[500],
-        fontWeight: "700",
-    },
-    rowTrailing: {
-        minWidth: 30,
-        alignItems: "flex-end",
-        gap: theme.spacing.xs,
-    },
-    unreadBadge: {
-        minWidth: 24,
-        height: 24,
+        gap: 10,
+        height: 46,
+        paddingHorizontal: 14,
         borderRadius: 12,
-        alignItems: "center",
-        justifyContent: "center",
-        paddingHorizontal: theme.spacing.xs,
-        backgroundColor: theme.accent.primary,
-    },
-    unreadText: {
-        color: "#fff",
-        fontSize: 11,
-        fontWeight: "800",
-    },
-    emptyState: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: theme.spacing.xl,
-        backgroundColor: theme.surface.default,
-    },
-    emptyIcon: {
-        width: 68,
-        height: 68,
-        borderRadius: 22,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.raised,
         borderWidth: 1,
-        borderColor: theme.ink[300],
-        marginBottom: theme.spacing.lg,
     },
-    emptyTitle: {
-        fontSize: 24,
-        lineHeight: 30,
-        fontWeight: "800",
-        color: theme.ink[900],
-        textAlign: "center",
-    },
-    emptyBody: {
-        marginTop: theme.spacing.sm,
-        marginBottom: theme.spacing.xl,
-        maxWidth: 320,
-        fontSize: 15,
-        lineHeight: 22,
-        color: theme.ink[500],
-        textAlign: "center",
-    },
-    primaryAction: {
-        minHeight: 50,
-        alignSelf: "stretch",
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.ink[900],
-        alignItems: "center",
-        justifyContent: "center",
+    searchInput: { flex: 1, fontSize: 15, padding: 0 },
+    chipsWrap: { paddingBottom: 12 },
+    chips: { paddingHorizontal: 18, gap: 8, flexDirection: "row" },
+    chip: {
         flexDirection: "row",
-        gap: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.lg,
-        marginBottom: theme.spacing.sm,
+        alignItems: "center",
+        gap: 6,
+        height: 32,
+        paddingHorizontal: 12,
+        borderRadius: 999,
     },
-    primaryActionText: {
-        color: "#fff",
-        fontSize: 15,
-        fontWeight: "800",
+    list: { paddingBottom: 20 },
+    row: {
+        flexDirection: "row",
+        gap: 12,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        alignItems: "flex-start",
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        position: "relative",
     },
-    secondaryAction: {
-        minHeight: 46,
-        alignSelf: "stretch",
+    breathBar: { position: "absolute", top: 0, bottom: 0, left: 0, width: 3 },
+    rowBody: { flex: 1, minWidth: 0 },
+    rowTop: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
+    rowName: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
+    rowBottom: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginTop: 3 },
+    previewWrap: { flexDirection: "row", alignItems: "center", gap: 5, flex: 1, minWidth: 0 },
+    rowTrailing: { flexDirection: "row", alignItems: "center", gap: 6 },
+    assignee: { width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+    unreadBadge: {
+        minWidth: 18,
+        height: 18,
+        paddingHorizontal: 5,
+        borderRadius: 9,
         alignItems: "center",
         justifyContent: "center",
     },
-    secondaryActionText: {
-        color: theme.accent.primary,
-        fontSize: 14,
-        fontWeight: "800",
-    },
-    loading: {
-        flex: 1,
+    center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+    emptyIcon: {
+        width: 64,
+        height: 64,
+        borderRadius: 20,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: theme.surface.default,
-    },
-    pressed: {
-        opacity: 0.65,
+        borderWidth: 1,
     },
 });

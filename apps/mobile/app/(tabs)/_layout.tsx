@@ -15,7 +15,7 @@ function tabIcon(name: IconName) {
 
 export default function TabsLayout() {
     return (
-        <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: theme.surface.default }}>
+        <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: theme.paper.white }}>
             <Tabs
                 screenOptions={{
                     headerShown: false,
