@@ -21,12 +21,21 @@ test.describe("Contacts v3", () => {
         await expect(main.getByRole("button", { name: /Nouveau/ })).toBeVisible()
         await expect(main.getByRole("button", { name: /Importer/ })).toBeVisible()
 
-        // Either the table has rows or the empty state shows.
-        const rows = main.locator("tbody tr")
+        // Either the v3 table has rows or the empty state shows. The v3
+        // ContactsTable is a CSS-grid (div role="button" rows, not a <table>),
+        // so detect rows via the per-row select checkbox. `networkidle` fires
+        // before the Convex websocket query resolves, so poll until the list
+        // settles into one of the two states (avoids the loading-skeleton race).
+        const rows = main.locator('input[type="checkbox"][aria-label^="Sélectionner"]')
         const empty = main.getByText(/annuaire est vide|Aucun contact/)
-        const hasRows = (await rows.count()) > 0
-        const hasEmpty = await empty.isVisible().catch(() => false)
-        expect(hasRows || hasEmpty).toBeTruthy()
+        await expect
+            .poll(
+                async () =>
+                    (await rows.count()) > 0 ||
+                    (await empty.isVisible().catch(() => false)),
+                { timeout: 10000 },
+            )
+            .toBe(true)
 
         expect(errors, `runtime errors on /dashboard/contacts: ${errors.join(" | ")}`).toEqual([])
     })
@@ -66,9 +75,13 @@ test.describe("Contacts v3", () => {
     test("clicking a contact opens the v3 detail drawer", async ({ page }) => {
         await page.goto("/dashboard/contacts")
         await page.waitForLoadState("networkidle")
-        const rows = page.locator("#main-content tbody tr")
-        test.skip((await rows.count()) === 0, "Compte de test sans contact")
-        await rows.first().click()
+        // v3 rows are CSS-grid divs (role="button"); target them via the
+        // per-row select checkbox, then click the row it belongs to.
+        const rowCheckboxes = page.locator(
+            '#main-content input[type="checkbox"][aria-label^="Sélectionner"]',
+        )
+        test.skip((await rowCheckboxes.count()) === 0, "Compte de test sans contact")
+        await rowCheckboxes.first().locator("xpath=ancestor::*[@role='button'][1]").click()
         const drawer = page.getByRole("dialog")
         await expect(drawer.getByText("Informations")).toBeVisible()
     })

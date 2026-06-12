@@ -5,7 +5,14 @@ import { test, expect, Page } from '@playwright/test';
 // - Essai expiré + pas de plan = tout verrouillé
 // - Essai expiré + plan choisi = features selon rank du plan
 
-const BASE_URL = 'https://be-in-digital.localhost:1000';
+// Empty → use the configured baseURL (https://localhost:1000) where the shared
+// auth cookie applies. The redesign dropped the per-org subdomain hop, so the
+// old be-in-digital.localhost host now lands on the sign-in page (unauthenticated).
+const BASE_URL = '';
+
+// A FeatureGate (either the billing or the plan variant) renders one of these
+// CTAs when a feature is locked for the current plan.
+const GATE_CTA = /voir les plans|passer au plan|plan .+ requis|débloquer/i;
 
 async function gotoOrSkip(page: Page, path: string) {
     await page.goto(`${BASE_URL}${path}`);
@@ -25,6 +32,25 @@ async function gotoOrSkip(page: Page, path: string) {
     }
 }
 
+/**
+ * A FeatureGate first renders a "Chargement…" frame while `useFeatureAccess`
+ * resolves, then either the gated content or an upgrade CTA. Poll until one of
+ * the two terminal states is reached (rides through the loading frame; tolerant
+ * of the Convex websocket query resolving well after `networkidle`).
+ */
+async function expectFeatureContentOrGate(page: Page, contentHeading: string) {
+    const content = page.getByRole('heading', { name: contentHeading });
+    const gateCta = page.getByText(GATE_CTA).first();
+    await expect
+        .poll(
+            async () =>
+                (await content.isVisible().catch(() => false)) ||
+                (await gateCta.isVisible().catch(() => false)),
+            { timeout: 15000 },
+        )
+        .toBe(true);
+}
+
 test.describe('Plan gating — trial & feature badges', () => {
     test('dashboard affiche le badge de plan ou countdown d\'essai dans la sidebar', async ({ page }) => {
         await gotoOrSkip(page, '/dashboard');
@@ -38,38 +64,20 @@ test.describe('Plan gating — trial & feature badges', () => {
 
     test('page campagnes : badge tier OU FeatureGate actif', async ({ page }) => {
         await gotoOrSkip(page, '/dashboard/campagnes');
-
-        const badge = page.locator('text=/BUSINESS|Inclus|Essai · |requis/i').first();
-        const gateCta = page.locator('text=/choisir un plan|mettre à niveau|débloquer cette/i').first();
-
-        const badgeVisible = await badge.isVisible({ timeout: 5000 }).catch(() => false);
-        const gateVisible = await gateCta.isVisible({ timeout: 5000 }).catch(() => false);
-
-        expect(badgeVisible || gateVisible).toBeTruthy();
+        // Gating is wired either way: the feature is unlocked (the Campagnes
+        // screen renders) OR locked (a FeatureGate upgrade CTA shows).
+        await expectFeatureContentOrGate(page, 'Campagnes');
     });
 
     test('page flows : badge PRO OU FeatureGate actif', async ({ page }) => {
+        // /dashboard/flows now redirects (308) to /dashboard/automatisations.
         await gotoOrSkip(page, '/dashboard/flows');
-
-        const proBadge = page.locator('text=/PRO/i').first();
-        const gateCta = page.locator('text=/choisir un plan|mettre à niveau|débloquer cette|PRO requis/i').first();
-
-        const badgeVisible = await proBadge.isVisible({ timeout: 5000 }).catch(() => false);
-        const gateVisible = await gateCta.isVisible({ timeout: 5000 }).catch(() => false);
-
-        expect(badgeVisible || gateVisible).toBeTruthy();
+        await expectFeatureContentOrGate(page, 'Automatisations');
     });
 
     test('page automatisations (chatbot) : badge BUSINESS OU gate', async ({ page }) => {
         await gotoOrSkip(page, '/dashboard/automatisations');
-
-        const businessBadge = page.locator('text=/BUSINESS/i').first();
-        const gateCta = page.locator('text=/choisir un plan|mettre à niveau|débloquer cette/i').first();
-
-        const badgeVisible = await businessBadge.isVisible({ timeout: 5000 }).catch(() => false);
-        const gateVisible = await gateCta.isVisible({ timeout: 5000 }).catch(() => false);
-
-        expect(badgeVisible || gateVisible).toBeTruthy();
+        await expectFeatureContentOrGate(page, 'Automatisations');
     });
 
     test('page billing : info de plan / essai visible', async ({ page }) => {

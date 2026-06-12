@@ -46,14 +46,23 @@ test.describe("Modèles v3", () => {
         await page.goto("/dashboard/modeles")
         await page.waitForLoadState("networkidle")
         await page.locator("#main-content").getByRole("button", { name: /Nouveau modèle/ }).click()
-        await expect(page.getByText(/Choisissez le type/)).toBeVisible()
+        // v3: "Nouveau modèle" opens the 5-step creation wizard directly at
+        // step 1 ("Configurez le modèle") rather than a standalone type picker.
+        await expect(page.getByText(/Étape 1 · réglages/)).toBeVisible()
+        await expect(page.getByRole("heading", { name: /Configurez le modèle/ })).toBeVisible()
     })
 
     test("picking an advanced type offers the legacy builder", async ({ page }) => {
         await page.goto("/dashboard/modeles")
         await page.waitForLoadState("networkidle")
         await page.locator("#main-content").getByRole("button", { name: /Nouveau modèle/ }).click()
+        // The wizard's advanced formats are behind the "Format avancé" link on
+        // step 1; it opens the advanced-type grid (Carrousel, liste, catalogue…).
+        await page.getByRole("button", { name: /Format avancé/i }).click()
+        await expect(page.getByRole("heading", { name: /Carrousel, liste, catalogue/i })).toBeVisible()
+        // Selecting an advanced type (Catalogue) hands off to the full-page
+        // legacy builder (its "Retour aux modèles" back button is the marker).
         await page.getByRole("button", { name: /Catalogue/ }).click()
-        await expect(page.getByRole("button", { name: /éditeur avancé/i })).toBeVisible()
+        await expect(page.getByRole("button", { name: /Retour aux modèles/i })).toBeVisible()
     })
 })

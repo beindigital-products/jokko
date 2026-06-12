@@ -22,14 +22,22 @@ test.describe("Mentions v3", () => {
         await expect(main.getByRole("heading", { name: "Mentions" })).toBeVisible()
         await expect(main.getByText("Inbox · mentions")).toBeVisible()
 
-        // Either the empty state or at least one mention card is shown.
+        // Either the empty state or at least one mention card is shown. The
+        // Convex `mentions.feed` query resolves after `networkidle`, so poll
+        // until the body settles into one of the two states (de-flakes the
+        // loading-frame race).
         const empty = main.getByText("Aucune mention")
         const cards = main.getByRole("button", { name: "Répondre" }).or(
             main.getByRole("link", { name: "Répondre" }),
         )
-        const hasEmpty = await empty.isVisible().catch(() => false)
-        const cardCount = await cards.count()
-        expect(hasEmpty || cardCount > 0).toBeTruthy()
+        await expect
+            .poll(
+                async () =>
+                    (await empty.isVisible().catch(() => false)) ||
+                    (await cards.count()) > 0,
+                { timeout: 10000 },
+            )
+            .toBe(true)
 
         expect(errors, `runtime errors on /dashboard/mentions: ${errors.join(" | ")}`).toEqual([])
     })

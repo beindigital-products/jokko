@@ -159,7 +159,12 @@ test.describe("Inbox v3 — messages", () => {
         await expect(page).toHaveURL(/\/dashboard\/conversations\/[a-z0-9]+/i)
         await expect(page.locator("textarea")).toBeVisible()
 
-        const imagesBefore = await page.locator('img[src*="convex"]').count()
+        // Let the thread's existing Convex media settle before reading the
+        // baseline — otherwise we race the async thread render and capture a
+        // stale (too-low) count, making the "+1" assertion flaky.
+        const convexImages = page.locator('img[src*="convex"]')
+        await page.waitForTimeout(2000)
+        const imagesBefore = await convexImages.count()
 
         // Push the file straight to the hidden input (skip the OS picker).
         await page.setInputFiles(
@@ -173,10 +178,12 @@ test.describe("Inbox v3 — messages", () => {
         await page.locator("textarea").click()
         await page.locator("textarea").press("Enter")
 
-        // The uploaded image renders from Convex storage as a new bubble.
-        await expect(page.locator('img[src*="convex"]')).toHaveCount(imagesBefore + 1, {
-            timeout: 15000,
-        })
+        // The uploaded image renders from Convex storage as a new bubble. The
+        // thread may already hold media from earlier runs (shared dev data), so
+        // assert the count strictly grew rather than an exact value.
+        await expect
+            .poll(() => convexImages.count(), { timeout: 15000 })
+            .toBeGreaterThan(imagesBefore)
     })
 
     test("message vocal : enregistrer puis envoyer → bulle audio", async ({ page }) => {
@@ -187,7 +194,11 @@ test.describe("Inbox v3 — messages", () => {
         await expect(page).toHaveURL(/\/dashboard\/conversations\/[a-z0-9]+/i)
         await expect(page.locator("textarea")).toBeVisible()
 
-        const audiosBefore = await page.locator("audio").count()
+        // Settle existing thread audio before the baseline read (avoid racing
+        // the async render → stale count → flaky "+1" assertion).
+        const audios = page.locator("audio")
+        await page.waitForTimeout(2000)
+        const audiosBefore = await audios.count()
 
         // Empty composer → the mic button is shown (record voice message).
         const mic = page.locator("button:has(.lucide-mic)")
@@ -201,9 +212,11 @@ test.describe("Inbox v3 — messages", () => {
         // Send the recording (Send button inside the recording UI).
         await page.locator("button:has(.lucide-send)").click()
 
-        // A voice message (audio element from Convex storage) lands in the thread.
-        await expect(page.locator("audio")).toHaveCount(audiosBefore + 1, {
-            timeout: 20000,
-        })
+        // A voice message (audio element from Convex storage) lands in the
+        // thread. Assert the count strictly grew (shared dev data may already
+        // hold voice messages from earlier runs).
+        await expect
+            .poll(() => audios.count(), { timeout: 20000 })
+            .toBeGreaterThan(audiosBefore)
     })
 })

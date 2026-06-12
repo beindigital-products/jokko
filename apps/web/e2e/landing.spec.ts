@@ -10,6 +10,7 @@ test('navigate to sign-in page', async ({ page }) => {
     await page.goto('/');
     await page.click('text=Connexion');
     await expect(page).toHaveURL(/.*sign-in/);
-    // Wait for the heading "Bienvenue" which is inside an animation
-    await expect(page.getByRole('heading', { name: 'Bienvenue' })).toBeVisible({ timeout: 10000 });
+    // The v3 heading ("Ravi de vous revoir.") is rendered char-by-char via
+    // SplitText, so assert on the stable login form instead.
+    await expect(page.locator('#email')).toBeVisible({ timeout: 10000 });
 });

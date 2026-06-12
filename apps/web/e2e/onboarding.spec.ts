@@ -3,37 +3,46 @@ import { test, expect } from "@playwright/test"
 /**
  * Slice 3 — Onboarding wizard smoke test.
  *
- * Requires the test user to be authenticated (via auth.setup.ts). For a
- * truly fresh user the wizard starts at BUSINESS_INFO ; for a user mid-
- * onboarding the wizard resumes at their persisted onboardingStep.
+ * The real /onboarding route redirects authenticated, already-onboarded users
+ * to /dashboard (the shared test account has completed onboarding), so the
+ * wizard chrome never mounts there. We instead exercise the live
+ * `<OnboardingWizard />` via its dev preview route (/dev/onboarding), which
+ * mounts the real component without the redirect guard. That page also renders
+ * the stepper at its 4 static states (Section B) below the live wizard, so
+ * every wizard-chrome locator scopes to the FIRST occurrence (the live wizard).
  *
  * Scope of this spec : visual chrome + stepper interactivity + step routing
- * shell. Per-step form submission flows are out of scope (existing org-state
- * setup would interfere).
+ * shell. Per-step form submission flows are out of scope.
  */
 test.describe("Slice 3 — /onboarding wizard chrome", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("/onboarding")
+    await page.goto("/dev/onboarding")
+    await page.waitForLoadState("networkidle")
   })
 
   test("renders the progress stepper with 4 steps", async ({ page }) => {
-    // 4 step buttons (numbered or with check)
+    // 4 step buttons (numbered or with check) — the live wizard's stepper.
     const stepButtons = page
       .locator("nav[aria-label*='Progression']")
+      .first()
       .getByRole("button")
     await expect(stepButtons).toHaveCount(4)
   })
 
   test("stepper labels show all 4 step titles", async ({ page }) => {
-    await expect(page.getByText("Informations Business")).toBeVisible()
-    await expect(page.getByText("Choisir un plan")).toBeVisible()
-    await expect(page.getByText("Connexion WhatsApp")).toBeVisible()
-    await expect(page.getByText("Terminé !")).toBeVisible()
+    // Scope to the live wizard's stepper : the current step's title also
+    // renders as the page <h1>, so an unscoped getByText would match 2+ elements.
+    const stepper = page.locator("nav[aria-label*='Progression']").first()
+    await expect(stepper.getByText("Informations Business")).toBeVisible()
+    await expect(stepper.getByText("Choisir un plan")).toBeVisible()
+    await expect(stepper.getByText("Connexion WhatsApp")).toBeVisible()
+    await expect(stepper.getByText("Terminé !")).toBeVisible()
   })
 
   test("future steps are aria-disabled (no skip-ahead)", async ({ page }) => {
     const stepperButtons = page
       .locator("nav[aria-label*='Progression']")
+      .first()
       .getByRole("button")
     // Each non-current step that hasn't been completed is aria-disabled
     const futureBtns = stepperButtons.locator("[data-state='future']")
@@ -46,6 +55,7 @@ test.describe("Slice 3 — /onboarding wizard chrome", () => {
   test("current step is a violet circle marker (v3 uniform shape)", async ({ page }) => {
     const current = page
       .locator("nav[aria-label*='Progression']")
+      .first()
       .locator("[data-state='current']")
     await expect(current).toBeVisible()
     await expect(current).toHaveAttribute("aria-current", "step")
@@ -80,7 +90,10 @@ test.describe("Slice 3 — /onboarding wizard chrome", () => {
   })
 
   test("page bg is paper-warm (v2 token, not gray-50)", async ({ page }) => {
-    const root = page.locator("div.min-h-screen.bg-\\[var\\(--paper-warm\\)\\]")
-    await expect(root).toBeVisible()
+    // The onboarding surface fills the viewport on a paper-warm background.
+    // (On the dev preview route this is the <main> wrapper; both expose the
+    // same min-h-screen + paper-warm token, so match on class regardless of tag.)
+    const root = page.locator(".min-h-screen.bg-\\[var\\(--paper-warm\\)\\]")
+    await expect(root.first()).toBeVisible()
   })
 })
