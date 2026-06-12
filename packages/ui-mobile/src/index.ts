@@ -3,6 +3,7 @@ export { ThemeProvider, useTheme, getTheme, type JokkoTheme } from "./theme";
 export { Screen, LegacyScreen } from "./Screen";
 export { Icon, type IconName } from "./Icon";
 export { ICONS } from "./icons-data";
+export { tint, avatarInitials, avatarTone } from "./kit-utils";
 export {
   Avatar,
   Pill,

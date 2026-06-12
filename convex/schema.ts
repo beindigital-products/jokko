@@ -1075,6 +1075,7 @@ export default defineSchema({
         // Reply/Forward
         replyToId: v.optional(v.id("messages")),
         isForwarded: v.optional(v.boolean()),
+        isStarred: v.optional(v.boolean()), // "Marquer" depuis le menu d'actions
 
         // Internal note (team-only, NOT sent to WhatsApp). When true the
         // message is a private note visible only to the team.

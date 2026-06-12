@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -65,6 +65,15 @@ export function MobileConversationScreen({ conversationId }: Props) {
         for (const message of messages) map.set(message.id, message);
         return map;
     }, [messages]);
+
+    // Keep the thread pinned to the newest message: jump to the bottom on first
+    // load, then auto-follow each new message that lands at the end.
+    const scrollRef = useRef<ScrollView>(null);
+    const didInitialScroll = useRef(false);
+    const newestId = messages.length > 0 ? messages[messages.length - 1].id : null;
+    useEffect(() => {
+        if (newestId && didInitialScroll.current) scrollRef.current?.scrollToEnd({ animated: true });
+    }, [newestId]);
 
     const contactName = conversation?.contact?.name || conversation?.contact?.phoneNumber || "Contact inconnu";
     const contactPhone = conversation?.contact?.phoneNumber;
@@ -252,7 +261,19 @@ export function MobileConversationScreen({ conversationId }: Props) {
 
             {/* Body */}
             <View style={[styles.body, { backgroundColor: colors.paper2 }]}>
-                <ScrollView contentContainerStyle={styles.thread} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+                <ScrollView
+                    ref={scrollRef}
+                    contentContainerStyle={styles.thread}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    maintainVisibleContentPosition={{ minIndexForVisible: 1 }}
+                    onContentSizeChange={() => {
+                        if (!didInitialScroll.current && messages.length > 0) {
+                            scrollRef.current?.scrollToEnd({ animated: false });
+                            didInitialScroll.current = true;
+                        }
+                    }}
+                >
                     {status === "CanLoadMore" ? (
                         <Pressable onPress={() => loadMore(30)} style={({ pressed }) => [styles.loadMore, { backgroundColor: colors.card, borderColor: colors.rule }, pressed && styles.pressed]}>
                             <Text style={{ fontSize: 12, fontFamily: font.sansMedium, color: colors.mute }}>Charger les messages précédents</Text>

@@ -1,7 +1,8 @@
-import { Image, Pressable, StyleSheet, Text, View } from "react-native";
-import { Icon, useTheme, type IconName, type JokkoTheme } from "@jokko/ui-mobile";
+import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
+import { Icon, tint, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { SwipeToReply } from "./SwipeToReply";
+import { AudioMessage } from "./AudioMessage";
 
 export type ConversationMessage = {
     id: Id<"messages">;
@@ -15,8 +16,13 @@ export type ConversationMessage = {
     fileName?: string | null;
     fileSize?: number | null;
     replyToId?: Id<"messages"> | null;
+    isStarred?: boolean | null;
     reactions?: { userId: Id<"users">; emoji: string; createdAt: number }[];
 };
+
+function openMedia(url?: string | null) {
+    if (url) Linking.openURL(url).catch(() => undefined);
+}
 
 type Props = {
     message: ConversationMessage;
@@ -57,6 +63,7 @@ export function MessageBubble({ message, replyTo, onRetry, onReplyRequest, onRea
             {replyTo ? <ReplyQuote message={replyTo} outbound={outbound} theme={theme} /> : null}
             <BubbleContent message={message} outbound={outbound} theme={theme} />
             <View style={[styles.meta, isMedia && message.type === "IMAGE" ? styles.metaMedia : null]}>
+                {message.isStarred ? <Icon name="star" size={10} color={fg} strokeWidth={2} /> : null}
                 <Text style={{ fontFamily: font.mono, fontSize: 9.5, color: fg, opacity: 0.55 }}>
                     {formatMessageTime(message.timestamp)}
                 </Text>
@@ -129,7 +136,9 @@ function BubbleContent({ message, outbound, theme }: { message: ConversationMess
     if (message.type === "IMAGE" && message.mediaUrl) {
         return (
             <View style={{ gap: 4 }}>
-                <Image source={{ uri: message.mediaUrl }} style={[styles.mediaImage, { backgroundColor: colors.paper2 }]} resizeMode="cover" />
+                <Pressable onPress={() => openMedia(message.mediaUrl)} accessibilityRole="imagebutton" accessibilityLabel="Ouvrir la photo">
+                    <Image source={{ uri: message.mediaUrl }} style={[styles.mediaImage, { backgroundColor: colors.paper2 }]} resizeMode="cover" />
+                </Pressable>
                 {message.content ? (
                     <Text style={[styles.text, { color: fg, fontFamily: font.sans, paddingHorizontal: 8, paddingTop: 4 }]}>
                         {message.content}
@@ -139,38 +148,58 @@ function BubbleContent({ message, outbound, theme }: { message: ConversationMess
         );
     }
 
-    if (message.type === "AUDIO" || message.type === "VIDEO") {
-        const icon: IconName = message.type === "AUDIO" ? "mic" : "video";
-        const label = message.type === "AUDIO" ? message.content?.trim() || "Note vocale" : "Vidéo";
+    if (message.type === "AUDIO") {
+        if (message.mediaUrl) {
+            return <AudioMessage uri={message.mediaUrl} fallbackLabel={extractDuration(message.content)} outbound={outbound} />;
+        }
         return (
             <View style={[styles.mediaTile, { backgroundColor: tileBg }]}>
                 <View style={[styles.mediaTileIcon, { backgroundColor: outbound ? "rgba(242,239,232,0.12)" : colors.card }]}>
-                    <Icon name={icon} size={18} color={outbound ? fg : colors.accentInk} strokeWidth={1.8} />
+                    <Icon name="mic" size={18} color={outbound ? fg : colors.accentInk} strokeWidth={1.8} />
                 </View>
                 <Text style={[styles.mediaTileText, { color: fg, fontFamily: font.sansMedium }]} numberOfLines={1}>
-                    {label}
+                    {message.content?.trim() || "Message vocal"}
                 </Text>
             </View>
         );
     }
 
-    if (message.type === "DOCUMENT") {
+    if (message.type === "VIDEO") {
         return (
-            <View style={[styles.mediaTile, { backgroundColor: tileBg }]}>
+            <Pressable onPress={() => openMedia(message.mediaUrl)} style={[styles.mediaTile, { backgroundColor: tileBg }]}>
                 <View style={[styles.mediaTileIcon, { backgroundColor: outbound ? "rgba(242,239,232,0.12)" : colors.card }]}>
-                    <Icon name="doc" size={18} color={outbound ? fg : colors.accentInk} strokeWidth={1.6} />
+                    <Icon name="video" size={18} color={outbound ? fg : colors.accentInk} strokeWidth={1.8} />
+                </View>
+                <Text style={[styles.mediaTileText, { color: fg, fontFamily: font.sansMedium, flex: 1 }]} numberOfLines={1}>
+                    {message.content?.trim() || "Vidéo"}
+                </Text>
+                <Icon name="arrow-up-right" size={16} color={fg} />
+            </Pressable>
+        );
+    }
+
+    if (message.type === "DOCUMENT") {
+        const meta = message.fileSize ? formatBytes(message.fileSize) : null;
+        return (
+            <Pressable
+                onPress={() => openMedia(message.mediaUrl)}
+                accessibilityRole="button"
+                accessibilityLabel={`Ouvrir ${message.fileName ?? "le document"}`}
+                style={[styles.docCard, { backgroundColor: tileBg }]}
+            >
+                <View style={[styles.docIcon, { backgroundColor: tint(colors.hot, 0.12) }]}>
+                    <Icon name="doc" size={20} color={colors.hot} strokeWidth={1.6} />
                 </View>
                 <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={[styles.mediaTileText, { color: fg, fontFamily: font.sansMedium }]} numberOfLines={1}>
                         {message.fileName ?? "Document"}
                     </Text>
-                    {message.fileSize ? (
-                        <Text style={{ fontFamily: font.mono, fontSize: 11, color: fg, opacity: 0.6, marginTop: 2 }}>
-                            {formatBytes(message.fileSize)}
-                        </Text>
+                    {meta ? (
+                        <Text style={{ fontFamily: font.mono, fontSize: 10.5, color: fg, opacity: 0.6, marginTop: 2 }}>{meta}</Text>
                     ) : null}
                 </View>
-            </View>
+                <Icon name="arrow-up-right" size={16} color={fg} />
+            </Pressable>
         );
     }
 
@@ -241,6 +270,12 @@ function formatBytes(bytes: number): string {
     return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
+// Pull a "m:ss" duration out of a voice-note caption (e.g. "Note vocale (0:34)").
+function extractDuration(content?: string | null): string | undefined {
+    const match = (content ?? "").match(/(\d+:\d{2})/);
+    return match ? match[1] : undefined;
+}
+
 const styles = StyleSheet.create({
     row: { flexDirection: "row", justifyContent: "flex-start" },
     rowOutbound: { justifyContent: "flex-end" },
@@ -257,6 +292,8 @@ const styles = StyleSheet.create({
     mediaTile: { flexDirection: "row", alignItems: "center", gap: 10, padding: 8, borderRadius: 12, minWidth: 180 },
     mediaTileIcon: { width: 40, height: 40, borderRadius: 8, alignItems: "center", justifyContent: "center" },
     mediaTileText: { fontSize: 13.5 },
+    docCard: { flexDirection: "row", alignItems: "center", gap: 10, padding: 8, borderRadius: 12, minWidth: 200 },
+    docIcon: { width: 40, height: 48, borderRadius: 6, alignItems: "center", justifyContent: "center" },
     replyQuote: { borderLeftWidth: 2.5, paddingLeft: 10, paddingRight: 8, paddingVertical: 5, borderRadius: 8, marginBottom: 6 },
     reactionsRow: { marginTop: -6, flexDirection: "row", flexWrap: "wrap", gap: 4 },
     reactionsRowInbound: { justifyContent: "flex-start", paddingLeft: 8 },

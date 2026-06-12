@@ -521,3 +521,45 @@ export const getConversationMedia = query({
         return enriched;
     }
 });
+
+// Supprimer un message (menu d'actions / message échoué).
+export const remove = mutation({
+    args: { messageId: v.id("messages") },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+        await requirePermission(ctx, conversation.organizationId, "messages:send");
+
+        await ctx.db.delete(args.messageId);
+
+        // If we just removed the conversation's last message, refresh its preview.
+        if (conversation.lastMessageAt === message.createdAt) {
+            const last = await ctx.db
+                .query("messages")
+                .withIndex("by_conversation", (q) => q.eq("conversationId", message.conversationId))
+                .order("desc")
+                .first();
+            await ctx.db.patch(conversation._id, {
+                preview: last ? formatConversationPreview({ type: last.type, content: last.content }) : "",
+                lastMessageAt: last?.createdAt ?? conversation.createdAt,
+                lastMessageDirection: last?.direction ?? conversation.lastMessageDirection,
+                updatedAt: Date.now(),
+            });
+        }
+    },
+});
+
+// "Marquer" un message (étoile).
+export const toggleStar = mutation({
+    args: { messageId: v.id("messages") },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+        await requirePermission(ctx, conversation.organizationId, "messages:send");
+        await ctx.db.patch(args.messageId, { isStarred: !message.isStarred, updatedAt: Date.now() });
+    },
+});
