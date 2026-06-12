@@ -132,21 +132,27 @@ export const create = action({
         const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite/${token}`;
         const inviterName = identity.name || identity.email || "Someone";
 
-        try {
-            await sendInvitationEmail({
-                to: args.email,
-                orgName: orgName,
-                inviterName: inviterName,
-                role: roleEnum,
-                inviteUrl: inviteUrl,
-            });
-        } catch (error) {
-            console.error("Failed to send email:", error);
-            // We don't throw here to avoid failing the whole action if email fails? 
-            // Better to log it. The invitation is created anyway.
+        let emailSent = false;
+        if (!process.env.AWS_SES_FROM_EMAIL) {
+            // No email infra configured (test / local dev) — skip silently.
+            console.log("[invitation] AWS_SES_FROM_EMAIL absent, email non envoyé (invitation créée).");
+        } else {
+            try {
+                await sendInvitationEmail({
+                    to: args.email,
+                    orgName: orgName,
+                    inviterName: inviterName,
+                    role: roleEnum,
+                    inviteUrl: inviteUrl,
+                });
+                emailSent = true;
+            } catch (error) {
+                console.error("[invitation] échec d'envoi email:", error);
+                // L'invitation est créée — on ne fait pas échouer l'action.
+            }
         }
 
-        return { success: true, token };
+        return { success: true, token, emailSent };
     },
 });
 
@@ -240,6 +246,11 @@ export const resend = action({
         // If it was expired, we would need to refresh it.
         // Let's assume for now it's PENDING and not checked here for expiry (expiration is usually checked on consume).
 
+        if (!process.env.AWS_SES_FROM_EMAIL) {
+            console.log("[invitation] AWS_SES_FROM_EMAIL absent, email de renvoi non envoyé.");
+            return { success: true, emailSent: false };
+        }
+
         await sendInvitationEmail({
             to: invitation.email,
             orgName: orgName,
@@ -248,7 +259,7 @@ export const resend = action({
             inviteUrl: inviteUrl,
         });
 
-        return { success: true };
+        return { success: true, emailSent: true };
     }
 });
 
