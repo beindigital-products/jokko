@@ -186,6 +186,42 @@ export const updateSyncPreferences = mutation({
 });
 
 /**
+ * Internal: asserts the current user may manage a CRM connection — same guard
+ * as `_prepareDisconnect` (org scoping + `integrations:manage`) but without
+ * returning any token material. Used by mutation/action entry points (e.g.
+ * `triggerResync`) that operate on a client-supplied connectionId and must not
+ * be reachable cross-tenant. Throws on any failure; returns the org id on success.
+ */
+export const _assertConnectionManager = internalQuery({
+    args: { connectionId: v.id("crmConnections"), userId: v.id("users") },
+    handler: async (ctx, { connectionId, userId }) => {
+        const conn = await ctx.db.get(connectionId);
+        if (!conn) throw new Error("connection_not_found");
+
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+        if (session?.currentOrganizationId !== conn.organizationId) {
+            throw new Error("forbidden");
+        }
+
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", conn.organizationId),
+            )
+            .first();
+        if (!membership) throw new Error("forbidden");
+        if (!hasPermission(membership.role, "integrations:manage")) {
+            throw new Error("forbidden");
+        }
+
+        return { organizationId: conn.organizationId };
+    },
+});
+
+/**
  * Internal: loads enough state to perform a disconnect + remote revocation.
  * Enforces organization scoping + `integrations:manage` permission.
  * Returns encrypted tokens that the caller (an `action`) will decrypt and

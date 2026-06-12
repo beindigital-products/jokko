@@ -1,7 +1,7 @@
 
 import { v } from "convex/values";
 import { internalMutation, MutationCtx } from "./_generated/server";
-import { internal, api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { Id, Doc } from "./_generated/dataModel";
 import { createNotification } from "./notifications";
 
@@ -95,7 +95,7 @@ export const processMessage = internalMutation({
         // 3. Auto-Assignment / Routing (if no flow handled it)
         if (!flowExecuted) {
             console.log("[ENGINE] No flow matched. Triggering Auto-Assignment/Routing.");
-            await ctx.scheduler.runAfter(0, api.assignments.analyzeAndRoute, {
+            await ctx.scheduler.runAfter(0, internal.assignments.analyzeAndRoute, {
                 conversationId: args.conversationId,
                 organizationId: args.organizationId,
                 messageText: args.messageText,

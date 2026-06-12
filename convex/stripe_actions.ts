@@ -6,6 +6,7 @@ import { internal } from "./_generated/api";
 import Stripe from "stripe";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { priceIdFromPlan } from "./lib/stripePlans";
+import { rateLimiter } from "./lib/rateLimits";
 import { Id } from "./_generated/dataModel";
 
 function getStripe(): Stripe {
@@ -62,11 +63,18 @@ export const createCheckoutSession = action({
         const userId = await getAuthUserId(ctx);
         if (!userId) throw new Error("Non authentifié");
 
-        // Verify role (only OWNER/ADMIN)
-        const role = await ctx.runQuery(internal.sessions.getCurrentSession, {});
-        if (!role?.organizationId) throw new Error("Aucune organisation active");
+        // SECURITY: actually verify the caller is OWNER/ADMIN of the active org
+        // (the previous code commented "only OWNER/ADMIN" but never checked the
+        // role — any AGENT could open a checkout / start a billing change).
+        const session = await ctx.runQuery(internal.sessions.getCurrentMembership, {});
+        if (!session?.organizationId) throw new Error("Aucune organisation active");
+        if (session.role !== "OWNER" && session.role !== "ADMIN") {
+            throw new Error("Permission refusée: seul un propriétaire ou administrateur peut gérer la facturation");
+        }
 
-        const session = role;
+        // Abuse protection: cap checkout-session creation per org.
+        await rateLimiter.limit(ctx, "createCheckout", { key: session.organizationId, throws: true });
+
         const org: any = await ctx.runQuery(internal.utils.getOrganization, { id: session.organizationId as any });
         if (!org) throw new Error("Organisation introuvable");
 

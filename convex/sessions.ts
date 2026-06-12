@@ -32,6 +32,41 @@ export const getCurrentSession = internalQuery({
     },
 });
 
+/**
+ * Like getCurrentSession but also resolves the caller's role in the active org.
+ * Used by billing actions to enforce an OWNER/ADMIN check (the older
+ * getCurrentSession only returned the org id, so role gating was impossible).
+ */
+export const getCurrentMembership = internalQuery({
+    args: {},
+    handler: async (
+        ctx,
+    ): Promise<{ userId: string; organizationId: string; role: string } | null> => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return null;
+
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+        if (!session?.currentOrganizationId) return null;
+
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", session.currentOrganizationId!),
+            )
+            .first();
+        if (!membership) return null;
+
+        return {
+            userId: userId as string,
+            organizationId: session.currentOrganizationId as string,
+            role: membership.role,
+        };
+    },
+});
+
 export const current = query({
     args: {},
     handler: async (ctx) => {

@@ -124,6 +124,13 @@ export const updateRole = mutation({
             throw new Error("Insufficient permissions");
         }
 
+        // SECURITY (privilege escalation): an ADMIN must not be able to alter an
+        // OWNER's role (e.g. demote then evict them). Only an OWNER may touch a
+        // membership that is currently OWNER — symmetric to removeMember's guard.
+        if (targetMembership.role === "OWNER" && requesterMembership.role !== "OWNER") {
+            throw new Error("Seul le propriétaire peut modifier le rôle d'un propriétaire");
+        }
+
         // Map frontend role string to schema enum
         const roleEnum = args.role.toUpperCase() as "ADMIN" | "AGENT" | "OWNER";
 

@@ -1,9 +1,10 @@
 import { v } from "convex/values";
-import { query, mutation, action, internalMutation, internalQuery } from "./_generated/server";
+import { query, mutation, internalAction, internalMutation, internalQuery } from "./_generated/server";
 import { internal, api } from "./_generated/api";
 import OpenAI from "openai";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { buildConversationFilter, canViewConversation, VisibilityContext } from "./lib/visibility";
+import { hasPermission, Role } from "./lib/permissions";
 import { Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
 import { createNotification } from "./notifications";
@@ -498,7 +499,21 @@ export const assign = mutation({
     },
     handler: async (ctx, args) => {
         const context = await getContext(ctx);
-        const { organizationId, memberId: assignerId } = context;
+        const { organizationId, memberId: assignerId, role } = context;
+
+        // SECURITY: assigning/reassigning a conversation is a privileged action —
+        // AGENT role lacks `conversations:assign` (they can only work their own
+        // queue). Without this an AGENT could reassign any conversation in the org.
+        // (VisibilityContext.role still carries a legacy "MANAGER" literal that is
+        // not a stored membership role; treat anything that isn't a real Role as
+        // unauthorized rather than feeding it to hasPermission.)
+        const assignerRole = role as Role;
+        if (
+            (assignerRole !== "OWNER" && assignerRole !== "ADMIN" && assignerRole !== "AGENT") ||
+            !hasPermission(assignerRole, "conversations:assign")
+        ) {
+            throw new Error("Permission refusée: conversations:assign");
+        }
 
         const conversation = await ctx.db.get(args.conversationId);
         if (!conversation) throw new Error("Conversation not found");
@@ -914,7 +929,11 @@ export const assignToBestAvailable = internalMutation({
     }
 });
 
-export const analyzeAndRoute = action({
+// SECURITY: internalAction (not public). This triggers AI routing + assignment
+// + outbound WhatsApp on an arbitrary org/conversation; it is only ever invoked
+// by the automation engine (convex/engine.ts) via internal.assignments.analyzeAndRoute.
+// Exposing it publicly let any authenticated user drive sends/assignments for any org.
+export const analyzeAndRoute = internalAction({
     args: {
         conversationId: v.id("conversations"),
         organizationId: v.id("organizations"),

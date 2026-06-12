@@ -5,6 +5,7 @@
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "../_generated/dataModel";
 import {
     action,
@@ -700,6 +701,16 @@ function _firstPhoneE164(
 export const triggerResync = action({
     args: { connectionId: v.id("crmConnections") },
     handler: async (ctx, { connectionId }): Promise<{ jobId: Id<"crmImportJobs"> }> => {
+        // SECURITY: the connectionId is client-supplied — enforce org scoping +
+        // `integrations:manage` before kicking off a resync (was a cross-tenant
+        // IDOR that could trigger imports against another org's CRM connection).
+        const userId = await getAuthUserId(ctx);
+        if (!userId) throw new Error("unauthenticated");
+        await ctx.runQuery(internal.crm.connections._assertConnectionManager, {
+            connectionId,
+            userId,
+        });
+
         const jobId = await ctx.runMutation(internal.crm.importer._enqueueResync, {
             connectionId,
         });

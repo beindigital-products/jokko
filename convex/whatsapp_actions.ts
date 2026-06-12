@@ -15,6 +15,51 @@ import ffmpegPath from "ffmpeg-static";
 const execFileAsync = promisify(execFile);
 
 /**
+ * SSRF guard: server-side media fetches must only target Convex Storage.
+ *
+ * `messages.send` accepts a client-supplied `mediaUrl` that is relayed here and
+ * fetched server-side. Without this allow-list, an authenticated AGENT could
+ * point `mediaUrl` at internal/metadata endpoints (e.g. http://169.254.169.254,
+ * http://localhost, ...) and have the backend fetch them. The safe path
+ * (`mediaStorageId` → ctx.storage.getUrl) stays preferred; arbitrary hosts are
+ * rejected here.
+ *
+ * Allowed: https URLs whose host is the deployment's Convex Storage host
+ * (CONVEX_CLOUD_URL / CONVEX_SITE_URL) or any *.convex.cloud host.
+ */
+function assertConvexStorageUrl(rawUrl: string): void {
+    let url: URL;
+    try {
+        url = new URL(rawUrl);
+    } catch {
+        throw new Error(`[OUTBOUND] mediaUrl invalide (URL malformée)`);
+    }
+
+    if (url.protocol !== "https:") {
+        throw new Error(`[OUTBOUND] mediaUrl refusée: protocole ${url.protocol} non autorisé`);
+    }
+
+    const host = url.hostname.toLowerCase();
+
+    const allowedHosts = new Set<string>();
+    for (const envUrl of [process.env.CONVEX_CLOUD_URL, process.env.CONVEX_SITE_URL]) {
+        if (!envUrl) continue;
+        try {
+            allowedHosts.add(new URL(envUrl).hostname.toLowerCase());
+        } catch {
+            // ignore malformed env value
+        }
+    }
+
+    const isConvexCloud = host === "convex.cloud" || host.endsWith(".convex.cloud");
+    if (!isConvexCloud && !allowedHosts.has(host)) {
+        throw new Error(
+            `[OUTBOUND] mediaUrl refusée: l'hôte "${host}" n'appartient pas au stockage Convex`,
+        );
+    }
+}
+
+/**
  * Download media from WhatsApp Cloud API and store in Convex Storage.
  * WhatsApp only sends a media ID in webhooks — the actual file must be fetched
  * via two API calls:
@@ -160,6 +205,23 @@ export const sendMessage = internalAction({
         // Construct Payload
         let type = (args.type || "text").toLowerCase(); // Ensure lowercase for WhatsApp API
 
+        // SSRF guard (H4): the client-supplied mediaUrl is fetched server-side
+        // below (and, on upload failure, relayed to Meta as a `link`). Validate it
+        // ONCE here — outside the swallowing try/catch blocks — so a non-Convex
+        // host fails the message cleanly instead of being fetched or forwarded.
+        if (args.mediaUrl) {
+            try {
+                assertConvexStorageUrl(args.mediaUrl);
+            } catch (err) {
+                console.error(`[OUTBOUND] Rejected media send:`, String(err));
+                await ctx.runMutation(internal.utils.updateMessageStatus, {
+                    messageId: args.messageId,
+                    status: "FAILED",
+                });
+                return;
+            }
+        }
+
         // Handle Media Conversion (specifically for WebM audio -> OGG Opus/MP4 AAC)
         let mediaId: string | null = null;
         if (type === 'audio' && (args.mimeType?.includes('webm') || args.mediaUrl?.endsWith('.webm'))) {
@@ -223,7 +285,8 @@ export const sendMessage = internalAction({
         // WhatsApp's servers often handle H.264 content inside MOVs correctly if labeled as MP4.
         if (["image", "video", "audio", "document"].includes(type) && !mediaId && args.mediaUrl) {
             try {
-                console.log(`[OUTBOUND] Fetching media from ${args.mediaUrl} for direct upload...`);
+                // mediaUrl already SSRF-validated above (assertConvexStorageUrl).
+                console.log(`[OUTBOUND] Fetching media for direct upload...`);
                 const mediaRes = await fetch(args.mediaUrl);
 
                 if (mediaRes.ok) {
@@ -315,13 +378,13 @@ export const sendMessage = internalAction({
             }
 
             messageBody[type] = mediaObj;
-            console.log(`[DEBUG] Media object prepared:`, JSON.stringify(mediaObj));
+            // PII: do not dump the media object/URL.
         } else {
             console.error(`[OUTBOUND] Unsupported properties or type: ${type}`);
             return;
         }
 
-        console.log(`[DEBUG] Sending WhatsApp Payload:`, JSON.stringify(messageBody));
+        // PII: do not log the full WhatsApp payload (message body / caption / link).
 
         try {
             const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {

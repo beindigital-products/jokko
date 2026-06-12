@@ -253,6 +253,49 @@ describe("Team Members", () => {
             const membership = await t.run(async (ctx: any) => ctx.db.get(agentMembershipId));
             expect(membership.role).toBe("ADMIN");
         });
+
+        // M3: an ADMIN must not be able to alter an OWNER's role (privilege
+        // escalation: demote the owner then evict them).
+        it("forbids an ADMIN from changing an OWNER's role", async () => {
+            const { adminUserId, ownerMembershipId } = await t.run(async (ctx: any) => {
+                // Promote a separate ADMIN requester.
+                const adminId = await ctx.db.insert("users", { email: "admin@test.com", name: "Admin" });
+                await ctx.db.insert("memberships", {
+                    userId: adminId,
+                    organizationId: orgId,
+                    role: "ADMIN",
+                    status: "ONLINE",
+                    maxConversations: 5,
+                    activeConversations: 0,
+                    lastSeenAt: Date.now(),
+                    joinedAt: Date.now(),
+                });
+                await ctx.db.insert("userSessions", {
+                    userId: adminId,
+                    currentOrganizationId: orgId,
+                    lastActivityAt: Date.now(),
+                });
+                // The OWNER membership belongs to `userId` (created in beforeEach).
+                const ownerMembership = await ctx.db
+                    .query("memberships")
+                    .withIndex("by_user_org", (q: any) =>
+                        q.eq("userId", userId).eq("organizationId", orgId),
+                    )
+                    .first();
+                return { adminUserId: adminId, ownerMembershipId: ownerMembership._id };
+            });
+
+            await expect(
+                t.withIdentity({ subject: adminUserId }).mutation(api.team.updateRole, {
+                    membershipId: ownerMembershipId,
+                    role: "AGENT",
+                }),
+            ).rejects.toThrow(/propriétaire/i);
+
+            // The owner's role is unchanged.
+            const owner = await t.run(async (ctx: any) => ctx.db.get(ownerMembershipId));
+            expect(owner.role).toBe("OWNER");
+        });
     });
 
     // ============================================
