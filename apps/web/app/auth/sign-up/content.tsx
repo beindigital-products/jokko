@@ -20,6 +20,7 @@ import {
     Bot,
 } from "lucide-react";
 import { SplitText } from "@/components/animations/split-text";
+import { evaluatePassword, PASSWORD_CRITERIA } from "@/lib/password-policy";
 
 export default function SignUpContent() {
     const router = useRouter();
@@ -43,6 +44,18 @@ export default function SignUpContent() {
             return;
         }
 
+        // Client-side validation against the real policy (mirrors convex/auth.ts).
+        const evaluation = evaluatePassword(password);
+        if (!evaluation.isValid) {
+            const failing = PASSWORD_CRITERIA
+                .filter((c) => evaluation.failed.includes(c.id))
+                .map((c) => c.label)
+                .join(", ");
+            setError(`Mot de passe invalide : ${failing}.`);
+            setLoading(false);
+            return;
+        }
+
         formData.delete("confirmPassword");
         formData.set("flow", "signUp");
 
@@ -52,10 +65,10 @@ export default function SignUpContent() {
         } catch (err) {
             console.error("Sign up error:", err);
             if (err instanceof Error) {
-                const message = err.message.includes(
-                    "Le mot de passe doit contenir",
-                )
-                    ? "Le mot de passe doit contenir au moins 8 caractères."
+                // Pass through backend policy errors verbatim; they already
+                // use the right criteria wording from convex/auth.ts.
+                const message = err.message.includes("Le mot de passe doit contenir")
+                    ? err.message
                     : "Une erreur est survenue lors de l'inscription.";
                 setError(message);
             } else {
@@ -151,7 +164,7 @@ export default function SignUpContent() {
                             name="password"
                             type={showPassword ? "text" : "password"}
                             label="Mot de passe"
-                            placeholder="8 caractères minimum"
+                            placeholder="10 car. min, majuscule, chiffre"
                             autoComplete="new-password"
                             required
                             suffix={
