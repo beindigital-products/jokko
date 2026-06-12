@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Image,
     Linking,
     Modal,
     Pressable,
@@ -31,6 +32,17 @@ type Props = {
     conversationId: string | null;
 };
 
+type StagedMedia = {
+    key: string;
+    uri: string;
+    type: "IMAGE" | "VIDEO" | "DOCUMENT";
+    mediaType: string;
+    fileName: string;
+    fileSize?: number;
+};
+
+const MAX_STAGED = 5;
+
 export function MobileConversationScreen({ conversationId }: Props) {
     const router = useRouter();
     const { colors, font } = useTheme();
@@ -44,6 +56,8 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
     const [forwarding, setForwarding] = useState<ConversationMessage | null>(null);
     const [voiceActive, setVoiceActive] = useState(false);
+    const [staged, setStaged] = useState<StagedMedia[]>([]);
+    const stagedKey = useRef(0);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
         api.conversations.getById,
@@ -224,22 +238,45 @@ export function MobileConversationScreen({ conversationId }: Props) {
         }
     };
 
-    const sendMedia = async (payload: { uri: string; type: "IMAGE" | "VIDEO" | "DOCUMENT"; mediaType: string; fileName: string; fileSize?: number }) => {
-        if (!typedConversationId) return;
+    const stageMedia = (payload: { uri: string; type: "IMAGE" | "VIDEO" | "DOCUMENT"; mediaType: string; fileName: string; fileSize?: number }) => {
+        setStaged((current) => {
+            if (current.length >= MAX_STAGED) {
+                Alert.alert("Pièces jointes", `Maximum ${MAX_STAGED} fichiers par message.`);
+                return current;
+            }
+            stagedKey.current += 1;
+            return [...current, { ...payload, key: `staged-${stagedKey.current}` }];
+        });
+    };
+
+    const uploadAndSend = async (item: StagedMedia, caption: string | undefined) => {
+        const uploadUrl = await generateUploadUrl({});
+        const storageId = await uploadFileToConvex(uploadUrl, item.uri, item.mediaType);
+        await sendMessage({
+            conversationId: typedConversationId!,
+            content: caption,
+            type: item.type,
+            mediaStorageId: storageId as Id<"_storage">,
+            mediaType: item.mediaType,
+            fileName: item.fileName,
+            fileSize: item.fileSize,
+            isForwarded: false,
+        });
+    };
+
+    const submitStaged = async () => {
+        if (!typedConversationId || staged.length === 0 || isSending) return;
+        const items = staged;
+        const caption = draft.trim();
         setError(null);
         setIsSending(true);
         try {
-            const uploadUrl = await generateUploadUrl({});
-            const storageId = await uploadFileToConvex(uploadUrl, payload.uri, payload.mediaType);
-            await sendMessage({
-                conversationId: typedConversationId,
-                type: payload.type,
-                mediaStorageId: storageId as Id<"_storage">,
-                mediaType: payload.mediaType,
-                fileName: payload.fileName,
-                fileSize: payload.fileSize,
-                isForwarded: false,
-            });
+            // Caption rides with the first attachment, like WhatsApp.
+            for (let i = 0; i < items.length; i++) {
+                await uploadAndSend(items[i], i === 0 && caption ? caption : undefined);
+            }
+            setStaged([]);
+            setDraft("");
         } catch (uploadError) {
             Alert.alert("Pièce jointe", uploadError instanceof Error ? uploadError.message : "Erreur d'envoi");
         } finally {
@@ -470,11 +507,43 @@ export function MobileConversationScreen({ conversationId }: Props) {
                         />
                     ) : null}
 
+                    {staged.length > 0 ? (
+                        <View style={styles.stagedRow}>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.stagedScroll}>
+                                {staged.map((item) => (
+                                    <View key={item.key} style={[styles.stagedChip, { backgroundColor: colors.paper2, borderColor: colors.rule }]}>
+                                        {item.type === "IMAGE" ? (
+                                            <Image source={{ uri: item.uri }} style={styles.stagedThumb} resizeMode="cover" />
+                                        ) : (
+                                            <View style={styles.stagedTile}>
+                                                <Icon name={item.type === "VIDEO" ? "video" : "doc"} size={20} color={colors.ink3} strokeWidth={1.6} />
+                                                <Text numberOfLines={2} style={{ fontSize: 9, lineHeight: 11, marginTop: 4, textAlign: "center", color: colors.mute, fontFamily: font.mono }}>
+                                                    {item.fileName}
+                                                </Text>
+                                            </View>
+                                        )}
+                                        <Pressable
+                                            accessibilityLabel="Retirer la pièce jointe"
+                                            onPress={() => setStaged((current) => current.filter((s) => s.key !== item.key))}
+                                            hitSlop={6}
+                                            style={[styles.stagedClose, { backgroundColor: colors.ink }]}
+                                        >
+                                            <Icon name="close" size={10} color={colors.paper} strokeWidth={2.4} />
+                                        </Pressable>
+                                    </View>
+                                ))}
+                            </ScrollView>
+                            <Text style={{ fontFamily: font.mono, fontSize: 10.5, color: colors.mute, paddingHorizontal: 12, paddingTop: 4 }}>
+                                {staged.length}/{MAX_STAGED}
+                            </Text>
+                        </View>
+                    ) : null}
+
                     {/* Composer */}
                     <View style={[styles.composer, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
                         {!voiceActive ? (
                             <>
-                                <MediaPicker disabled={!typedConversationId || isSending} onPicked={(payload) => void sendMedia(payload)} />
+                                <MediaPicker disabled={!typedConversationId || isSending || staged.length >= MAX_STAGED} onPicked={stageMedia} />
                                 <TemplatePicker disabled={!typedConversationId || isSending} onSelect={(templateId) => void sendTemplateMessage(templateId)} />
                                 <TextInput
                                     value={draft}
@@ -487,17 +556,17 @@ export function MobileConversationScreen({ conversationId }: Props) {
                                 />
                             </>
                         ) : null}
-                        {!voiceActive && draft.trim().length > 0 ? (
+                        {!voiceActive && (staged.length > 0 || draft.trim().length > 0) ? (
                             <Pressable
                                 accessibilityRole="button"
-                                disabled={!canSend}
-                                onPress={submitText}
-                                style={({ pressed }) => [styles.sendButton, { backgroundColor: colors.ink, opacity: !canSend ? 0.45 : pressed ? 0.8 : 1 }]}
+                                disabled={isSending || !typedConversationId}
+                                onPress={() => (staged.length > 0 ? void submitStaged() : submitText())}
+                                style={({ pressed }) => [styles.sendButton, { backgroundColor: colors.ink, opacity: isSending || !typedConversationId ? 0.45 : pressed ? 0.8 : 1 }]}
                             >
                                 {isSending ? <ActivityIndicator color={colors.paper} /> : <Icon name="send" size={18} color={colors.paper} strokeWidth={2} />}
                             </Pressable>
                         ) : null}
-                        {voiceActive || draft.trim().length === 0 ? (
+                        {voiceActive || (staged.length === 0 && draft.trim().length === 0) ? (
                             <VoiceNoteRecorder disabled={!typedConversationId} onSend={sendVoiceNote} onActiveChange={setVoiceActive} />
                         ) : null}
                     </View>
@@ -660,6 +729,12 @@ const styles = StyleSheet.create({
         borderTopWidth: StyleSheet.hairlineWidth,
     },
     gateHint: { fontSize: 11.5, textAlign: "center", marginTop: 8 },
+    stagedRow: { paddingTop: 8 },
+    stagedScroll: { gap: 8, paddingHorizontal: 12 },
+    stagedChip: { width: 72, height: 72, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, overflow: "hidden" },
+    stagedThumb: { width: "100%", height: "100%" },
+    stagedTile: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 4 },
+    stagedClose: { position: "absolute", top: 3, right: 3, width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
     replyBar: {
         flexDirection: "row",
         alignItems: "center",
