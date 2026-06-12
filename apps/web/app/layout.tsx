@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     siteName: "Jokko",
     images: [
       {
-        url: "/og-image.png",
+        url: "/logo.png",
         width: 1200,
         height: 630,
         alt: "Jokko — L'inbox WhatsApp partagée pour les équipes",
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
     title: "Jokko — L'inbox WhatsApp partagée pour les équipes",
     description:
       "Centralisez vos WhatsApp Business. Répondez à plusieurs. Laissez l'IA faire le premier brouillon.",
-    images: ["/og-image.png"],
+    images: ["/logo.png"],
     creator: "@jokko_co",
   },
   icons: {

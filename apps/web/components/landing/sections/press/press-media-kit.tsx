@@ -66,22 +66,22 @@ export function PressMediaKit() {
                             Téléchargez tout.
                         </h2>
                     </div>
-                    <a
-                        href="/press/kit-jokko-2026.zip"
-                        className="hidden items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition-all hover:bg-white/15 md:inline-flex"
+                    <div
+                        title="Bientôt disponible"
+                        className="hidden cursor-default items-center gap-2 rounded-full bg-white/10 px-5 py-2.5 text-sm font-semibold text-white/40 backdrop-blur md:inline-flex"
                     >
                         <Download className="h-4 w-4" />
-                        Kit complet (45 MB)
-                    </a>
+                        Kit complet — Bientôt
+                    </div>
                 </motion.div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     {assets.map((asset, i) => {
                         const Icon = asset.icon;
                         return (
-                            <motion.a
+                            <motion.div
                                 key={asset.title}
-                                href={`/press/${asset.title.toLowerCase().replace(/\s+/g, "-")}.zip`}
+                                title="Bientôt disponible"
                                 initial={{ opacity: 0, y: 16 }}
                                 whileInView={{ opacity: 1, y: 0 }}
                                 viewport={{ once: true, amount: 0.15 }}
@@ -90,15 +90,17 @@ export function PressMediaKit() {
                                     delay: i * 0.06,
                                     ease: [0.22, 1, 0.36, 1],
                                 }}
-                                className="group flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur transition-all hover:-translate-y-1 hover:bg-white/[0.08]"
+                                className="group flex h-full flex-col rounded-2xl border border-white/10 bg-white/[0.03] p-5 backdrop-blur"
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-[var(--accent-muted)] text-[var(--accent)]">
                                         <Icon className="h-5 w-5" />
                                     </div>
-                                    <Download className="h-4 w-4 text-[var(--surface-dark-muted-foreground)] transition-all group-hover:text-white group-hover:-translate-y-0.5" />
+                                    <span className="rounded-full bg-white/10 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-white/40">
+                                        Bientôt
+                                    </span>
                                 </div>
-                                <h3 className="mt-5 font-semibold text-white">
+                                <h3 className="mt-5 font-semibold text-white/70">
                                     {asset.title}
                                 </h3>
                                 <p className="mt-1.5 flex-1 text-xs leading-relaxed text-[var(--surface-dark-muted-foreground)]">
@@ -108,7 +110,7 @@ export function PressMediaKit() {
                                     <span>{asset.format}</span>
                                     <span>{asset.size}</span>
                                 </div>
-                            </motion.a>
+                            </motion.div>
                         );
                     })}
                 </div>

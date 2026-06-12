@@ -29,3 +29,30 @@ export const join = mutation({
     },
 });
 
+export const subscribeNewsletter = mutation({
+    args: {
+        email: v.string(),
+        source: v.optional(v.string()),
+    },
+    handler: async (ctx, args) => {
+        const existing = await ctx.db
+            .query("waitingList")
+            .withIndex("by_email", (q) => q.eq("email", args.email))
+            .first();
+
+        if (existing) {
+            return { success: true, alreadySubscribed: true };
+        }
+
+        await ctx.db.insert("waitingList", {
+            email: args.email,
+            companyName: "newsletter",
+            representativeName: args.source ?? "newsletter",
+            status: "NEWSLETTER",
+            createdAt: Date.now(),
+        });
+
+        return { success: true, alreadySubscribed: false };
+    },
+});
+

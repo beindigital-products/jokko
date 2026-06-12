@@ -3,7 +3,9 @@
 import { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, Shield, Twitter, Linkedin, Github } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { ArrowRight, Check, Shield, Twitter, Linkedin, Github, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -67,17 +69,26 @@ const socialLinks = [
 ];
 
 export function Footer() {
+  const subscribeNewsletter = useMutation(api.waitingList.subscribeNewsletter);
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [newsletterError, setNewsletterError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    setSubscribed(true);
-    setTimeout(() => {
-      setSubscribed(false);
+    setIsLoading(true);
+    setNewsletterError(null);
+    try {
+      await subscribeNewsletter({ email, source: "footer" });
+      setSubscribed(true);
       setEmail("");
-    }, 3000);
+    } catch {
+      setNewsletterError("Erreur, veuillez réessayer.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -132,7 +143,7 @@ export function Footer() {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={subscribed}
+                  disabled={subscribed || isLoading}
                   className={cn(
                     "h-11 shrink-0 rounded-full px-5 font-medium transition-all",
                     subscribed
@@ -140,7 +151,9 @@ export function Footer() {
                       : "bg-white text-[var(--surface-dark)] hover:bg-white/90"
                   )}
                 >
-                  {subscribed ? (
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : subscribed ? (
                     <>
                       <Check className="h-4 w-4" />
                       Inscrit
@@ -153,6 +166,9 @@ export function Footer() {
                   )}
                 </Button>
               </div>
+              {newsletterError && (
+                <p className="mt-1 text-xs text-red-400">{newsletterError}</p>
+              )}
               <p className="mt-2 text-xs text-white/40">
                 Une fois par mois. Pas de spam, désinscription en 1 clic.
               </p>

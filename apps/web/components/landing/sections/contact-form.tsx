@@ -1,11 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '@/components/ui/input-group'
-import { Send, CheckCircle, Loader2, User, Mail, Building, Phone, MessageSquare, ChevronDown } from 'lucide-react'
+import { Send, CheckCircle, Loader2, User, Mail, Building, Phone, MessageSquare, ChevronDown, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FormData {
@@ -18,6 +20,7 @@ interface FormData {
 }
 
 export function ContactForm() {
+    const createTicket = useMutation(api.tickets.create)
     const [formData, setFormData] = useState<FormData>({
         name: '',
         email: '',
@@ -28,6 +31,7 @@ export function ContactForm() {
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSubmitted, setIsSubmitted] = useState(false)
+    const [submitError, setSubmitError] = useState<string | null>(null)
     const [errors, setErrors] = useState<Partial<FormData>>({})
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -81,17 +85,25 @@ export function ContactForm() {
         }
 
         setIsSubmitting(true)
+        setSubmitError(null)
 
         try {
-            // Simuler l'envoi du formulaire
-            await new Promise(resolve => setTimeout(resolve, 2000))
+            const subjectLabel = formData.subject
+                ? `[${formData.subject.toUpperCase()}] ${formData.name}${formData.company ? ` — ${formData.company}` : ''}`
+                : `Contact: ${formData.name}${formData.company ? ` — ${formData.company}` : ''}`
 
-            // En réalité, ici on ferait l'appel API
-            console.log('Form data:', formData)
+            await createTicket({
+                subject: subjectLabel,
+                message: formData.message,
+                type: 'OTHER',
+                contactEmail: formData.email || undefined,
+                contactPhone: formData.phone || undefined,
+            })
 
             setIsSubmitted(true)
         } catch (error) {
             console.error('Error submitting form:', error)
+            setSubmitError('Une erreur est survenue. Veuillez réessayer ou nous contacter directement.')
         } finally {
             setIsSubmitting(false)
         }
@@ -108,6 +120,7 @@ export function ContactForm() {
         })
         setIsSubmitted(false)
         setErrors({})
+        setSubmitError(null)
     }
 
     if (isSubmitted) {
@@ -292,6 +305,14 @@ export function ContactForm() {
                         )}
                     </Button>
                 </div>
+
+                {/* Error state */}
+                {submitError && (
+                    <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                        <span>{submitError}</span>
+                    </div>
+                )}
 
                 {/* Note */}
                 <p className="text-xs text-gray-500 text-center">
