@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useMutation } from "convex/react"
+import { useQuery, useMutation } from "convex/react"
 import {
     ArrowUpRight,
     Bell,
@@ -62,15 +62,47 @@ const NOTIFS = [
 ]
 
 export function NotificationsSection() {
+    const prefs = useQuery(api.notifications.getMyNotificationPreferences)
+    const savePrefs = useMutation(api.notifications.saveNotificationPreferences)
+
+    // Initialise from defaults; will be updated once prefs load.
     const [state, setState] = useState<Record<string, boolean>>(
         Object.fromEntries(NOTIFS.map((n) => [n.id, n.defaultOn])),
     )
+    const [saving, setSaving] = useState(false)
+
+    // Sync local state whenever the backend preferences load/change.
+    useEffect(() => {
+        if (!prefs) return
+        setState({
+            "new-messages": prefs.assignments,
+            "mentions": prefs.mentions,
+            "security-alerts": prefs.systemAlerts,
+        })
+    }, [prefs])
+
+    const handleSave = async () => {
+        setSaving(true)
+        try {
+            await savePrefs({
+                assignments: state["new-messages"],
+                mentions: state["mentions"],
+                systemAlerts: state["security-alerts"],
+            })
+            toast.success("Préférences enregistrées")
+        } catch {
+            toast.error("Impossible d'enregistrer les préférences.")
+        } finally {
+            setSaving(false)
+        }
+    }
+
     return (
         <SettingsCard
             icon={Bell}
             title="Préférences de notification"
             description="Contrôlez quand et comment vous êtes notifié"
-            footer={<SaveButton onClick={() => toast.success("Préférences enregistrées")}>Enregistrer les préférences</SaveButton>}
+            footer={<SaveButton onClick={handleSave} loading={saving}>Enregistrer les préférences</SaveButton>}
         >
             <div className="divide-y divide-[var(--ink-100)]">
                 {NOTIFS.map((n) => (
