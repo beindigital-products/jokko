@@ -16,9 +16,12 @@ import { useRouter } from "expo-router";
 import { Avatar, Btn, Icon, NavButton, tint, useTheme, type IconName } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import * as Clipboard from "expo-clipboard";
+import * as Haptics from "expo-haptics";
+import { ForwardSheet } from "./conversation/ForwardSheet";
+import { GlassReply, type GlassReaction } from "./conversation/GlassReply";
 import { MediaPicker } from "./conversation/MediaPicker";
 import { MessageBubble, type ConversationMessage } from "./conversation/MessageBubble";
-import { ReactionPicker, type ReactionEmoji } from "./conversation/ReactionPicker";
 import { ShortcutPopover } from "./conversation/ShortcutPopover";
 import { TemplatePicker } from "./conversation/TemplatePicker";
 import { VoiceNoteRecorder } from "./conversation/VoiceNoteRecorder";
@@ -39,6 +42,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [templateGateOpen, setTemplateGateOpen] = useState(false);
     const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
     const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
+    const [forwarding, setForwarding] = useState<ConversationMessage | null>(null);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
         api.conversations.getById,
@@ -50,6 +54,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const retryMessage = useMutation(api.messages.retry);
     const removeMessage = useMutation(api.messages.remove);
     const reactToMessage = useMutation(api.messages.react);
+    const toggleStar = useMutation(api.messages.toggleStar);
     const assignToMe = useMutation(api.conversations.assignToMe);
     const resolveConversation = useMutation(api.conversations.resolve);
     const reopenConversation = useMutation(api.conversations.reopen);
@@ -131,7 +136,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
         }
     };
 
-    const submitReaction = async (emoji: ReactionEmoji) => {
+    const submitReaction = async (emoji: GlassReaction) => {
         const target = reactingTo;
         setReactingTo(null);
         if (!target) return;
@@ -139,6 +144,69 @@ export function MobileConversationScreen({ conversationId }: Props) {
             await reactToMessage({ messageId: target.id, emoji });
         } catch (reactionError) {
             Alert.alert("Réaction", reactionError instanceof Error ? reactionError.message : "Réaction impossible");
+        }
+    };
+
+    // ── Glass Reply (long-press) actions ──────────────────────────────────
+    const openGlassReply = (message: ConversationMessage) => {
+        void Haptics.selectionAsync().catch(() => undefined);
+        setReactingTo(message);
+    };
+
+    const glassReply = () => {
+        const target = reactingTo;
+        setReactingTo(null);
+        if (target) setReplyingTo(target);
+    };
+
+    const glassCopy = async () => {
+        const target = reactingTo;
+        setReactingTo(null);
+        const text = (target?.content ?? "").trim();
+        if (text) await Clipboard.setStringAsync(text);
+    };
+
+    const glassToggleStar = async () => {
+        const target = reactingTo;
+        setReactingTo(null);
+        if (!target) return;
+        try {
+            await toggleStar({ messageId: target.id });
+        } catch (starError) {
+            Alert.alert("Marquer", starError instanceof Error ? starError.message : "Action impossible");
+        }
+    };
+
+    const glassDelete = () => {
+        const target = reactingTo;
+        setReactingTo(null);
+        if (target) confirmDelete(target.id);
+    };
+
+    const glassForward = () => {
+        const target = reactingTo;
+        setReactingTo(null);
+        if (target) setForwarding(target);
+    };
+
+    const submitForward = async (targetConversationId: Id<"conversations">) => {
+        const source = forwarding;
+        setForwarding(null);
+        if (!source) return;
+        try {
+            await sendMessage({
+                conversationId: targetConversationId,
+                content: source.content ?? undefined,
+                type: source.type,
+                mediaUrl: source.mediaUrl ?? undefined,
+                mediaType: source.mediaType ?? undefined,
+                fileName: source.fileName ?? undefined,
+                fileSize: source.fileSize ?? undefined,
+                isForwarded: true,
+            });
+            Alert.alert("Transféré", "Le message a été transféré.");
+        } catch (forwardError) {
+            Alert.alert("Transférer", forwardError instanceof Error ? forwardError.message : "Transfert impossible");
         }
     };
 
@@ -200,8 +268,8 @@ export function MobileConversationScreen({ conversationId }: Props) {
         void removeMessage({ messageId: message.id }).catch(() => undefined);
     };
 
-    const handleDeleteFailed = (messageId: Id<"messages">) => {
-        Alert.alert("Supprimer le message", "Ce message en échec sera retiré du fil.", [
+    const confirmDelete = (messageId: Id<"messages">) => {
+        Alert.alert("Supprimer le message", "Ce message sera retiré du fil.", [
             { text: "Annuler", style: "cancel" },
             {
                 text: "Supprimer",
@@ -265,9 +333,9 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 replyTo={message.replyToId ? messagesById.get(message.replyToId) ?? null : null}
                 onRetry={handleRetry}
                 onEdit={handleEditFailed}
-                onDelete={handleDeleteFailed}
+                onDelete={confirmDelete}
                 onReplyRequest={setReplyingTo}
-                onReactionRequest={setReactingTo}
+                onReactionRequest={openGlassReply}
             />,
         );
     }
@@ -430,7 +498,24 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 </>
             )}
 
-            <ReactionPicker visible={reactingTo !== null} onSelect={(emoji) => void submitReaction(emoji)} onClose={() => setReactingTo(null)} />
+            <GlassReply
+                message={reactingTo}
+                onReact={(emoji) => void submitReaction(emoji)}
+                onReply={glassReply}
+                onForward={glassForward}
+                onCopy={() => void glassCopy()}
+                onToggleStar={() => void glassToggleStar()}
+                onDelete={glassDelete}
+                onClose={() => setReactingTo(null)}
+            />
+
+            <ForwardSheet
+                visible={forwarding !== null}
+                organizationId={conversation.organizationId}
+                excludeConversationId={typedConversationId}
+                onPick={(id) => void submitForward(id)}
+                onClose={() => setForwarding(null)}
+            />
 
             {/* Actions menu */}
             <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
