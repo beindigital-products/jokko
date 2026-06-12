@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useQuery, useMutation } from 'convex/react';
+import { useQuery, useMutation, useAction } from 'convex/react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { ArrowLeft, Check, Loader2 } from 'lucide-react';
@@ -18,71 +18,176 @@ interface FlowAIAssistantProps {
 
 const EYEBROW = 'font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]';
 
-/** The welcome + routing flow the assistant assembles — real, editable nodes. */
-function buildFlow() {
-    const nodes = [
-        { id: 'start-1', type: 'start', position: { x: 250, y: 0 }, data: { label: 'Déclencheur', triggerType: 'NEW_CONVERSATION' } },
-        { id: 'msg-1', type: 'message', position: { x: 250, y: 150 }, data: { label: 'Message', content: 'Bonjour {{prenom}} 👋 Merci de nous écrire ! Comment pouvons-nous vous aider aujourd’hui ?' } },
-        {
-            id: 'menu-1',
-            type: 'interactive',
-            position: { x: 250, y: 300 },
-            data: {
-                label: 'Menu de tri',
-                interactiveType: 'list',
-                content: 'Que souhaitez-vous faire ?',
-                options: [
-                    { id: 'ventes', title: 'Ventes & devis', label: 'Ventes & devis' },
-                    { id: 'support', title: 'Support technique', label: 'Support technique' },
-                    { id: 'suivi', title: 'Suivi de commande', label: 'Suivi de commande' },
-                ],
-            },
-        },
-        { id: 'act-1', type: 'action', position: { x: 600, y: 230 }, data: { label: 'Assigner', actionType: 'assign', details: 'Pôle Ventes (round-robin)' } },
-        { id: 'act-2', type: 'action', position: { x: 600, y: 360 }, data: { label: 'Assigner', actionType: 'assign', details: 'Pôle Support (round-robin)' } },
-        { id: 'act-3', type: 'action', position: { x: 600, y: 490 }, data: { label: 'Tag', actionType: 'tag', details: 'suivi' } },
-    ];
-    const edges = [
-        { id: 'e1', source: 'start-1', target: 'msg-1', animated: true, style: { stroke: 'var(--ink-300)', strokeWidth: 1.6 } },
-        { id: 'e2', source: 'msg-1', target: 'menu-1', animated: true, style: { stroke: 'var(--ink-300)', strokeWidth: 1.6 } },
-        { id: 'e3', source: 'menu-1', target: 'act-1', animated: true, style: { stroke: 'var(--ink-300)', strokeWidth: 1.6 } },
-        { id: 'e4', source: 'menu-1', target: 'act-2', animated: true, style: { stroke: 'var(--ink-300)', strokeWidth: 1.6 } },
-        { id: 'e5', source: 'menu-1', target: 'act-3', animated: true, style: { stroke: 'var(--ink-300)', strokeWidth: 1.6 } },
-    ];
-    return { nodes, edges };
+// ── Generated-flow shapes (what api.ai.generateFlow returns) ─────────────────
+type GenOption = { id?: string; title?: string; label?: string; description?: string };
+type GenNode = {
+    id: string;
+    type: string;
+    position?: { x: number; y: number };
+    data?: {
+        label?: string;
+        content?: string;
+        triggerType?: string;
+        keywords?: string;
+        interactiveType?: string;
+        options?: GenOption[];
+        actionType?: string;
+        details?: string;
+    };
+};
+type GenEdge = { id: string; source: string; target: string };
+type GeneratedFlow = { nodes: GenNode[]; edges: GenEdge[] };
+
+type ChatTurn =
+    | { role: 'user'; text: string }
+    | { role: 'assistant'; text: string; tags?: Tag[] }
+    | { role: 'error'; text: string };
+
+const NODE_META: Record<string, { kind: NodeKind; icon: IconName }> = {
+    start: { kind: 'trigger', icon: 'bolt' },
+    message: { kind: 'message', icon: 'send' },
+    interactive: { kind: 'condition', icon: 'list' },
+    action: { kind: 'action', icon: 'user' },
+};
+
+/** Type guard: a usable {nodes, edges} payload (not the {error} branch). */
+function isGeneratedFlow(r: unknown): r is GeneratedFlow {
+    return (
+        !!r &&
+        typeof r === 'object' &&
+        Array.isArray((r as GeneratedFlow).nodes) &&
+        Array.isArray((r as GeneratedFlow).edges)
+    );
+}
+
+/** Short, human summary of what the model assembled, shown as a chat reply + tags. */
+function summarize(flow: GeneratedFlow): { text: string; tags: Tag[] } {
+    const counts = flow.nodes.reduce<Record<string, number>>((acc, n) => {
+        acc[n.type] = (acc[n.type] || 0) + 1;
+        return acc;
+    }, {});
+    const tags: Tag[] = [];
+    const start = flow.nodes.find((n) => n.type === 'start');
+    if (start) {
+        const tt = (start.data?.triggerType || '').toLowerCase();
+        const label =
+            tt === 'keyword'
+                ? `Déclencheur · Mot-clé${start.data?.keywords ? ` (${start.data.keywords})` : ''}`
+                : tt === 'no_reply'
+                  ? 'Déclencheur · Sans réponse'
+                  : 'Déclencheur · Premier message';
+        tags.push({ icon: 'bolt', label, tone: 'warn' });
+    }
+    if (counts.message) tags.push({ icon: 'send', label: `${counts.message} message${counts.message > 1 ? 's' : ''}`, tone: 'accent' });
+    if (counts.interactive) tags.push({ icon: 'list', label: `${counts.interactive} menu${counts.interactive > 1 ? 's' : ''}`, tone: 'ink' });
+    if (counts.action) tags.push({ icon: 'user', label: `${counts.action} action${counts.action > 1 ? 's' : ''}`, tone: 'good' });
+
+    return {
+        text: `C'est construit 🎉 ${flow.nodes.length} nœud${flow.nodes.length > 1 ? 's' : ''} au total — aperçu à droite. Décrivez une modification, ou publiez.`,
+        tags,
+    };
 }
 
 /**
- * FlowAIAssistant — conversational automation builder recreated from the design
- * handoff (`flow-ai.jsx`): chat thread (left) + live read-only preview (right).
- * The conversation is scripted but assembles a *real* welcome + routing flow,
- * persisted via `flows.update`; "Publier" sets it live, "Ouvrir dans l'éditeur"
- * hands off to the diagram editor.
+ * FlowAIAssistant — conversational automation builder (design handoff
+ * `flow-ai.jsx`): chat thread (left) + live read-only preview (right).
+ * The user describes the automation in natural language; each prompt is sent to
+ * `api.ai.generateFlow`, and the returned {nodes, edges} are persisted via
+ * `flows.update` and rendered live. "Publier" sets it active, "Ouvrir dans
+ * l'éditeur" hands off to the diagram editor.
  */
 export function FlowAIAssistant({ flowId }: FlowAIAssistantProps) {
     const router = useRouter();
     const flow = useQuery(api.flows.get, { flowId: flowId as Id<'flows'> });
     const updateFlow = useMutation(api.flows.update);
+    const generateFlow = useAction(api.ai.generateFlow);
 
-    const [step, setStep] = useState(0); // 0 greeting · 1 trigger · 2 message-kept · 3 built
+    const [turns, setTurns] = useState<ChatTurn[]>([]);
+    const [generated, setGenerated] = useState<GeneratedFlow | null>(null);
+    const [generating, setGenerating] = useState(false);
     const [busy, setBusy] = useState<null | 'publish' | 'editor'>(null);
     const [draft, setDraft] = useState('');
     const scrollRef = useRef<HTMLDivElement>(null);
-    const built = step >= 3;
+    const built = generated !== null;
+
+    // Hydrate the preview from an already-saved flow so reopening the assistant
+    // shows the current state instead of an empty canvas.
+    useEffect(() => {
+        if (flow && generated === null && turns.length === 0) {
+            try {
+                const nodes = flow.nodes ? JSON.parse(flow.nodes) : [];
+                const edges = flow.edges ? JSON.parse(flow.edges) : [];
+                if (Array.isArray(nodes) && nodes.length > 0) {
+                    setGenerated({ nodes, edges: Array.isArray(edges) ? edges : [] });
+                }
+            } catch {
+                /* ignore malformed persisted flow */
+            }
+        }
+    }, [flow, generated, turns.length]);
 
     useEffect(() => {
         if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }, [step]);
+    }, [turns, generating]);
 
-    const persist = async (publish: boolean) => {
-        setBusy(publish ? 'publish' : 'editor');
+    const send = async (text: string) => {
+        const prompt = text.trim();
+        if (!prompt || generating) return;
+
+        setDraft('');
+        setTurns((t) => [...t, { role: 'user', text: prompt }]);
+        setGenerating(true);
         try {
-            const { nodes, edges } = buildFlow();
+            const result = await generateFlow({
+                prompt,
+                ...(generated
+                    ? {
+                          currentNodes: JSON.stringify(generated.nodes),
+                          currentEdges: JSON.stringify(generated.edges),
+                      }
+                    : {}),
+            });
+
+            if (!isGeneratedFlow(result)) {
+                const message =
+                    (result && typeof result === 'object' && 'error' in result && typeof result.error === 'string'
+                        ? result.error
+                        : null) || "L'assistant n'a pas pu générer le flux. Réessayez en reformulant.";
+                setTurns((t) => [...t, { role: 'error', text: message }]);
+                toast.error('Échec de la génération');
+                return;
+            }
+
+            // Persist immediately (draft). flows.update reconciles triggerType /
+            // triggerConfig.keywords from the generated start node for the engine.
             await updateFlow({
                 flowId: flowId as Id<'flows'>,
-                triggerType: 'NEW_CONVERSATION',
-                nodes: JSON.stringify(nodes),
-                edges: JSON.stringify(edges),
+                nodes: JSON.stringify(result.nodes),
+                edges: JSON.stringify(result.edges),
+            });
+
+            setGenerated(result);
+            const { text: reply, tags } = summarize(result);
+            setTurns((t) => [...t, { role: 'assistant', text: reply, tags }]);
+        } catch (e) {
+            console.error('generateFlow failed', e);
+            const message =
+                e instanceof Error && e.message ? e.message : 'Une erreur est survenue pendant la génération.';
+            setTurns((t) => [...t, { role: 'error', text: message }]);
+            toast.error('Erreur lors de la génération');
+        } finally {
+            setGenerating(false);
+        }
+    };
+
+    const persist = async (publish: boolean) => {
+        if (!generated) return;
+        setBusy(publish ? 'publish' : 'editor');
+        try {
+            await updateFlow({
+                flowId: flowId as Id<'flows'>,
+                nodes: JSON.stringify(generated.nodes),
+                edges: JSON.stringify(generated.edges),
                 ...(publish ? { isActive: true } : {}),
             });
             if (publish) {
@@ -98,14 +203,11 @@ export function FlowAIAssistant({ flowId }: FlowAIAssistantProps) {
     };
 
     const quickReplies = built
-        ? ['Ajouter une condition', 'Changer le ton du message', 'Ajouter une relance']
-        : step === 0
-          ? ['Quand un nouveau client écrit', 'Sur un mot-clé']
-          : step === 1
-            ? ['Oui, garde ce message', 'Reformuler']
-            : ['Oui, ajoute le menu', 'Non merci'];
-
-    const advance = () => setStep((s) => Math.min(s + 1, 3));
+        ? ['Ajoute une relance après 24h', 'Change le ton du message d’accueil', 'Ajoute un menu de tri']
+        : [
+              'Accueille les nouveaux clients et trie vers le bon pôle',
+              'Réponds au mot-clé « devis » avec un menu',
+          ];
 
     return (
         <div className="flex h-full w-full flex-col bg-[var(--paper-warm)]">
@@ -156,60 +258,53 @@ export function FlowAIAssistant({ flowId }: FlowAIAssistantProps) {
                 <div className="flex min-w-0 flex-1 flex-col bg-[var(--paper-white)]">
                     <div ref={scrollRef} className="flex-1 overflow-y-auto py-7">
                         <div className="mx-auto flex max-w-[600px] flex-col gap-[18px] px-7">
-                            <AIMsg>Bonjour 👋 Décrivez ce que doit faire votre automatisation — je construis le flux pour vous, nœud par nœud.</AIMsg>
-                            <AIMsg>Pour commencer : qu&apos;est-ce qui doit déclencher ce flux ?</AIMsg>
+                            <AIMsg>Bonjour 👋 Décrivez ce que doit faire votre automatisation — je construis le flux complet pour vous (déclencheur, messages, menus, actions).</AIMsg>
+                            <AIMsg>Par exemple : « Accueille les nouveaux clients, propose un menu Ventes / Support / Suivi, et assigne au bon pôle. »</AIMsg>
 
-                            {step >= 1 ? (
-                                <>
-                                    <UserMsg>Quand un nouveau client nous écrit pour la première fois.</UserMsg>
-                                    <AIMsg tags={[{ icon: 'bolt', label: 'Déclencheur · Premier message', tone: 'warn' }]}>
-                                        Parfait. J&apos;ajoute un déclencheur « Premier message ». Voici un message d&apos;accueil — gardez-le ou reformulez :
-                                        <AICard>Bonjour {'{{prenom}}'} 👋 Merci de nous écrire ! Comment pouvons-nous vous aider aujourd&apos;hui ?</AICard>
+                            {turns.map((turn, i) =>
+                                turn.role === 'user' ? (
+                                    <UserMsg key={i}>{turn.text}</UserMsg>
+                                ) : turn.role === 'error' ? (
+                                    <ErrorMsg key={i}>{turn.text}</ErrorMsg>
+                                ) : (
+                                    <AIMsg key={i} tags={turn.tags}>
+                                        {turn.text}
+                                        {built ? (
+                                            <div className="mt-3 flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => persist(false)}
+                                                    disabled={busy !== null}
+                                                    className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 py-1.5 text-[12.5px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)] disabled:opacity-50"
+                                                >
+                                                    <Icon name="hub" size={14} strokeWidth={1.8} />
+                                                    Affiner dans l&apos;éditeur
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => persist(true)}
+                                                    disabled={busy !== null}
+                                                    className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-[var(--ink-700)] disabled:opacity-50"
+                                                >
+                                                    <Check className="h-3.5 w-3.5" />
+                                                    Publier le flux
+                                                </button>
+                                            </div>
+                                        ) : null}
                                     </AIMsg>
-                                </>
-                            ) : null}
+                                ),
+                            )}
 
-                            {step >= 2 ? (
-                                <>
-                                    <UserMsg>Oui, garde ce message.</UserMsg>
-                                    <AIMsg tags={[{ icon: 'send', label: 'Message · Accueil', tone: 'accent' }]}>
-                                        Souhaitez-vous trier les demandes vers le bon pôle avec un menu de choix ?
-                                    </AIMsg>
-                                </>
-                            ) : null}
-
-                            {built ? (
-                                <>
-                                    <UserMsg>Oui — Ventes, Support, et Suivi de commande.</UserMsg>
-                                    <AIMsg
-                                        tags={[
-                                            { icon: 'list', label: 'Menu · 3 options', tone: 'ink' },
-                                            { icon: 'user', label: '3 actions d’assignation', tone: 'good' },
-                                        ]}
-                                    >
-                                        C&apos;est construit 🎉 Le menu route chaque choix vers le pôle correspondant en round-robin. Aperçu complet à droite.
-                                        <div className="mt-3 flex gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => persist(false)}
-                                                disabled={busy !== null}
-                                                className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2.5 py-1.5 text-[12.5px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)] disabled:opacity-50"
-                                            >
-                                                <Icon name="hub" size={14} strokeWidth={1.8} />
-                                                Affiner dans l&apos;éditeur
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => persist(true)}
-                                                disabled={busy !== null}
-                                                className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[12.5px] font-medium text-white transition-colors hover:bg-[var(--ink-700)] disabled:opacity-50"
-                                            >
-                                                <Check className="h-3.5 w-3.5" />
-                                                Publier le flux
-                                            </button>
-                                        </div>
-                                    </AIMsg>
-                                </>
+                            {generating ? (
+                                <div className="flex items-center gap-[11px]">
+                                    <span className="mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-[var(--accent)]">
+                                        <Icon name="sparkle" size={15} color="#fff" strokeWidth={1.9} />
+                                    </span>
+                                    <div className="inline-flex items-center gap-2 rounded-[4px_14px_14px_14px] border border-[var(--ink-200)] bg-[var(--paper-white)] px-3.5 py-[11px] text-[13.5px] text-[var(--ink-500)]">
+                                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--accent)]" />
+                                        Je construis le flux…
+                                    </div>
+                                </div>
                             ) : null}
                         </div>
                     </div>
@@ -222,8 +317,9 @@ export function FlowAIAssistant({ flowId }: FlowAIAssistantProps) {
                                     <button
                                         key={q}
                                         type="button"
-                                        onClick={advance}
-                                        className="h-[30px] rounded-full border border-[var(--ink-200)] bg-[var(--paper-warm)] px-3 text-[12.5px] font-medium tracking-[-0.005em] text-[var(--ink-700)] transition-colors hover:border-[var(--accent)]"
+                                        disabled={generating}
+                                        onClick={() => send(q)}
+                                        className="h-[30px] rounded-full border border-[var(--ink-200)] bg-[var(--paper-warm)] px-3 text-[12.5px] font-medium tracking-[-0.005em] text-[var(--ink-700)] transition-colors hover:border-[var(--accent)] disabled:opacity-50"
                                     >
                                         {q}
                                     </button>
@@ -234,25 +330,28 @@ export function FlowAIAssistant({ flowId }: FlowAIAssistantProps) {
                                 <input
                                     value={draft}
                                     onChange={(e) => setDraft(e.target.value)}
+                                    disabled={generating}
                                     onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && draft.trim()) {
-                                            setDraft('');
-                                            advance();
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            send(draft);
                                         }
                                     }}
-                                    placeholder="Décrivez une modification…"
-                                    className="flex-1 border-none bg-transparent text-[14px] tracking-[-0.005em] text-[var(--ink-900)] outline-none placeholder:text-[var(--ink-soft)]"
+                                    placeholder={built ? 'Décrivez une modification…' : 'Décrivez votre automatisation…'}
+                                    className="flex-1 border-none bg-transparent text-[14px] tracking-[-0.005em] text-[var(--ink-900)] outline-none placeholder:text-[var(--ink-soft)] disabled:opacity-60"
                                 />
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        setDraft('');
-                                        advance();
-                                    }}
-                                    className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-[var(--accent)] transition-opacity hover:opacity-90"
+                                    disabled={generating || !draft.trim()}
+                                    onClick={() => send(draft)}
+                                    className="flex h-[34px] w-[34px] items-center justify-center rounded-[9px] bg-[var(--accent)] transition-opacity hover:opacity-90 disabled:opacity-50"
                                     aria-label="Envoyer"
                                 >
-                                    <Icon name="send" size={16} color="#fff" strokeWidth={2} />
+                                    {generating ? (
+                                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                                    ) : (
+                                        <Icon name="send" size={16} color="#fff" strokeWidth={2} />
+                                    )}
                                 </button>
                             </div>
                         </div>
@@ -275,20 +374,20 @@ export function FlowAIAssistant({ flowId }: FlowAIAssistantProps) {
                     </div>
 
                     <div
-                        className="relative flex-1 overflow-hidden"
+                        className="relative flex-1 overflow-auto"
                         style={{
                             background: 'radial-gradient(circle, rgba(10,10,10,0.05) 1px, transparent 1.2px), var(--paper-warm)',
                             backgroundSize: '16px 16px',
                         }}
                     >
-                        <PreviewFlow built={built} />
+                        <PreviewFlow flow={generated} />
                     </div>
 
                     <div className="flex shrink-0 gap-[18px] border-t border-[var(--ink-200)] bg-[var(--paper-white)] px-5 py-[13px]">
                         {[
-                            { k: 'Nœuds', v: built ? '6' : '2' },
-                            { k: 'Déclencheur', v: '1er msg' },
-                            { k: 'Branches', v: built ? '3' : '0' },
+                            { k: 'Nœuds', v: generated ? String(generated.nodes.length) : '—' },
+                            { k: 'Déclencheur', v: generated ? triggerShort(generated) : '—' },
+                            { k: 'Branches', v: generated ? String(branchCount(generated)) : '—' },
                         ].map((s, i) => (
                             <div key={s.k} className="flex items-center gap-[18px]">
                                 {i > 0 ? <div className="h-7 w-px bg-[var(--ink-200)]" /> : null}
@@ -303,6 +402,24 @@ export function FlowAIAssistant({ flowId }: FlowAIAssistantProps) {
             </div>
         </div>
     );
+}
+
+// ── Preview helpers ──────────────────────────────────────────────────────────
+function triggerShort(flow: GeneratedFlow): string {
+    const start = flow.nodes.find((n) => n.type === 'start');
+    const tt = (start?.data?.triggerType || '').toLowerCase();
+    if (tt === 'keyword') return 'mot-clé';
+    if (tt === 'no_reply') return 'timeout';
+    return '1er msg';
+}
+
+function branchCount(flow: GeneratedFlow): number {
+    // Branches = nodes with more than one outgoing edge → fan-out count.
+    const out = new Map<string, number>();
+    for (const e of flow.edges) out.set(e.source, (out.get(e.source) || 0) + 1);
+    let branches = 0;
+    for (const count of out.values()) if (count > 1) branches += count;
+    return branches;
 }
 
 // ── Chat bubbles ────────────────────────────────────────────────────────────
@@ -320,7 +437,7 @@ function AIMsg({ children, tags }: { children: React.ReactNode; tags?: Tag[] }) 
                 <div className="rounded-[4px_14px_14px_14px] border border-[var(--ink-200)] bg-[var(--paper-white)] px-3.5 py-[11px] text-[13.5px] leading-[1.5] tracking-[-0.005em] text-[var(--ink-900)] shadow-[0_1px_2px_rgba(10,10,10,0.03)]">
                     {children}
                 </div>
-                {tags ? (
+                {tags && tags.length > 0 ? (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                         {tags.map((t, i) => (
                             <span
@@ -348,45 +465,63 @@ function UserMsg({ children }: { children: React.ReactNode }) {
     );
 }
 
-function AICard({ children }: { children: React.ReactNode }) {
+function ErrorMsg({ children }: { children: React.ReactNode }) {
     return (
-        <div className="mt-2.5 rounded-[10px] border border-l-[2.5px] border-[var(--ink-200)] border-l-[var(--accent)] bg-[var(--paper-warm)] px-[13px] py-[11px] text-[13px] leading-[1.5] tracking-[-0.005em] text-[var(--ink-700)]">
-            {children}
+        <div className="flex items-start gap-[11px]">
+            <span className="mt-px flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] bg-[var(--status-danger-soft)]">
+                <Icon name="flag" size={15} color="var(--status-danger)" strokeWidth={1.9} />
+            </span>
+            <div className="min-w-0 flex-1">
+                <div className="rounded-[4px_14px_14px_14px] border border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)] px-3.5 py-[11px] text-[13.5px] leading-[1.5] tracking-[-0.005em] text-[var(--status-danger)]">
+                    {children}
+                </div>
+            </div>
         </div>
     );
 }
 
-// ── Read-only mini preview ──────────────────────────────────────────────────
-function PreviewNode({
-    x,
-    y,
-    kind,
-    icon,
-    title,
-    sub,
-    options,
-    width = 188,
-}: {
-    x: number;
-    y: number;
-    kind: NodeKind;
-    icon: IconName;
-    title: string;
-    sub?: string;
-    options?: string[];
-    width?: number;
-}) {
-    const c = NODE_KIND[kind];
+// ── Read-only flow preview (renders the actual generated nodes) ──────────────
+function PreviewNode({ node }: { node: GenNode }) {
+    const meta = NODE_META[node.type] ?? { kind: 'message' as NodeKind, icon: 'cog' as IconName };
+    const c = NODE_KIND[meta.kind];
     const KIND_LABEL: Record<NodeKind, string> = { trigger: 'Déclencheur', message: 'Message', condition: 'Interactif', action: 'Action' };
+
+    const title =
+        node.data?.label ||
+        (node.type === 'start'
+            ? 'Déclencheur'
+            : node.type === 'action'
+              ? node.data?.actionType || 'Action'
+              : node.type === 'interactive'
+                ? 'Menu'
+                : 'Message');
+    const sub =
+        node.type === 'message'
+            ? node.data?.content
+            : node.type === 'action'
+              ? node.data?.details
+              : node.type === 'start'
+                ? node.data?.keywords
+                    ? `Mots-clés : ${node.data.keywords}`
+                    : undefined
+                : node.data?.content;
+    const options =
+        node.type === 'interactive'
+            ? (node.data?.options || []).map((o) => o.label || o.title || 'Option')
+            : undefined;
+
+    const x = node.position?.x ?? 0;
+    const y = node.position?.y ?? 0;
+
     return (
         <div
             className="absolute overflow-hidden rounded-xl border bg-[var(--paper-white)] shadow-[0_3px_12px_rgba(10,10,10,0.07)]"
-            style={{ left: x, top: y, width, borderColor: c.border }}
+            style={{ left: x, top: y, width: 188, borderColor: c.border }}
         >
             <div className="flex items-center gap-[7px] border-b px-[11px] py-[7px]" style={{ background: c.tint, borderColor: c.border }}>
-                <Icon name={icon} size={12} color={c.ico} strokeWidth={1.9} />
+                <Icon name={meta.icon} size={12} color={c.ico} strokeWidth={1.9} />
                 <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.07em]" style={{ color: c.head }}>
-                    {KIND_LABEL[kind]}
+                    {KIND_LABEL[meta.kind]}
                 </span>
             </div>
             <div className="px-3 pb-[10px] pt-[8px]">
@@ -410,36 +545,60 @@ function PreviewNode({
     );
 }
 
-function PreviewFlow({ built }: { built: boolean }) {
+function PreviewFlow({ flow }: { flow: GeneratedFlow | null }) {
+    if (!flow || flow.nodes.length === 0) {
+        return (
+            <div className="flex h-full flex-col items-center justify-center gap-2.5 px-8 text-center">
+                <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)]">
+                    <Icon name="sparkle" size={18} color="var(--ink-soft)" />
+                </span>
+                <p className="max-w-[260px] text-[12.5px] leading-[1.5] text-[var(--ink-500)]">
+                    Décrivez votre automatisation dans le chat — l&apos;aperçu du flux apparaîtra ici.
+                </p>
+            </div>
+        );
+    }
+
+    // Layout bounds → fit the generated nodes in the preview viewport.
+    const NODE_W = 188;
+    const NODE_H = 110;
+    const PAD = 24;
+    const xs = flow.nodes.map((n) => n.position?.x ?? 0);
+    const ys = flow.nodes.map((n) => n.position?.y ?? 0);
+    const width = Math.max(...xs) + NODE_W + PAD;
+    const height = Math.max(...ys) + NODE_H + PAD;
+
     return (
-        <div className="absolute left-0 top-0 origin-top-left" style={{ width: 470, height: 540, transform: 'scale(0.82)', padding: '6px 0 0 6px' }}>
-            <svg className="pointer-events-none absolute inset-0 h-full w-full">
+        <div className="relative origin-top-left p-1.5" style={{ width, height }}>
+            <svg className="pointer-events-none absolute inset-0 h-full w-full" style={{ width, height }}>
                 <defs>
                     <marker id="ai-arr" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
                         <path d="M0,1 L9,5 L0,9" fill="none" stroke="var(--ink-soft)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                     </marker>
                 </defs>
-                <path d="M118,92 C118,116 118,116 118,140" stroke="var(--ink-300)" strokeWidth="1.6" fill="none" markerEnd="url(#ai-arr)" />
-                {built ? (
-                    <>
-                        <path d="M118,236 C118,256 118,256 118,284" stroke="var(--ink-300)" strokeWidth="1.6" fill="none" markerEnd="url(#ai-arr)" />
-                        <path d="M236,360 C300,360 300,300 250,300" stroke="var(--ink-300)" strokeWidth="1.6" fill="none" markerEnd="url(#ai-arr)" />
-                        <path d="M236,372 C300,372 304,374 250,374" stroke="var(--ink-300)" strokeWidth="1.6" fill="none" markerEnd="url(#ai-arr)" />
-                        <path d="M236,384 C300,384 304,448 250,448" stroke="var(--ink-300)" strokeWidth="1.6" fill="none" markerEnd="url(#ai-arr)" />
-                    </>
-                ) : null}
+                {flow.edges.map((e) => {
+                    const s = flow.nodes.find((n) => n.id === e.source);
+                    const t = flow.nodes.find((n) => n.id === e.target);
+                    if (!s || !t) return null;
+                    const sx = (s.position?.x ?? 0) + NODE_W / 2 + 6;
+                    const sy = (s.position?.y ?? 0) + NODE_H - 18 + 6;
+                    const tx = (t.position?.x ?? 0) + NODE_W / 2 + 6;
+                    const ty = (t.position?.y ?? 0) + 6;
+                    return (
+                        <path
+                            key={e.id}
+                            d={`M${sx},${sy} C${sx},${(sy + ty) / 2} ${tx},${(sy + ty) / 2} ${tx},${ty}`}
+                            stroke="var(--ink-300)"
+                            strokeWidth="1.6"
+                            fill="none"
+                            markerEnd="url(#ai-arr)"
+                        />
+                    );
+                })}
             </svg>
-
-            <PreviewNode x={24} y={20} kind="trigger" icon="bolt" title="Premier message" sub="Nouveau contact" />
-            <PreviewNode x={24} y={140} kind="message" icon="send" title="Message d'accueil" sub="« Bonjour {{prenom}} 👋 … »" />
-            {built ? (
-                <>
-                    <PreviewNode x={24} y={284} kind="condition" icon="list" title="Menu de tri" options={['Ventes', 'Support', 'Suivi']} />
-                    <PreviewNode x={250} y={274} kind="action" icon="user" title="→ Ventes" width={180} />
-                    <PreviewNode x={250} y={350} kind="action" icon="user" title="→ Support" width={180} />
-                    <PreviewNode x={250} y={426} kind="action" icon="doc" title="→ Suivi + tag" width={180} />
-                </>
-            ) : null}
+            {flow.nodes.map((n) => (
+                <PreviewNode key={n.id} node={n} />
+            ))}
         </div>
     );
 }
