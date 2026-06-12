@@ -8,9 +8,8 @@ import {
     Text,
     View,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
 import { useQuery } from "convex/react";
-import { theme } from "@jokko/tokens";
+import { Icon, useTheme } from "@jokko/ui-mobile";
 import { api } from "../../../../convex/_generated/api";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { templateBodyHasPlaceholders } from "../lib/template-placeholders";
@@ -27,6 +26,11 @@ type TemplateRow = {
 type Props = {
     disabled?: boolean;
     onSelect: (templateId: Id<"templates">) => void;
+    /** Controlled open state — when provided the picker is driven by the parent. */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
+    /** Hide the built-in icon trigger (the parent renders its own CTA). */
+    hideTrigger?: boolean;
 };
 
 /**
@@ -36,8 +40,15 @@ type Props = {
  * placeholders. Templates with placeholders require a parameter-fill UI
  * that's intentionally deferred (avoids shipping a half-baked form).
  */
-export function TemplatePicker({ disabled, onSelect }: Props) {
-    const [open, setOpen] = useState(false);
+export function TemplatePicker({ disabled, onSelect, open: controlledOpen, onOpenChange, hideTrigger }: Props) {
+    const { colors, font } = useTheme();
+    const [internalOpen, setInternalOpen] = useState(false);
+    const open = controlledOpen ?? internalOpen;
+    const setOpen = (value: boolean) => {
+        if (onOpenChange) onOpenChange(value);
+        else setInternalOpen(value);
+    };
+
     const templatesPage = useQuery(
         api.templates.queries.list,
         open ? { paginationOpts: { numItems: 50, cursor: null }, status: "APPROVED" } : "skip",
@@ -50,54 +61,54 @@ export function TemplatePicker({ disabled, onSelect }: Props) {
 
     return (
         <>
-            <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Insérer un modèle WhatsApp"
-                disabled={disabled}
-                onPress={() => setOpen(true)}
-                hitSlop={8}
-                style={({ pressed }) => [
-                    styles.iconButton,
-                    disabled && styles.disabled,
-                    pressed && !disabled && styles.pressed,
-                ]}
-            >
-                <Ionicons name="document-text-outline" size={20} color={theme.ink[900]} />
-            </Pressable>
-
-            <Modal
-                visible={open}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setOpen(false)}
-            >
+            {hideTrigger ? null : (
                 <Pressable
-                    accessibilityLabel="Fermer la sélection de modèle"
-                    style={styles.backdrop}
-                    onPress={() => setOpen(false)}
-                />
-                <View style={styles.sheet}>
-                    <View style={styles.sheetHeader}>
-                        <Text style={styles.sheetTitle}>Modèles WhatsApp</Text>
+                    accessibilityRole="button"
+                    accessibilityLabel="Insérer un modèle WhatsApp"
+                    disabled={disabled}
+                    onPress={() => setOpen(true)}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                        styles.iconButton,
+                        { backgroundColor: colors.card, borderColor: colors.rule },
+                        disabled && styles.disabled,
+                        pressed && !disabled && styles.pressed,
+                    ]}
+                >
+                    <Icon name="sticky-note" size={19} color={colors.ink} strokeWidth={1.7} />
+                </Pressable>
+            )}
+
+            <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
+                <Pressable accessibilityLabel="Fermer la sélection de modèle" style={styles.backdrop} onPress={() => setOpen(false)} />
+                <View style={[styles.sheet, { backgroundColor: colors.paper }]}>
+                    <View style={styles.handle}>
+                        <View style={[styles.handleBar, { backgroundColor: colors.rule }]} />
+                    </View>
+                    <View style={[styles.sheetHeader, { borderBottomColor: colors.rule }]}>
+                        <View>
+                            <Text style={[styles.eyebrow, { color: colors.mute, fontFamily: font.mono }]}>WHATSAPP</Text>
+                            <Text style={[styles.sheetTitle, { color: colors.ink, fontFamily: font.display }]}>Modèles approuvés</Text>
+                        </View>
                         <Pressable
                             accessibilityRole="button"
                             onPress={() => setOpen(false)}
                             hitSlop={10}
-                            style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}
+                            style={({ pressed }) => [styles.closeButton, { backgroundColor: colors.card }, pressed && styles.pressed]}
                         >
-                            <Ionicons name="close" size={20} color={theme.ink[700]} />
+                            <Icon name="close" size={18} color={colors.ink3} />
                         </Pressable>
                     </View>
 
                     {templatesPage === undefined ? (
                         <View style={styles.center}>
-                            <ActivityIndicator color={theme.accent.primary} />
+                            <ActivityIndicator color={colors.accent} />
                         </View>
                     ) : approved.length === 0 ? (
                         <View style={styles.center}>
-                            <Text style={styles.emptyTitle}>Aucun modèle disponible</Text>
-                            <Text style={styles.emptyBody}>
-                                Seuls les modèles APPROUVÉS sans paramètres apparaissent ici.
+                            <Text style={[styles.emptyTitle, { color: colors.ink, fontFamily: font.sansSemibold }]}>Aucun modèle disponible</Text>
+                            <Text style={[styles.emptyBody, { color: colors.mute, fontFamily: font.sans }]}>
+                                Seuls les modèles approuvés sans paramètres apparaissent ici.
                             </Text>
                         </View>
                     ) : (
@@ -112,19 +123,20 @@ export function TemplatePicker({ disabled, onSelect }: Props) {
                                     }}
                                     style={({ pressed }) => [
                                         styles.templateRow,
+                                        { backgroundColor: colors.card, borderColor: colors.rule },
                                         pressed && styles.pressed,
                                     ]}
                                 >
                                     <View style={styles.templateHeader}>
-                                        <Text style={styles.templateName} numberOfLines={1}>
+                                        <Text style={[styles.templateName, { color: colors.ink, fontFamily: font.sansSemibold }]} numberOfLines={1}>
                                             {tpl.name}
                                         </Text>
-                                        <Text style={styles.templateMeta}>
+                                        <Text style={[styles.templateMeta, { color: colors.mute, fontFamily: font.mono, backgroundColor: colors.paper2 }]}>
                                             {tpl.language.toUpperCase()}
                                         </Text>
                                     </View>
                                     {tpl.body ? (
-                                        <Text style={styles.templateBody} numberOfLines={3}>
+                                        <Text style={[styles.templateBody, { color: colors.ink3, fontFamily: font.sans }]} numberOfLines={3}>
                                             {tpl.body}
                                         </Text>
                                     ) : null}
@@ -145,103 +157,42 @@ const styles = StyleSheet.create({
         borderRadius: 19,
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
+        borderWidth: StyleSheet.hairlineWidth,
     },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: "rgba(0,0,0,0.4)",
-    },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.4)" },
     sheet: {
         position: "absolute",
         bottom: 0,
         left: 0,
         right: 0,
-        maxHeight: "70%",
-        backgroundColor: theme.surface.default,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        paddingBottom: theme.spacing.xl,
+        maxHeight: "72%",
+        borderTopLeftRadius: 22,
+        borderTopRightRadius: 22,
+        paddingBottom: 28,
     },
+    handle: { alignItems: "center", paddingTop: 8, paddingBottom: 4 },
+    handleBar: { width: 38, height: 4, borderRadius: 2 },
     sheetHeader: {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "space-between",
-        paddingHorizontal: theme.spacing.lg,
-        paddingVertical: theme.spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.ink[300],
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 14,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
-    sheetTitle: {
-        fontSize: 16,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    closeButton: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    list: {
-        padding: theme.spacing.lg,
-        gap: theme.spacing.sm,
-    },
-    templateRow: {
-        padding: theme.spacing.md,
-        borderRadius: theme.radius.md,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        backgroundColor: theme.surface.raised,
-        gap: theme.spacing.xs,
-    },
-    templateHeader: {
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-    },
-    templateName: {
-        flex: 1,
-        fontSize: 14,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    templateMeta: {
-        fontSize: 10,
-        fontWeight: "800",
-        color: theme.ink[500],
-        backgroundColor: theme.surface.sunken,
-        paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
-    },
-    templateBody: {
-        fontSize: 13,
-        lineHeight: 18,
-        color: theme.ink[700],
-    },
-    center: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: theme.spacing.xl,
-        minHeight: 180,
-    },
-    emptyTitle: {
-        fontSize: 16,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    emptyBody: {
-        marginTop: theme.spacing.xs,
-        textAlign: "center",
-        fontSize: 13,
-        color: theme.ink[500],
-        maxWidth: 280,
-    },
+    eyebrow: { fontSize: 10, letterSpacing: 1.2, marginBottom: 3 },
+    sheetTitle: { fontSize: 20, letterSpacing: -0.3 },
+    closeButton: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+    list: { padding: 16, gap: 10 },
+    templateRow: { padding: 13, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, gap: 6 },
+    templateHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 },
+    templateName: { flex: 1, fontSize: 14.5 },
+    templateMeta: { fontSize: 10, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, overflow: "hidden" },
+    templateBody: { fontSize: 13, lineHeight: 18 },
+    center: { alignItems: "center", justifyContent: "center", padding: 32, minHeight: 200 },
+    emptyTitle: { fontSize: 16 },
+    emptyBody: { marginTop: 6, textAlign: "center", fontSize: 13, lineHeight: 18, maxWidth: 280 },
     disabled: { opacity: 0.4 },
     pressed: { opacity: 0.65 },
 });

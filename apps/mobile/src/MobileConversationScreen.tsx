@@ -36,6 +36,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [isSending, setIsSending] = useState(false);
     const [isMutating, setIsMutating] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [templateGateOpen, setTemplateGateOpen] = useState(false);
     const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
     const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
     const typedConversationId = conversationId as Id<"conversations"> | null;
@@ -66,14 +67,19 @@ export function MobileConversationScreen({ conversationId }: Props) {
         return map;
     }, [messages]);
 
+    // WhatsApp 24h service window: once the customer's last message is older than
+    // 24h, free-form replies are blocked — only approved templates can re-open it.
+    const windowExpiresAt = conversation?.windowExpiresAt;
+    const windowExpired = typeof windowExpiresAt === "number" && Date.now() > windowExpiresAt;
+
     // Keep the thread pinned to the newest message: jump to the bottom on first
-    // load, then auto-follow each new message that lands at the end.
+    // load, then auto-follow each new message (or the 24h notice) at the end.
     const scrollRef = useRef<ScrollView>(null);
     const didInitialScroll = useRef(false);
     const newestId = messages.length > 0 ? messages[messages.length - 1].id : null;
     useEffect(() => {
         if (newestId && didInitialScroll.current) scrollRef.current?.scrollToEnd({ animated: true });
-    }, [newestId]);
+    }, [newestId, windowExpired]);
 
     const contactName = conversation?.contact?.name || conversation?.contact?.phoneNumber || "Contact inconnu";
     const contactPhone = conversation?.contact?.phoneNumber;
@@ -289,61 +295,95 @@ export function MobileConversationScreen({ conversationId }: Props) {
                     ) : (
                         renderedThread
                     )}
+                    {windowExpired ? (
+                        <View style={[styles.windowNotice, { backgroundColor: colors.card, borderColor: colors.rule }]}>
+                            <View style={styles.windowNoticeHead}>
+                                <Icon name="clock" size={14} color={colors.warn} strokeWidth={2} />
+                                <Text style={{ fontFamily: font.mono, fontSize: 10.5, letterSpacing: 0.8, color: colors.warn }}>
+                                    FENÊTRE 24H EXPIRÉE
+                                </Text>
+                            </View>
+                            <Text style={{ fontSize: 13, lineHeight: 19, textAlign: "center", color: colors.ink3, fontFamily: font.sans }}>
+                                Pour relancer la conversation, envoyez un modèle WhatsApp approuvé.
+                            </Text>
+                        </View>
+                    ) : null}
                 </ScrollView>
             </View>
 
             {error ? <Text style={[styles.errorText, { color: colors.hot, fontFamily: font.sans }]}>{error}</Text> : null}
 
-            {/* Reply morph */}
-            {replyingTo ? (
-                <View style={[styles.replyBar, { backgroundColor: colors.paper2, borderLeftColor: colors.accent }]}>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={{ fontSize: 11.5, fontFamily: font.sansSemibold, color: colors.accentInk }}>
-                            {replyingTo.direction === "OUTBOUND" ? "Vous" : contactName}
-                        </Text>
-                        <Text numberOfLines={1} style={{ fontSize: 12.5, color: colors.ink3, marginTop: 2, fontFamily: font.sans }}>
-                            {(replyingTo.content ?? "").trim() || `[${replyingTo.type}]`}
-                        </Text>
-                    </View>
-                    <Pressable onPress={() => setReplyingTo(null)} hitSlop={10}>
-                        <Icon name="close" size={16} color={colors.mute} />
-                    </Pressable>
+            {windowExpired ? (
+                /* 24h service window expired — free-form locked, only templates re-open it. */
+                <View style={[styles.gate, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
+                    <Btn tone="accent" size="lg" full icon="sticky-note" onPress={() => setTemplateGateOpen(true)}>
+                        Envoyer un modèle
+                    </Btn>
+                    <Text style={[styles.gateHint, { color: colors.mute, fontFamily: font.sans }]}>
+                        La saisie libre se débloquera à la réponse du contact.
+                    </Text>
+                    <TemplatePicker
+                        hideTrigger
+                        open={templateGateOpen}
+                        onOpenChange={setTemplateGateOpen}
+                        disabled={!typedConversationId}
+                        onSelect={(templateId) => void sendTemplateMessage(templateId)}
+                    />
                 </View>
-            ) : null}
+            ) : (
+                <>
+                    {/* Reply morph */}
+                    {replyingTo ? (
+                        <View style={[styles.replyBar, { backgroundColor: colors.paper2, borderLeftColor: colors.accent }]}>
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={{ fontSize: 11.5, fontFamily: font.sansSemibold, color: colors.accentInk }}>
+                                    {replyingTo.direction === "OUTBOUND" ? "Vous" : contactName}
+                                </Text>
+                                <Text numberOfLines={1} style={{ fontSize: 12.5, color: colors.ink3, marginTop: 2, fontFamily: font.sans }}>
+                                    {(replyingTo.content ?? "").trim() || `[${replyingTo.type}]`}
+                                </Text>
+                            </View>
+                            <Pressable onPress={() => setReplyingTo(null)} hitSlop={10}>
+                                <Icon name="close" size={16} color={colors.mute} />
+                            </Pressable>
+                        </View>
+                    ) : null}
 
-            {showShortcutPopover ? (
-                <ShortcutPopover
-                    query={draft}
-                    onSelect={(suggestion) => setDraft(`${suggestion.text ?? suggestion.shortcut} `)}
-                />
-            ) : null}
+                    {showShortcutPopover ? (
+                        <ShortcutPopover
+                            query={draft}
+                            onSelect={(suggestion) => setDraft(`${suggestion.text ?? suggestion.shortcut} `)}
+                        />
+                    ) : null}
 
-            {/* Composer */}
-            <View style={[styles.composer, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
-                <MediaPicker disabled={!typedConversationId || isSending} onPicked={(payload) => void sendMedia(payload)} />
-                <TemplatePicker disabled={!typedConversationId || isSending} onSelect={(templateId) => void sendTemplateMessage(templateId)} />
-                <TextInput
-                    value={draft}
-                    onChangeText={setDraft}
-                    placeholder="Répondre par WhatsApp"
-                    placeholderTextColor={colors.mute}
-                    style={[styles.input, { backgroundColor: colors.card, borderColor: colors.rule, color: colors.ink, fontFamily: font.sans }]}
-                    multiline
-                    maxLength={2000}
-                />
-                {draft.trim().length > 0 ? (
-                    <Pressable
-                        accessibilityRole="button"
-                        disabled={!canSend}
-                        onPress={submitText}
-                        style={({ pressed }) => [styles.sendButton, { backgroundColor: colors.ink, opacity: !canSend ? 0.45 : pressed ? 0.8 : 1 }]}
-                    >
-                        {isSending ? <ActivityIndicator color={colors.paper} /> : <Icon name="send" size={18} color={colors.paper} strokeWidth={2} />}
-                    </Pressable>
-                ) : (
-                    <VoiceNoteRecorder disabled={!typedConversationId} onSend={sendVoiceNote} />
-                )}
-            </View>
+                    {/* Composer */}
+                    <View style={[styles.composer, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
+                        <MediaPicker disabled={!typedConversationId || isSending} onPicked={(payload) => void sendMedia(payload)} />
+                        <TemplatePicker disabled={!typedConversationId || isSending} onSelect={(templateId) => void sendTemplateMessage(templateId)} />
+                        <TextInput
+                            value={draft}
+                            onChangeText={setDraft}
+                            placeholder="Répondre par WhatsApp"
+                            placeholderTextColor={colors.mute}
+                            style={[styles.input, { backgroundColor: colors.card, borderColor: colors.rule, color: colors.ink, fontFamily: font.sans }]}
+                            multiline
+                            maxLength={2000}
+                        />
+                        {draft.trim().length > 0 ? (
+                            <Pressable
+                                accessibilityRole="button"
+                                disabled={!canSend}
+                                onPress={submitText}
+                                style={({ pressed }) => [styles.sendButton, { backgroundColor: colors.ink, opacity: !canSend ? 0.45 : pressed ? 0.8 : 1 }]}
+                            >
+                                {isSending ? <ActivityIndicator color={colors.paper} /> : <Icon name="send" size={18} color={colors.paper} strokeWidth={2} />}
+                            </Pressable>
+                        ) : (
+                            <VoiceNoteRecorder disabled={!typedConversationId} onSend={sendVoiceNote} />
+                        )}
+                    </View>
+                </>
+            )}
 
             <ReactionPicker visible={reactingTo !== null} onSelect={(emoji) => void submitReaction(emoji)} onClose={() => setReactingTo(null)} />
 
@@ -454,6 +494,25 @@ const styles = StyleSheet.create({
     loadMore: { alignSelf: "center", paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, marginBottom: 6 },
     threadEmpty: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 60 },
     errorText: { paddingHorizontal: 18, paddingTop: 8, fontSize: 13, lineHeight: 18 },
+    windowNotice: {
+        alignSelf: "center",
+        maxWidth: "86%",
+        marginTop: 16,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderRadius: 16,
+        borderWidth: StyleSheet.hairlineWidth,
+        alignItems: "center",
+        gap: 6,
+    },
+    windowNoticeHead: { flexDirection: "row", alignItems: "center", gap: 6 },
+    gate: {
+        paddingHorizontal: 14,
+        paddingTop: 12,
+        paddingBottom: 12,
+        borderTopWidth: StyleSheet.hairlineWidth,
+    },
+    gateHint: { fontSize: 11.5, textAlign: "center", marginTop: 8 },
     replyBar: {
         flexDirection: "row",
         alignItems: "center",
