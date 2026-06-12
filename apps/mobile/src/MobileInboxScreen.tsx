@@ -1,13 +1,13 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Swipeable } from "react-native-gesture-handler";
 import { useRouter } from "expo-router";
-import { useQuery } from "convex/react";
+import { useMutation, useQuery } from "convex/react";
 import {
     Avatar,
     Btn,
     Icon,
     Micro,
-    NavBar,
     NavButton,
     SectionHead,
     Skeleton,
@@ -35,6 +35,13 @@ type ConversationRowRecord = MobileConversationSearchFields & {
     tags?: string[];
 };
 
+type RowActions = {
+    pin: (id: Id<"conversations">) => void;
+    assign: (id: Id<"conversations">) => void;
+    resolve: (id: Id<"conversations">) => void;
+    archive: (id: Id<"conversations">) => void;
+};
+
 const FILTERS: { key: MobileInboxFilter; label: string }[] = [
     { key: "all", label: "Tout" },
     { key: "unread", label: "Non lus" },
@@ -44,7 +51,7 @@ const FILTERS: { key: MobileInboxFilter; label: string }[] = [
 
 export function MobileInboxScreen() {
     const router = useRouter();
-    const { colors } = useTheme();
+    const { colors, font } = useTheme();
     const session = useQuery(api.sessions.current);
     const organizations = useQuery(api.organizations.listMine);
     const [filter, setFilter] = useState<MobileInboxFilter>("all");
@@ -53,6 +60,20 @@ export function MobileInboxScreen() {
 
     const activeOrganization = session?.organization ?? organizations?.[0] ?? null;
     const currentUserId = session?.membership?.userId ?? null;
+
+    const togglePin = useMutation(api.conversations.togglePin);
+    const assignToMe = useMutation(api.conversations.assignToMe);
+    const resolveConversation = useMutation(api.conversations.resolve);
+    const archiveConversation = useMutation(api.conversations.archive);
+    const actions = useMemo<RowActions>(
+        () => ({
+            pin: (id) => void togglePin({ id }),
+            assign: (id) => void assignToMe({ id }),
+            resolve: (id) => void resolveConversation({ id }),
+            archive: (id) => void archiveConversation({ id }),
+        }),
+        [togglePin, assignToMe, resolveConversation, archiveConversation],
+    );
 
     // The full (non-archived) set drives the all/unread/mine views + chip counts;
     // archived is loaded on demand. Search + final sort are applied client-side.
@@ -100,17 +121,19 @@ export function MobileInboxScreen() {
 
     return (
         <View style={[styles.root, { backgroundColor: colors.paper }]}>
-            <NavBar
-                large
-                eyebrow={`${activeOrganization.name} · ${counts.all} ${counts.all === 1 ? "ouverte" : "ouvertes"}`}
-                title="Inbox"
-                right={
-                    <>
-                        <NavButton icon="search" onPress={() => setSearchOpen((open) => !open)} />
-                        <NavButton icon="filter" onPress={() => setSearchOpen((open) => !open)} />
-                    </>
-                }
-            />
+            {/* Header — eyebrow + title on the left, actions aligned to the title baseline on the right. */}
+            <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                    <Micro>
+                        {`${activeOrganization.name} · ${counts.all} ${counts.all === 1 ? "ouverte" : "ouvertes"}`}
+                    </Micro>
+                    <Text style={[styles.title, { fontFamily: font.display, color: colors.ink }]}>Inbox</Text>
+                </View>
+                <View style={styles.headerIcons}>
+                    <NavButton icon="search" onPress={() => setSearchOpen((open) => !open)} />
+                    <NavButton icon="filter" onPress={() => setSearchOpen((open) => !open)} />
+                </View>
+            </View>
 
             {searchOpen ? (
                 <View style={styles.searchWrap}>
@@ -183,9 +206,9 @@ export function MobileInboxScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <Section title="Épinglés" rows={groups.pinned} breathingId={breathingId} onOpen={openConversation} />
-                    <Section title="Aujourd'hui" rows={groups.today} breathingId={breathingId} onOpen={openConversation} />
-                    <Section title="Plus tôt" rows={groups.earlier} breathingId={breathingId} onOpen={openConversation} count={false} />
+                    <Section title="Épinglés" rows={groups.pinned} breathingId={breathingId} onOpen={openConversation} actions={actions} />
+                    <Section title="Aujourd'hui" rows={groups.today} breathingId={breathingId} onOpen={openConversation} actions={actions} />
+                    <Section title="Plus tôt" rows={groups.earlier} breathingId={breathingId} onOpen={openConversation} actions={actions} count={false} />
                 </ScrollView>
             )}
         </View>
@@ -197,12 +220,14 @@ function Section({
     rows,
     breathingId,
     onOpen,
+    actions,
     count = true,
 }: {
     title: string;
     rows: ConversationRowRecord[];
     breathingId?: string;
     onOpen: (id: string) => void;
+    actions: RowActions;
     count?: boolean;
 }) {
     if (rows.length === 0) return null;
@@ -215,6 +240,7 @@ function Section({
                     conversation={conversation}
                     breathing={conversation._id === breathingId}
                     onPress={() => onOpen(conversation._id)}
+                    actions={actions}
                 />
             ))}
         </Fragment>
@@ -225,12 +251,15 @@ function InboxRow({
     conversation,
     breathing,
     onPress,
+    actions,
 }: {
     conversation: ConversationRowRecord;
     breathing: boolean;
     onPress: () => void;
+    actions: RowActions;
 }) {
     const { colors, font } = useTheme();
+    const swipeRef = useRef<Swipeable>(null);
     const unread = conversation.unreadCount ?? 0;
     const name = getConversationDisplayName(conversation);
     const time = formatConversationTimestamp(conversation.lastMessageAt);
@@ -241,84 +270,137 @@ function InboxRow({
     const kindIcon: IconName | null =
         kind === "voice" ? "mic" : kind === "doc" ? "doc" : kind === "image" ? "image" : null;
 
+    const run = (action: (id: Id<"conversations">) => void) => {
+        swipeRef.current?.close();
+        action(conversation._id);
+    };
+
     return (
-        <Pressable
-            onPress={onPress}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-                styles.row,
-                { borderBottomColor: colors.rule2 },
-                breathing
-                    ? { backgroundColor: colors.accentSoft }
-                    : pressed
-                      ? { backgroundColor: colors.paper2 }
-                      : null,
-            ]}
+        <Swipeable
+            ref={swipeRef}
+            friction={1.6}
+            leftThreshold={56}
+            rightThreshold={56}
+            overshootLeft={false}
+            overshootRight={false}
+            renderLeftActions={() => (
+                <View style={styles.leftActions}>
+                    <SwipeAction
+                        icon="pin"
+                        label={conversation.isPinned ? "Désépingler" : "Épingler"}
+                        bg={colors.accent}
+                        fg="#fff"
+                        width={96}
+                        onPress={() => run(actions.pin)}
+                    />
+                </View>
+            )}
+            renderRightActions={() => (
+                <View style={styles.rightActions}>
+                    <SwipeAction icon="user" label="Assigner" bg={colors.ink} fg={colors.paper} onPress={() => run(actions.assign)} />
+                    <SwipeAction icon="circle-check" label="Résoudre" bg={colors.good} fg="#fff" onPress={() => run(actions.resolve)} />
+                    <SwipeAction icon="archive" label="Archiver" bg={colors.mute} fg="#fff" onPress={() => run(actions.archive)} />
+                </View>
+            )}
         >
-            {breathing ? <View style={[styles.breathBar, { backgroundColor: colors.accent }]} /> : null}
-            <Avatar name={name} size={48} />
-            <View style={styles.rowBody}>
-                <View style={styles.rowTop}>
-                    <View style={styles.rowName}>
+            <Pressable
+                onPress={onPress}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                    styles.row,
+                    { borderBottomColor: colors.rule2, backgroundColor: breathing ? colors.accentSoft : colors.paper },
+                    pressed && !breathing ? { backgroundColor: colors.paper2 } : null,
+                ]}
+            >
+                {breathing ? <View style={[styles.breathBar, { backgroundColor: colors.accent }]} /> : null}
+                <Avatar name={name} size={48} />
+                <View style={styles.rowBody}>
+                    <View style={styles.rowTop}>
+                        <View style={styles.rowName}>
+                            <Text
+                                numberOfLines={1}
+                                style={{
+                                    fontSize: 15.5,
+                                    fontFamily: unread > 0 ? font.sansSemibold : font.sansMedium,
+                                    color: colors.ink,
+                                    letterSpacing: -0.15,
+                                }}
+                            >
+                                {name}
+                            </Text>
+                            {conversation.isPinned ? <Icon name="pin" size={11} color={colors.mute} strokeWidth={2} /> : null}
+                        </View>
                         <Text
-                            numberOfLines={1}
                             style={{
-                                fontSize: 15.5,
-                                fontFamily: unread > 0 ? font.sansSemibold : font.sansMedium,
-                                color: colors.ink,
-                                letterSpacing: -0.15,
+                                fontFamily: font.mono,
+                                fontSize: 11.5,
+                                color: unread > 0 ? colors.accentInk : colors.mute,
                             }}
                         >
-                            {name}
-                        </Text>
-                        {conversation.isPinned ? <Icon name="pin" size={11} color={colors.mute} strokeWidth={2} /> : null}
-                    </View>
-                    <Text
-                        style={{
-                            fontFamily: font.mono,
-                            fontSize: 11.5,
-                            color: unread > 0 ? colors.accentInk : colors.mute,
-                        }}
-                    >
-                        {time}
-                    </Text>
-                </View>
-                <View style={styles.rowBottom}>
-                    <View style={styles.previewWrap}>
-                        {isOutbound ? <Icon name="check-double" size={14} color={colors.mute} strokeWidth={2} /> : null}
-                        {kindIcon ? (
-                            <Icon name={kindIcon} size={14} color={kind === "voice" ? colors.accentInk : colors.mute} strokeWidth={2} />
-                        ) : null}
-                        <Text
-                            numberOfLines={1}
-                            style={{
-                                flex: 1,
-                                fontSize: 13.5,
-                                color: unread > 0 ? colors.ink2 : colors.mute,
-                                fontFamily: font.sans,
-                            }}
-                        >
-                            {preview}
+                            {time}
                         </Text>
                     </View>
-                    <View style={styles.rowTrailing}>
-                        {assignee ? (
-                            <View style={[styles.assignee, { backgroundColor: colors.ink }]}>
-                                <Text style={{ color: colors.paper, fontSize: 9.5, fontFamily: font.sansSemibold }}>
-                                    {assignee[0]?.toUpperCase()}
-                                </Text>
-                            </View>
-                        ) : null}
-                        {unread > 0 ? (
-                            <View style={[styles.unreadBadge, { backgroundColor: colors.accent }]}>
-                                <Text style={{ color: "#fff", fontSize: 10.5, fontFamily: font.monoMedium }}>
-                                    {unread > 99 ? "99+" : unread}
-                                </Text>
-                            </View>
-                        ) : null}
+                    <View style={styles.rowBottom}>
+                        <View style={styles.previewWrap}>
+                            {isOutbound ? <Icon name="check-double" size={14} color={colors.mute} strokeWidth={2} /> : null}
+                            {kindIcon ? (
+                                <Icon name={kindIcon} size={14} color={kind === "voice" ? colors.accentInk : colors.mute} strokeWidth={2} />
+                            ) : null}
+                            <Text
+                                numberOfLines={1}
+                                style={{
+                                    flex: 1,
+                                    fontSize: 13.5,
+                                    color: unread > 0 ? colors.ink2 : colors.mute,
+                                    fontFamily: font.sans,
+                                }}
+                            >
+                                {preview}
+                            </Text>
+                        </View>
+                        <View style={styles.rowTrailing}>
+                            {assignee ? (
+                                <View style={[styles.assignee, { backgroundColor: colors.ink }]}>
+                                    <Text style={{ color: colors.paper, fontSize: 9.5, fontFamily: font.sansSemibold }}>
+                                        {assignee[0]?.toUpperCase()}
+                                    </Text>
+                                </View>
+                            ) : null}
+                            {unread > 0 ? (
+                                <View style={[styles.unreadBadge, { backgroundColor: colors.accent }]}>
+                                    <Text style={{ color: "#fff", fontSize: 10.5, fontFamily: font.monoMedium }}>
+                                        {unread > 99 ? "99+" : unread}
+                                    </Text>
+                                </View>
+                            ) : null}
+                        </View>
                     </View>
                 </View>
-            </View>
+            </Pressable>
+        </Swipeable>
+    );
+}
+
+function SwipeAction({
+    icon,
+    label,
+    bg,
+    fg,
+    onPress,
+    width = 80,
+}: {
+    icon: IconName;
+    label: string;
+    bg: string;
+    fg: string;
+    onPress: () => void;
+    width?: number;
+}) {
+    const { font } = useTheme();
+    return (
+        <Pressable onPress={onPress} style={[styles.swipeAction, { width, backgroundColor: bg }]}>
+            <Icon name={icon} size={20} color={fg} strokeWidth={1.9} />
+            <Text style={{ color: fg, fontSize: 11, fontFamily: font.sansMedium }}>{label}</Text>
         </Pressable>
     );
 }
@@ -350,14 +432,7 @@ function FilterChip({
                 {label}
             </Text>
             {typeof count === "number" ? (
-                <Text
-                    style={{
-                        fontSize: 12,
-                        fontFamily: font.mono,
-                        color: active ? colors.paper : colors.mute,
-                        opacity: 0.6,
-                    }}
-                >
+                <Text style={{ fontSize: 12, fontFamily: font.mono, color: active ? colors.paper : colors.mute, opacity: 0.6 }}>
                     {count}
                 </Text>
             ) : null}
@@ -433,6 +508,18 @@ function InboxMessage({
 
 const styles = StyleSheet.create({
     root: { flex: 1 },
+    header: {
+        flexDirection: "row",
+        alignItems: "flex-end",
+        justifyContent: "space-between",
+        gap: 12,
+        paddingHorizontal: 18,
+        paddingTop: 12,
+        paddingBottom: 14,
+    },
+    headerLeft: { flex: 1, minWidth: 0, gap: 6 },
+    title: { fontSize: 40, lineHeight: 42, letterSpacing: -1 },
+    headerIcons: { flexDirection: "row", alignItems: "center", gap: 2, marginBottom: 2 },
     searchWrap: { paddingHorizontal: 18, paddingBottom: 10 },
     searchBox: {
         flexDirection: "row",
@@ -446,14 +533,7 @@ const styles = StyleSheet.create({
     searchInput: { flex: 1, fontSize: 15, padding: 0 },
     chipsWrap: { paddingBottom: 12 },
     chips: { paddingHorizontal: 18, gap: 8, flexDirection: "row" },
-    chip: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: 6,
-        height: 32,
-        paddingHorizontal: 12,
-        borderRadius: 999,
-    },
+    chip: { flexDirection: "row", alignItems: "center", gap: 6, height: 32, paddingHorizontal: 12, borderRadius: 999 },
     list: { paddingBottom: 20 },
     row: {
         flexDirection: "row",
@@ -472,21 +552,10 @@ const styles = StyleSheet.create({
     previewWrap: { flexDirection: "row", alignItems: "center", gap: 5, flex: 1, minWidth: 0 },
     rowTrailing: { flexDirection: "row", alignItems: "center", gap: 6 },
     assignee: { width: 18, height: 18, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-    unreadBadge: {
-        minWidth: 18,
-        height: 18,
-        paddingHorizontal: 5,
-        borderRadius: 9,
-        alignItems: "center",
-        justifyContent: "center",
-    },
+    unreadBadge: { minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+    leftActions: { flexDirection: "row" },
+    rightActions: { flexDirection: "row" },
+    swipeAction: { alignItems: "center", justifyContent: "center", gap: 5 },
     center: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
-    emptyIcon: {
-        width: 64,
-        height: 64,
-        borderRadius: 20,
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: 1,
-    },
+    emptyIcon: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1 },
 });
