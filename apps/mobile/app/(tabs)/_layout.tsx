@@ -16,7 +16,7 @@ const tabs: Record<string, { title: string; icon: IconName; activeIcon: IconName
 
 export default function TabsLayout() {
     return (
-        <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: theme.surface.raised }}>
+        <SafeAreaView edges={["top"]} style={{ flex: 1, backgroundColor: theme.surface.default }}>
         <Tabs
             screenOptions={({ route }) => {
                 const item = tabs[route.name] ?? tabs.inbox;

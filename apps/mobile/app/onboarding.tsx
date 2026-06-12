@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import { useConvexAuth, useMutation, useQuery } from "convex/react";
-import { Screen } from "@jokko/ui-mobile";
+import { LegacyScreen } from "@jokko/ui-mobile";
 import { MobileOnboarding, type MobileOnboardingSubmission } from "../src/MobileOnboarding";
 import { api } from "../../../convex/_generated/api";
 import { FIRST_LAUNCH_SEEN_STORAGE_KEY, serializeFirstLaunchSeen } from "../src/lib/first-launch";
@@ -80,7 +80,7 @@ export default function OnboardingRoute() {
     };
 
     return (
-        <Screen>
+        <LegacyScreen>
             <MobileOnboarding
                 onOpenSpikes={() => router.push("/spikes")}
                 onComplete={() => router.replace("/inbox")}
@@ -89,6 +89,6 @@ export default function OnboardingRoute() {
                 isSubmitting={isSubmitting}
                 submitError={submitError}
             />
-        </Screen>
+        </LegacyScreen>
     );
 }

@@ -1,6 +1,7 @@
 import { type ReactNode } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { theme } from "@jokko/tokens";
 import { useTheme } from "./theme";
 
 /**
@@ -62,4 +63,14 @@ export function Screen({
       {children}
     </View>
   );
+}
+
+/**
+ * Safe-area wrapper for screens not yet rebuilt on the v2 design — they still use
+ * the legacy warm surface (`theme.surface.default`). Paints that exact background
+ * to all four edges so it fills the whole screen, while insetting the content past
+ * the notch. Swap for a plain `<Screen>` once a screen is migrated to v2.
+ */
+export function LegacyScreen({ children }: { children: ReactNode }) {
+  return <Screen color={theme.surface.default}>{children}</Screen>;
 }
