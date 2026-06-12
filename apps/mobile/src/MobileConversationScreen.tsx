@@ -22,6 +22,7 @@ import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import { ForwardSheet } from "./conversation/ForwardSheet";
 import { MediaViewer } from "./conversation/MediaViewer";
+import { callsAvailable } from "./lib/call-env";
 import { GlassReply, type GlassReaction } from "./conversation/GlassReply";
 import { MediaPicker } from "./conversation/MediaPicker";
 import { MessageBubble, type ConversationMessage } from "./conversation/MessageBubble";
@@ -79,6 +80,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const reopenConversation = useMutation(api.conversations.reopen);
     const archiveConversation = useMutation(api.conversations.archive);
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+    const requestOutboundCall = useMutation(api.calls.requestOutboundCall);
     const { results, status, loadMore } = usePaginatedQuery(
         api.messages.list,
         typedConversationId ? { conversationId: typedConversationId } : "skip",
@@ -343,7 +345,27 @@ export function MobileConversationScreen({ conversationId }: Props) {
         }
     };
 
-    const callContact = async () => {
+    // In-app WhatsApp audio call (native build): the CallHost takes over the UI
+    // once the call record exists. Falls back to the phone dialer in Expo Go.
+    const handleCall = async () => {
+        if (!typedConversationId) return;
+        if (callsAvailable) {
+            try {
+                await requestOutboundCall({ conversationId: typedConversationId });
+            } catch (callError) {
+                const message = callError instanceof Error ? callError.message : "";
+                if (message.includes("INSUFFICIENT_CREDIT")) {
+                    Alert.alert("Crédit insuffisant", "Rechargez votre solde pour passer un appel.");
+                } else {
+                    Alert.alert("Appel", message || "Impossible de lancer l'appel.");
+                }
+            }
+            return;
+        }
+        await dialPhone();
+    };
+
+    const dialPhone = async () => {
         if (!contactPhone) {
             Alert.alert("Appel", "Aucun numéro disponible pour ce contact.");
             return;
@@ -353,7 +375,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
             const supported = await Linking.canOpenURL(url);
             if (!supported) {
                 // Simulators have no dialer; real devices do.
-                Alert.alert("Appel indisponible", "Les appels téléphoniques ne sont pas disponibles sur cet appareil.");
+                Alert.alert("Appel indisponible", "Les appels audio nécessitent l'application native (build de développement).");
                 return;
             }
             await Linking.openURL(url);
@@ -431,7 +453,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
                         </Text>
                     </View>
                 </Pressable>
-                <NavButton icon="phone" onPress={() => void callContact()} />
+                <NavButton icon="phone" onPress={() => void handleCall()} />
                 <NavButton icon="more-v" onPress={() => setMenuOpen(true)} />
             </View>
 

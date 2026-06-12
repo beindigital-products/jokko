@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useMemo, type ComponentType, type ReactNode } from "react";
 import { ConvexReactClient } from "convex/react";
 import { ConvexAuthProvider } from "@convex-dev/auth/react";
 import { I18nextProvider } from "react-i18next";
@@ -6,6 +6,14 @@ import { resolveConvexUrl } from "@jokko/convex-client";
 import { MOBILE_AUTH_STORAGE_NAMESPACE, secureAuthStorage } from "./lib/auth-storage";
 import { createMobileI18n } from "./lib/mobile-i18n";
 import { PrivacyConsentGate } from "./PrivacyConsentGate";
+import { callsAvailable } from "./lib/call-env";
+
+// Audio calls need react-native-webrtc — a native module absent from Expo Go.
+// Load the call host ONLY in a real dev/standalone build so Expo Go keeps
+// running everything else (the require never executes under Expo Go).
+const CallHost: ComponentType | null = callsAvailable
+    ? (require("./calls/CallHost") as { CallHost: ComponentType }).CallHost
+    : null;
 
 declare const process: {
     env: {
@@ -42,6 +50,7 @@ export function MobileAppProviders({ children }: { children: ReactNode }) {
             replaceURL={() => {}}
         >
             {content}
+            {CallHost ? <CallHost /> : null}
         </ConvexAuthProvider>
     );
 }

@@ -150,8 +150,14 @@
       [
         "expo-audio",
         {
-          "microphonePermission": "Jokko utilise le microphone pour enregistrer et envoyer des notes vocales.",
+          "microphonePermission": "Jokko utilise le microphone pour les notes vocales et les appels audio.",
           "recordAudioAndroid": true
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "microphonePermission": "Jokko utilise le microphone pour les notes vocales et les appels audio."
         }
       ],
       "expo-secure-store"

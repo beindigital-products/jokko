@@ -79,6 +79,8 @@ export const ICONS = {
   rotate: "M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5",
   building: "M3 21h18M5 21V5a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v16M9 8h.01M9 12h.01M9 16h.01M15 8h.01M15 12h.01M15 16h.01",
   "help-circle": "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM9 9a3 3 0 0 1 6 0c0 2-3 2-3 4M12 17h.01",
+  speaker: "M11 5 6 9H2v6h4l5 4V5ZM15.5 8.5a5 5 0 0 1 0 7M19 5a9 9 0 0 1 0 14",
+  "mic-off": "M3 3l18 18M9 9v2a3 3 0 0 0 5 2M15 9.3V6a3 3 0 0 0-6 0M19 11a7 7 0 0 1-1 3.6M12 18v4M8 22h8M5 11a7 7 0 0 0 4 6.3",
 } as const;
 
 export type IconName = keyof typeof ICONS;
