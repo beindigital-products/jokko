@@ -3,6 +3,7 @@ import { mutation, query } from "./_generated/server";
 import { requireMembership, requirePermission } from "./lib/auth";
 import { canSeeAllConversations } from "./lib/permissions";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { enqueueConversationEvent } from "./crm/enqueue";
 
 // ============================================
 // Queries
@@ -253,6 +254,18 @@ export const resolve = mutation({
             status: "RESOLVED",
             updatedAt: Date.now()
         });
+
+        // Push vers les CRM connectés en mode "out"/"two" (no-op si aucune
+        // connexion active poussante — la garde vit dans enqueueConversationEvent).
+        if (conversation.contactId) {
+            await enqueueConversationEvent(ctx, {
+                organizationId: conversation.organizationId,
+                eventType: "conversation_resolved",
+                contactId: conversation.contactId,
+                conversationId: args.id,
+                occurredAtMs: Date.now(),
+            });
+        }
     },
 });
 
@@ -363,6 +376,18 @@ export const assignToMe = mutation({
         await ctx.db.patch(membership._id, {
             activeConversations: (membership.activeConversations || 0) + 1,
         });
+
+        // Push "conversation_assigned" vers les CRM poussants (no-op sinon).
+        if (conversation.contactId) {
+            await enqueueConversationEvent(ctx, {
+                organizationId: conversation.organizationId,
+                eventType: "conversation_assigned",
+                contactId: conversation.contactId,
+                conversationId: args.id,
+                occurredAtMs: Date.now(),
+                metadata: { assignedTo: userId },
+            });
+        }
     },
 });
 
@@ -535,6 +560,16 @@ export const getOrCreate = mutation({
             lastMessageAt: Date.now(),
             createdAt: Date.now(),
             updatedAt: Date.now(),
+        });
+
+        // Nouvelle conversation → push "conversation_opened" vers les CRM
+        // connectés en mode poussant (no-op sinon, garde dans enqueue).
+        await enqueueConversationEvent(ctx, {
+            organizationId: contact.organizationId,
+            eventType: "conversation_opened",
+            contactId: args.contactId,
+            conversationId,
+            occurredAtMs: Date.now(),
         });
 
         return conversationId;

@@ -47,6 +47,11 @@ export const connectWithApiKey = action({
         if (info.authMode !== "apiKey") {
             throw new Error(`Le fournisseur ${provided} n'utilise pas une clé API`);
         }
+        // Garde "Bientôt" : connecteur non encore activé → non connectable
+        // (défense côté serveur en plus de la carte inerte dans le catalogue).
+        if (info.availability === "coming_soon") {
+            throw new Error(`Connecteur bientôt disponible : ${provided}`);
+        }
 
         const { organizationId, role, plan, trialEndsAt, hasSelectedPlan, createdAt } = await ctx.runQuery(
             internal.crm.oauth._sessionContext,

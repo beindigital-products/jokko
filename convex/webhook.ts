@@ -2,6 +2,7 @@ import { internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { enqueueConversationEvent } from "./crm/enqueue";
 
 // Gérer un message entrant (internal only — called from http.ts webhook handler)
 export const handleIncomingMessage = internalMutation({
@@ -128,6 +129,17 @@ export const handleIncomingMessage = internalMutation({
                 updatedAt: Date.now(),
             });
             conversation = await ctx.db.get(conversationId);
+
+            // Nouvelle conversation entrante → push "conversation_opened" vers
+            // les CRM connectés en mode poussant (no-op si aucune connexion
+            // active poussante — la garde vit dans enqueueConversationEvent).
+            await enqueueConversationEvent(ctx, {
+                organizationId,
+                eventType: "conversation_opened",
+                contactId: contact._id,
+                conversationId,
+                occurredAtMs: Date.now(),
+            });
         } else {
             // Auto-assign pole/team from channel if conversation doesn't have them yet
             const patches: Record<string, any> = {};

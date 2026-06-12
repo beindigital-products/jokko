@@ -7,6 +7,7 @@ import { buildConversationFilter, canViewConversation, VisibilityContext } from 
 import { Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
 import { createNotification } from "./notifications";
+import { enqueueConversationEvent } from "./crm/enqueue";
 
 // Helper to resolve context
 async function getContext(ctx: QueryCtx | MutationCtx): Promise<VisibilityContext> {
@@ -216,6 +217,18 @@ export const bulkAssign = mutation({
                 history: [],
                 internalNotes: "Bulk assignment"
             });
+
+            // Push "conversation_assigned" vers les CRM poussants (no-op sinon).
+            if (conv.contactId) {
+                await enqueueConversationEvent(ctx, {
+                    organizationId,
+                    eventType: "conversation_assigned",
+                    contactId: conv.contactId,
+                    conversationId: convId,
+                    occurredAtMs: Date.now(),
+                    metadata: { assignedTo: args.memberId },
+                });
+            }
 
             assigned++;
         }
@@ -443,6 +456,18 @@ export const autoAssign = mutation({
                 metadata: { conversationId: conv._id },
             });
 
+            // Push "conversation_assigned" vers les CRM poussants (no-op sinon).
+            if (conv.contactId) {
+                await enqueueConversationEvent(ctx, {
+                    organizationId,
+                    eventType: "conversation_assigned",
+                    contactId: conv.contactId,
+                    conversationId: conv._id,
+                    occurredAtMs: Date.now(),
+                    metadata: { assignedTo: member.userId },
+                });
+            }
+
             // Update local member state for next iteration
             member.activeConversations = (member.activeConversations || 0) + 1;
             member.lastAssignedAt = Date.now();
@@ -573,6 +598,19 @@ export const assign = mutation({
             await ctx.db.patch(membership._id, {
                 activeConversations: (membership.activeConversations || 0) + 1,
                 lastAssignedAt: Date.now(),
+            });
+        }
+
+        // Push "conversation_assigned" vers les CRM poussants (no-op si aucune
+        // connexion active poussante — garde dans enqueueConversationEvent).
+        if (conversation.contactId) {
+            await enqueueConversationEvent(ctx, {
+                organizationId,
+                eventType: "conversation_assigned",
+                contactId: conversation.contactId,
+                conversationId: args.conversationId,
+                occurredAtMs: Date.now(),
+                metadata: { assignedTo: args.memberId },
             });
         }
     }
@@ -859,6 +897,18 @@ export const assignToBestAvailable = internalMutation({
             link: `/dashboard/conversations/${conversationId}`,
             metadata: { conversationId },
         });
+
+        // Push "conversation_assigned" vers les CRM poussants (no-op sinon).
+        if (conversation.contactId) {
+            await enqueueConversationEvent(ctx, {
+                organizationId,
+                eventType: "conversation_assigned",
+                contactId: conversation.contactId,
+                conversationId,
+                occurredAtMs: Date.now(),
+                metadata: { assignedTo: selected.userId },
+            });
+        }
 
         return { success: true, agentId: selected.userId };
     }

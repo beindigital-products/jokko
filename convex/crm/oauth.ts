@@ -17,6 +17,7 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { hasPermission } from "../lib/permissions";
 import { requirePlanFeatureInAction } from "../lib/planFeatures";
 import { getAdapter } from "./registry";
+import { getProviderInfo } from "./core/providers";
 import {
     generateNonce,
     generatePkceVerifier,
@@ -64,6 +65,11 @@ async function beginOAuthFlow(
 
     if (!SUPPORTED_OAUTH_PROVIDERS.includes(params.provider)) {
         throw new Error(`Fournisseur OAuth non supporté au MVP : ${params.provider}`);
+    }
+    // Garde "Bientôt" : un connecteur marqué coming_soon n'est pas connectable
+    // (défense côté serveur en plus de la carte inerte dans le catalogue).
+    if (getProviderInfo(params.provider).availability === "coming_soon") {
+        throw new Error(`Connecteur bientôt disponible : ${params.provider}`);
     }
 
     const { organizationId, role, plan, trialEndsAt, hasSelectedPlan, createdAt } = await ctx.runQuery(
