@@ -47,12 +47,21 @@ pnpx convex dev --once        # push ponctuel vers le déploiement de dev
 | `OPENAI_API_KEY` | Brouillon IA (Copilot), génération de flux, routage IA |
 | `AWS_REGION`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SES_FROM_EMAIL` | Email SES (invitations, mentions, reset). Sans `AWS_SES_FROM_EMAIL` → no-op gracieux |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` | Stripe (abonnements + crédits) |
-| `WAVE_*` | Wave (paiement crédits) |
+| `STRIPE_PRICE_{STARTER,BUSINESS,PRO}[_YEARLY]` | IDs de prix Stripe mappés aux clés de plan |
+| `WAVE_API_KEY`, `WAVE_WEBHOOK_SECRET` | Wave (paiement crédits) |
 | `HUBSPOT_CLIENT_ID/SECRET`, `PIPEDRIVE_*`, `SALESFORCE_*`, `SELLSY_*` | OAuth CRM (providers actifs) |
-| `APP_URL`, `NEXT_PUBLIC_APP_URL` | URL publique (liens d'invitation, redirections) |
-| `CONVEX_SITE_URL` / `CONVEX_CLOUD_URL` | Hôtes Convex (allow-list média anti-SSRF) |
+| `{HUBSPOT,PIPEDRIVE,SELLSY,AXONAUT}_WEBHOOK_SECRET` | Vérification des webhooks CRM entrants |
+| `OAUTH_STATE_HMAC_SECRET` | Signature anti-CSRF du `state` OAuth (connexion CRM) |
+| `APP_URL`, `NEXT_PUBLIC_APP_URL`, `SITE_URL`, `ROOT_DOMAIN` | URLs publiques (invitations, redirections, multi-tenant) |
+| `CONVEX_SITE_URL` / `CONVEX_CLOUD_URL` | Hôtes Convex (auto ; allow-list média anti-SSRF) |
 
-Côté **Vercel** (frontend) : `NEXT_PUBLIC_CONVEX_URL`, `NEXT_PUBLIC_APP_URL`, et les clés publiques (FB App ID).
+Côté **Vercel** (frontend, build + runtime) :
+- `NEXT_PUBLIC_CONVEX_URL` (URL du déploiement Convex **prod**) + `CONVEX_DEPLOY_KEY` (déploie Convex au build)
+- `NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SITE_URL`, `NEXT_PUBLIC_ROOT_DOMAIN`
+- `NEXT_PUBLIC_FACEBOOK_APP_ID` (Embedded Signup) ; optionnels : `NEXT_PUBLIC_GOOGLE_MAPS_KEY` (adresses), `NEXT_PUBLIC_SENTRY_DSN` (monitoring)
+- `NEXT_PUBLIC_ENABLE_SUBDOMAIN_ROUTING` — laisser **off** sauf config sous-domaines explicite (cookie d'auth scopé au domaine)
+
+> Ne PAS définir en prod : `DEMO_REVIEW_PASSWORD`, `DEMO_SEED_TOKEN` (seed de démo uniquement).
 
 ```bash
 pnpx convex env set KEY "valeur"     # définir
@@ -124,4 +133,37 @@ Pour WhatsApp : dans l'app Meta, abonner le **champ `calls`** (en plus de `messa
 - [ ] Suites Vitest + Playwright vertes ; `convex typecheck` + `web typecheck` OK.
 - [ ] Token Meta valide + calling activé sur le(s) numéro(s).
 - [ ] Plans Stripe configurés ; crédits testés (achat + débit).
-- [ ] Arbitrer `updateOrgPlan` (octroi de plan hors paiement) selon la politique trial.
+- [ ] Arbitrer `updateOrgPlan` (octroi de plan hors paiement) — voir section 10.
+
+---
+
+## 8. Séquence de mise en production (ordonnée)
+
+1. **Convex prod** : `pnpx convex deploy` (depuis la racine) crée/met à jour le déploiement de production. Noter ses URLs (`https://<prod>.convex.cloud` et `.convex.site`).
+2. **Secrets Convex** : `pnpx convex env set KEY "valeur" --prod` pour tous les noms de la section 2.
+3. **Meta WhatsApp** : numéro connecté, token valide (scope messagerie **+ appels**), calling activé (`calling.status: ENABLED`), webhook `…convex.site/api/whatsapp/webhook` (verify-token + champs `messages` **+ `calls`**).
+4. **Stripe** : produits/prix créés (IDs = `STRIPE_PRICE_*`), webhook `…/api/stripe/webhook` (secret), portail client activé.
+5. **AWS SES** : adresse/domaine `AWS_SES_FROM_EMAIL` vérifié, compte sorti du sandbox.
+6. **CRM actifs** : `*_CLIENT_ID/SECRET` + webhooks `…/webhooks/crm/<provider>`.
+7. **Vercel** : variables `NEXT_PUBLIC_*` + `CONVEX_DEPLOY_KEY` pointant vers le Convex **prod**, domaine de prod, déploiement.
+8. **Vérification** : smoke test (section 9).
+
+## 9. Smoke test post-déploiement
+
+- [ ] Inscription → onboarding → dashboard (création d'org OK).
+- [ ] Envoyer/recevoir un message WhatsApp réel (webhook entrant + envoi sortant).
+- [ ] Passer/recevoir un appel (sonnerie, audio bidirectionnel, raccrochage, débit crédit).
+- [ ] Créer + envoyer une campagne **par tags** (vérifier le ciblage) avec variables de modèle.
+- [ ] Inviter un membre (email reçu) ; vérifier qu'un AGENT ne peut PAS inviter.
+- [ ] Connecter un CRM (HubSpot) → import des contacts + push d'un événement de conversation.
+- [ ] Achat de crédits Stripe → solde mis à jour (webhook).
+
+## 10. Décision à arbitrer — octroi de plan (`updateOrgPlan`)
+
+`organizations.updateOrgPlan` (owner-only, utilisé à l'onboarding) **fixe `org.plan`** sans vérifier Stripe. Pendant les **14 jours d'essai**, toutes les features sont déverrouillées (aucune exposition). **Après l'essai**, `planFeatures` accorde l'accès selon `org.plan` — un propriétaire pourrait donc s'octroyer un plan payant sans paiement.
+
+**Recommandation** selon le modèle économique :
+- **Trial → Stripe strict** (recommandé pour facturer) : ne pas accorder BUSINESS/PRO via `updateOrgPlan` ; router la sélection payante vers Stripe Checkout, l'octroi réel se faisant à `checkout.session.completed`. L'onboarding garde la sélection comme « intention » (features déjà ouvertes par l'essai).
+- **Facturation manuelle autorisée** (grands comptes) : garder `updateOrgPlan` réservé aux OWNER **et** journaliser tout octroi payant hors Stripe (audit).
+
+Tant que l'essai protège la mise en route, ce n'est pas bloquant ; à trancher avant de facturer réellement.
