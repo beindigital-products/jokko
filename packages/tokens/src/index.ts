@@ -118,3 +118,17 @@ export const theme = {
 } as const;
 
 export type Theme = typeof theme;
+
+// ============================================================================
+// V2 mobile palette + type ramp (Jokko App design bundle). Consumed via the
+// useTheme() hook in @jokko/ui-mobile. See ./v2.ts.
+// ============================================================================
+export {
+  v2Light,
+  v2Dark,
+  v2Radius,
+  fontFamily,
+  type V2Palette,
+  type V2Radius,
+  type FontFamily,
+} from "./v2";
