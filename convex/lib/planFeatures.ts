@@ -34,6 +34,7 @@ type TrialState = {
     trialEndsAt?: number;
     hasSelectedPlan?: boolean;
     createdAt?: number;
+    stripeStatus?: string;
 };
 
 const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
@@ -49,6 +50,16 @@ function orgHasChosenPlan(org: TrialState): boolean {
     if (org.hasSelectedPlan === true) return true;
     return org.plan !== "FREE" && org.plan != null;
 }
+/** Abonnement Stripe actif ("active" ou "trialing"). */
+function orgHasActiveStripe(org: TrialState): boolean {
+    return org.stripeStatus === "active" || org.stripeStatus === "trialing";
+}
+/** Accès payant : plan choisi ET (ENTERPRISE manuel OU abonnement Stripe actif). */
+function orgHasPaidAccess(org: TrialState): boolean {
+    if (!orgHasChosenPlan(org)) return false;
+    if (org.plan === "ENTERPRISE") return true;
+    return orgHasActiveStripe(org);
+}
 
 /**
  * Gating serveur unifié — applique exactement la règle de `hasFeatureAccess` :
@@ -61,9 +72,9 @@ function orgHasChosenPlan(org: TrialState): boolean {
  */
 function assertFeature(org: TrialState, feature: PlanFeature, now: number): void {
     if (orgIsTrialing(org, now)) return;
-    if (!orgHasChosenPlan(org)) {
+    if (!orgHasPaidAccess(org)) {
         throw new Error(
-            "Votre période d'essai est terminée. Choisissez un plan depuis /dashboard/billing pour débloquer cette fonctionnalité.",
+            "Votre période d'essai est terminée. Finalisez votre abonnement via /dashboard/billing (paiement Stripe) pour débloquer cette fonctionnalité.",
         );
     }
     if (!planIncludesFeature((org.plan ?? "FREE") as PlanKey, feature)) {
@@ -85,7 +96,20 @@ export async function requirePlanFeature(
 ): Promise<void> {
     const org = await ctx.db.get(organizationId);
     if (!org) throw new Error("Organization not found");
-    assertFeature(org as TrialState, feature, now);
+    // Aplatit `stripe.status` (imbriqué sur le Doc) vers `stripeStatus` (plat sur
+    // TrialState) : sans ce mapping, le gate « plans via Stripe » lirait undefined
+    // et verrouillerait un plan payant pourtant adossé à un abonnement actif.
+    assertFeature(
+        {
+            plan: org.plan,
+            trialEndsAt: org.trialEndsAt,
+            hasSelectedPlan: org.hasSelectedPlan,
+            createdAt: org.createdAt,
+            stripeStatus: org.stripe?.status,
+        },
+        feature,
+        now,
+    );
 }
 
 /**

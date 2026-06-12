@@ -33,6 +33,7 @@ export const getFlowContext = internalQuery({
             trialEndsAt: org?.trialEndsAt,
             hasSelectedPlan: org?.hasSelectedPlan,
             createdAt: org?.createdAt,
+            stripeStatus: org?.stripe?.status,
         };
     },
 });
@@ -56,6 +57,7 @@ export const generateFlow = action({
                 trialEndsAt: flowContext.trialEndsAt,
                 hasSelectedPlan: flowContext.hasSelectedPlan,
                 createdAt: flowContext.createdAt,
+                stripeStatus: flowContext.stripeStatus,
             },
             "ai",
         );
@@ -234,6 +236,7 @@ export const getReplyContext = internalQuery({
             trialEndsAt: org?.trialEndsAt,
             hasSelectedPlan: org?.hasSelectedPlan,
             createdAt: org?.createdAt,
+            stripeStatus: org?.stripe?.status,
         };
     },
 });
@@ -257,6 +260,7 @@ export const generateReplyDraft = action({
                 trialEndsAt: replyCtx.trialEndsAt,
                 hasSelectedPlan: replyCtx.hasSelectedPlan,
                 createdAt: replyCtx.createdAt,
+                stripeStatus: replyCtx.stripeStatus,
             },
             "ai",
         );

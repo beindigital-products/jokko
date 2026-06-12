@@ -72,7 +72,7 @@ async function beginOAuthFlow(
         throw new Error(`Connecteur bientôt disponible : ${params.provider}`);
     }
 
-    const { organizationId, role, plan, trialEndsAt, hasSelectedPlan, createdAt } = await ctx.runQuery(
+    const { organizationId, role, plan, trialEndsAt, hasSelectedPlan, createdAt, stripeStatus } = await ctx.runQuery(
         internal.crm.oauth._sessionContext,
         { userId },
     );
@@ -81,7 +81,7 @@ async function beginOAuthFlow(
         throw new Error("Permission refusée : integrations:manage");
     }
     // Feature gate plan : intégrations CRM réservées au plan PRO+ (honore le trial)
-    await requirePlanFeatureInAction({ plan, trialEndsAt, hasSelectedPlan, createdAt }, "integrations_crm");
+    await requirePlanFeatureInAction({ plan, trialEndsAt, hasSelectedPlan, createdAt, stripeStatus }, "integrations_crm");
 
     const verifier = generatePkceVerifier();
     const challenge = await pkceChallengeFromVerifier(verifier);
@@ -200,6 +200,7 @@ export const _sessionContext = internalQuery({
             trialEndsAt: org?.trialEndsAt as number | undefined,
             hasSelectedPlan: org?.hasSelectedPlan as boolean | undefined,
             createdAt: org?.createdAt as number | undefined,
+            stripeStatus: org?.stripe?.status as string | undefined,
         };
     },
 });

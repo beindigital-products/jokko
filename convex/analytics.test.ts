@@ -44,9 +44,11 @@ async function seedOrg(t: any) {
             name: "Analytics Org",
             ownerId: uid,
             plan: "BUSINESS" as PlanKey,
-            // Trial expired + plan selected → gating is purely by plan key.
+            // Trial expired + plan selected + active Stripe → gating is purely by
+            // plan key (« plans uniquement via Stripe » exige l'abonnement actif).
             trialEndsAt: Date.now() - 1000,
             hasSelectedPlan: true,
+            stripe: { customerId: "cus_test", status: "active" },
             createdAt: Date.now(),
             updatedAt: Date.now(),
         });

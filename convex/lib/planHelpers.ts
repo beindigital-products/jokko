@@ -21,7 +21,7 @@ export function isUnlimited(value: number): boolean {
 
 type OrgLike = Pick<
     Doc<"organizations">,
-    "plan" | "trialEndsAt" | "hasSelectedPlan" | "createdAt"
+    "plan" | "trialEndsAt" | "hasSelectedPlan" | "createdAt" | "stripe"
 >;
 
 /**
@@ -53,6 +53,23 @@ export function hasChosenPlan(org: OrgLike | null | undefined): boolean {
     return org.plan !== "FREE";
 }
 
+/** Abonnement Stripe actif (statut "active" ou "trialing" côté Stripe). */
+export function hasActiveStripeSubscription(org: OrgLike | null | undefined): boolean {
+    const s = org?.stripe?.status;
+    return s === "active" || s === "trialing";
+}
+
+/**
+ * Accès payant post-essai : l'org doit avoir choisi un plan ET ce plan doit être
+ * adossé à un abonnement Stripe actif (« plans uniquement via Stripe »). ENTERPRISE
+ * est un palier attribué manuellement (commercial) et reste exempté de Stripe.
+ */
+export function hasPaidAccess(org: OrgLike | null | undefined): boolean {
+    if (!hasChosenPlan(org)) return false;
+    if (org?.plan === "ENTERPRISE") return true;
+    return hasActiveStripeSubscription(org);
+}
+
 /**
  * Retourne la date de fin de trial (ou undefined si pas applicable).
  */
@@ -78,7 +95,9 @@ export function hasFeatureAccess(
 ): boolean {
     if (!org) return false;
     if (isTrialing(org, now)) return true;
-    if (!hasChosenPlan(org)) return false;
+    // « Plans uniquement via Stripe » : post-essai, un plan payant ne compte que
+    // s'il est adossé à un abonnement Stripe actif.
+    if (!hasPaidAccess(org)) return false;
     const def = FEATURES[feature];
     if (!def) return false;
     return planRank(org.plan as any) >= planRank(def.minPlan);
@@ -99,7 +118,7 @@ export function featureUnlockSource(
     const trialing = isTrialing(org, now);
     const def = FEATURES[feature];
     if (!def) return "locked";
-    const inPlan = hasChosenPlan(org) && planRank(org.plan as any) >= planRank(def.minPlan);
+    const inPlan = hasPaidAccess(org) && planRank(org.plan as any) >= planRank(def.minPlan);
     if (inPlan) return "plan";
     if (trialing) return "trial";
     return "locked";

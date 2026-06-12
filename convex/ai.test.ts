@@ -21,10 +21,12 @@ describe("ai.generateReplyDraft", () => {
         const ids = await t.run(async (ctx: any) => {
             const member = await ctx.db.insert("users", { email: "agent@a.com", name: "Agent" });
             const outsider = await ctx.db.insert("users", { email: "out@b.com", name: "Out" });
-            // PRO + chosen plan + past trial → "ai" feature allowed by plan (not trial).
+            // PRO + chosen plan + past trial + active Stripe → "ai" feature allowed
+            // by plan (« plans uniquement via Stripe » exige l'abonnement actif).
             const org = await ctx.db.insert("organizations", {
                 name: "Be in Digital", ownerId: member, plan: "PRO", hasSelectedPlan: true,
                 trialEndsAt: Date.now() - 1000, createdAt: Date.now() - 1000, updatedAt: Date.now(),
+                stripe: { customerId: "cus_test", status: "active" },
             });
             await ctx.db.insert("memberships", {
                 userId: member, organizationId: org, role: "OWNER", status: "ONLINE",

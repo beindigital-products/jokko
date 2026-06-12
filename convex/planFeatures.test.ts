@@ -61,6 +61,11 @@ async function seedOrgWithPlan(t: any, plan: PlanKey) {
             // (Le bypass pendant l'essai est couvert par des tests dédiés.)
             trialEndsAt: Date.now() - 1000,
             hasSelectedPlan: true,
+            // Abonnement Stripe actif : « plans uniquement via Stripe » exige un
+            // abonnement pour débloquer un plan payant. Ici on neutralise cette
+            // dimension pour isoler le gating par RANG de plan ; la dimension
+            // Stripe est testée à part (cf. describe dédié plus bas).
+            stripe: { customerId: `cus-${plan}`, status: "active" },
             createdAt: Date.now(),
             updatedAt: Date.now(),
         });
@@ -344,5 +349,77 @@ describe("Plan features — bypass pendant l'essai (régression)", () => {
                 triggerType: "NEW_CONVERSATION",
             }),
         ).rejects.toThrow(/période d'essai est terminée/);
+    });
+});
+
+/**
+ * « Plans uniquement via Stripe » : après l'essai, un plan payant ne débloque les
+ * features que s'il est adossé à un abonnement Stripe actif (status active|trialing).
+ * ENTERPRISE est l'exception (octroi commercial manuel, sans Stripe).
+ */
+describe("Plan features — accès payant adossé à Stripe (régression)", () => {
+    async function setStripe(t: any, oid: any, stripe: any) {
+        await t.run(async (ctx: any) => ctx.db.patch(oid, { stripe }));
+    }
+
+    it("VERROUILLE un plan payant (PRO) SANS abonnement Stripe", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid } = await seedOrgWithPlan(t, "PRO");
+        // Plan PRO sélectionné, essai terminé, mais aucun abonnement Stripe.
+        await setStripe(t, oid, undefined);
+
+        await expect(
+            t.withIdentity({ subject: uid }).mutation(api.flows.create, {
+                name: "Flow",
+                triggerType: "NEW_CONVERSATION",
+            }),
+        ).rejects.toThrow(/Finalisez votre abonnement via .*Stripe/);
+    });
+
+    it("VERROUILLE si l'abonnement Stripe est annulé (canceled)", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid } = await seedOrgWithPlan(t, "PRO");
+        await setStripe(t, oid, { customerId: "cus-x", status: "canceled" });
+
+        await expect(
+            t.withIdentity({ subject: uid }).mutation(api.flows.create, {
+                name: "Flow",
+                triggerType: "NEW_CONVERSATION",
+            }),
+        ).rejects.toThrow(/période d'essai est terminée/);
+    });
+
+    it("AUTORISE un plan payant (PRO) avec abonnement Stripe actif", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid } = await seedOrgWithPlan(t, "PRO");
+        await setStripe(t, oid, { customerId: "cus-x", status: "active" });
+
+        const flowId = await t
+            .withIdentity({ subject: uid })
+            .mutation(api.flows.create, { name: "Flow", triggerType: "NEW_CONVERSATION" });
+        expect(flowId).toBeDefined();
+    });
+
+    it("AUTORISE avec un abonnement Stripe en essai (status trialing)", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid } = await seedOrgWithPlan(t, "PRO");
+        await setStripe(t, oid, { customerId: "cus-x", status: "trialing" });
+
+        const flowId = await t
+            .withIdentity({ subject: uid })
+            .mutation(api.flows.create, { name: "Flow", triggerType: "NEW_CONVERSATION" });
+        expect(flowId).toBeDefined();
+    });
+
+    it("AUTORISE ENTERPRISE SANS Stripe (octroi commercial manuel)", async () => {
+        const t = convexTest(schema, modules);
+        const { uid, oid } = await seedOrgWithPlan(t, "ENTERPRISE");
+        // ENTERPRISE attribué à la main : exempté de l'exigence Stripe.
+        await setStripe(t, oid, undefined);
+
+        const flowId = await t
+            .withIdentity({ subject: uid })
+            .mutation(api.flows.create, { name: "Flow", triggerType: "NEW_CONVERSATION" });
+        expect(flowId).toBeDefined();
     });
 });
