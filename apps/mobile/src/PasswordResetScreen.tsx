@@ -1,344 +1,266 @@
 import { useMemo, useState } from "react";
-import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
-import { theme } from "@jokko/tokens";
+import { Btn, Field, Icon, Micro, NavButton, useTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import { validatePassword } from "./lib/password-validation";
 
 type PasswordResetMode = "request" | "confirm";
 
 type Props = {
-    mode: PasswordResetMode;
-    initialEmail?: string;
-    initialCode?: string;
+  mode: PasswordResetMode;
+  initialEmail?: string;
+  initialCode?: string;
 };
 
 type SubmitState = "idle" | "submitting";
 
 export function PasswordResetScreen({ mode, initialEmail = "", initialCode = "" }: Props) {
-    const router = useRouter();
-    const { signIn } = useAuthActions();
-    const ensureUser = useMutation(api.users.ensureUser);
-    const [email, setEmail] = useState(initialEmail);
-    const [code, setCode] = useState(initialCode);
-    const [newPassword, setNewPassword] = useState("");
-    const [confirmPassword, setConfirmPassword] = useState("");
-    const [showPassword, setShowPassword] = useState(false);
-    const [state, setState] = useState<SubmitState>("idle");
-    const [sent, setSent] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const normalizedEmail = email.trim().toLowerCase();
-    const passwordValid = useMemo(() => validatePassword(newPassword), [newPassword]);
+  const router = useRouter();
+  const { colors, font, dark } = useTheme();
+  const { signIn } = useAuthActions();
+  const ensureUser = useMutation(api.users.ensureUser);
+  const [email, setEmail] = useState(initialEmail);
+  const [code, setCode] = useState(initialCode);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [state, setState] = useState<SubmitState>("idle");
+  const [sent, setSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const normalizedEmail = email.trim().toLowerCase();
+  const passwordValid = useMemo(() => validatePassword(newPassword), [newPassword]);
 
-    const requestReset = async () => {
-        if (state !== "idle") return;
-        if (!looksLikeEmail(normalizedEmail)) {
-            setError("Renseigne un e-mail valide.");
-            return;
-        }
+  const requestReset = async () => {
+    if (state !== "idle") return;
+    if (!looksLikeEmail(normalizedEmail)) {
+      setError("Renseignez un e-mail valide.");
+      return;
+    }
+    setState("submitting");
+    setError(null);
+    try {
+      await signIn("password", {
+        email: normalizedEmail,
+        flow: "reset",
+        redirectTo: Linking.createURL("auth/reset-password", {
+          queryParams: { email: normalizedEmail },
+        }),
+      });
+      setSent(true);
+    } catch (err) {
+      const message = resetRequestError(err);
+      if (message) setError(message);
+      else setSent(true);
+    } finally {
+      setState("idle");
+    }
+  };
 
-        setState("submitting");
-        setError(null);
-        try {
-            await signIn("password", {
-                email: normalizedEmail,
-                flow: "reset",
-                redirectTo: Linking.createURL("auth/reset-password", {
-                    queryParams: { email: normalizedEmail },
-                }),
-            });
-            setSent(true);
-        } catch (err) {
-            const message = resetRequestError(err);
-            if (message) {
-                setError(message);
-            } else {
-                setSent(true);
-            }
-        } finally {
-            setState("idle");
-        }
-    };
+  const confirmReset = async () => {
+    if (state !== "idle") return;
+    if (!looksLikeEmail(normalizedEmail)) {
+      setError("Renseignez l'e-mail du compte.");
+      return;
+    }
+    if (code.trim().length < 8) {
+      setError("Le code de réinitialisation est incomplet.");
+      return;
+    }
+    if (!passwordValid.valid) {
+      setError(passwordValid.message);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError("Les mots de passe ne correspondent pas.");
+      return;
+    }
+    setState("submitting");
+    setError(null);
+    try {
+      await signIn("password", {
+        email: normalizedEmail,
+        code: code.trim(),
+        newPassword,
+        flow: "reset-verification",
+      });
+      await ensureUser();
+      router.replace("/boot");
+    } catch (err) {
+      setError(resetConfirmError(err));
+    } finally {
+      setState("idle");
+    }
+  };
 
-    const confirmReset = async () => {
-        if (state !== "idle") return;
-        if (!looksLikeEmail(normalizedEmail)) {
-            setError("Renseigne l'e-mail du compte.");
-            return;
-        }
-        if (code.trim().length < 8) {
-            setError("Le code de réinitialisation est incomplet.");
-            return;
-        }
-        if (!passwordValid.valid) {
-            setError(passwordValid.message);
-            return;
-        }
-        if (newPassword !== confirmPassword) {
-            setError("Les mots de passe ne correspondent pas.");
-            return;
-        }
+  const busy = state !== "idle";
+  const isRequest = mode === "request";
 
-        setState("submitting");
-        setError(null);
-        try {
-            await signIn("password", {
-                email: normalizedEmail,
-                code: code.trim(),
-                newPassword,
-                flow: "reset-verification",
-            });
-            await ensureUser();
-            router.replace("/boot");
-        } catch (err) {
-            setError(resetConfirmError(err));
-        } finally {
-            setState("idle");
-        }
-    };
+  return (
+    <View style={[styles.root, { backgroundColor: colors.paper }]}>
+      <View style={styles.header}>
+        <View style={styles.headerTop}>
+          <NavButton icon="chevron-left" onPress={() => router.replace("/auth/sign-in")} />
+        </View>
+        <Micro style={{ marginBottom: 10 }}>{isRequest ? "Mot de passe oublié" : "Nouveau mot de passe"}</Micro>
+        <Text style={[styles.title, { color: colors.ink, fontFamily: font.display }]}>
+          {isRequest ? "On vous " : "Choisissez-en "}
+          <Text style={{ fontFamily: font.displayItalic }}>{isRequest ? "renvoie ça." : "un autre."}</Text>
+        </Text>
+      </View>
 
-    return (
-        <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-            <Pressable style={styles.backButton} onPress={() => router.replace("/auth/sign-in")}>
-                <Ionicons name="chevron-back" size={18} color={theme.accent.primary} />
-                <Text style={styles.backButtonText}>Connexion</Text>
-            </Pressable>
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Text style={[styles.intro, { color: colors.ink3, fontFamily: font.sans }]}>
+          {isRequest
+            ? "Indiquez l'e-mail associé à votre compte. Nous vous enverrons un lien de réinitialisation valide 30 minutes."
+            : "Collez le code reçu par e-mail et choisissez un nouveau mot de passe."}
+        </Text>
 
-            <View style={styles.iconShell}>
-                <Ionicons name="key-outline" size={28} color={theme.accent.primary} />
-            </View>
-            <Text style={styles.title}>
-                {mode === "request" ? "Mot de passe oublié" : "Nouveau mot de passe"}
-            </Text>
-            <Text style={styles.subtitle}>
-                {mode === "request"
-                    ? "Entre ton e-mail professionnel pour recevoir le lien de réinitialisation."
-                    : "Colle le code reçu par e-mail et choisis un nouveau mot de passe."}
-            </Text>
+        <Field
+          label="E-mail"
+          value={email}
+          onChangeText={setEmail}
+          placeholder="vous@société.com"
+          icon="mail"
+          keyboardType="email-address"
+        />
 
-            <AuthField
-                label="E-mail professionnel"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="vous@entreprise.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                textContentType="emailAddress"
+        {!isRequest ? (
+          <>
+            <View style={{ height: 12 }} />
+            <Field label="Code reçu" value={code} onChangeText={setCode} placeholder="Code à 8 caractères" icon="shield" />
+            <View style={{ height: 12 }} />
+            <Field
+              label="Nouveau mot de passe"
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="10 caractères, 1 majuscule, 1 chiffre"
+              icon="lock"
+              secureTextEntry={!showPassword}
+              onToggleSecure={() => setShowPassword((v) => !v)}
             />
+            <View style={{ height: 12 }} />
+            <Field
+              label="Confirmer"
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              placeholder="Répéter le mot de passe"
+              icon="lock"
+              secureTextEntry={!showPassword}
+            />
+          </>
+        ) : null}
 
-            {mode === "confirm" && (
-                <>
-                    <AuthField
-                        label="Code"
-                        value={code}
-                        onChangeText={setCode}
-                        placeholder="Code reçu par e-mail"
-                        autoCapitalize="none"
-                        textContentType="oneTimeCode"
-                    />
-                    <AuthField
-                        label="Nouveau mot de passe"
-                        value={newPassword}
-                        onChangeText={setNewPassword}
-                        placeholder="10 caractères, majuscule, chiffre"
-                        secureTextEntry={!showPassword}
-                        textContentType="newPassword"
-                        suffix={
-                            <Pressable onPress={() => setShowPassword((value) => !value)} hitSlop={10}>
-                                <Ionicons name={showPassword ? "eye-off-outline" : "eye-outline"} size={20} color={theme.ink[500]} />
-                            </Pressable>
-                        }
-                    />
-                    <AuthField
-                        label="Confirmer"
-                        value={confirmPassword}
-                        onChangeText={setConfirmPassword}
-                        placeholder="Répéter le mot de passe"
-                        secureTextEntry={!showPassword}
-                        textContentType="newPassword"
-                    />
-                </>
-            )}
+        {sent ? (
+          <View style={[styles.sentBox, { backgroundColor: tint(colors.good, 0.08), borderColor: tint(colors.good, 0.25) }]}>
+            <View style={[styles.sentIcon, { backgroundColor: colors.good }]}>
+              <Icon name="check" size={16} color="#fff" strokeWidth={2.8} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.sentTitle, { color: colors.ink, fontFamily: font.sansSemibold }]}>E-mail envoyé</Text>
+              <Text style={[styles.sentBody, { color: colors.ink3, fontFamily: font.sans }]}>
+                Si un compte existe, le lien arrive dans quelques secondes. Vérifiez aussi vos spams.
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
-            {sent && (
-                <View style={styles.successBox}>
-                    <Ionicons name="mail-outline" size={18} color={theme.semantic.success} />
-                    <Text style={styles.successText}>
-                        Si ce compte existe, un e-mail de réinitialisation vient d'être envoyé.
-                    </Text>
-                </View>
-            )}
+        {error ? (
+          <View style={[styles.errorBox, { backgroundColor: tint(colors.hot, 0.08), borderColor: colors.hot }]}>
+            <Icon name="circle" size={16} color={colors.hot} />
+            <Text style={[styles.errorText, { color: colors.hot, fontFamily: font.sans }]}>{error}</Text>
+          </View>
+        ) : null}
+      </ScrollView>
 
-            {error && (
-                <View style={styles.errorBox}>
-                    <Ionicons name="alert-circle-outline" size={18} color={theme.semantic.danger} />
-                    <Text style={styles.errorText}>{error}</Text>
-                </View>
-            )}
-
-            <Pressable
-                style={[styles.primaryButton, state !== "idle" && styles.disabled]}
-                onPress={mode === "request" ? requestReset : confirmReset}
-                disabled={state !== "idle"}
-            >
-                {state === "submitting" ? (
-                    <ActivityIndicator color="#fff" />
-                ) : (
-                    <>
-                        <Text style={styles.primaryButtonText}>
-                            {mode === "request" ? "Envoyer le lien" : "Changer le mot de passe"}
-                        </Text>
-                        <Ionicons name="arrow-forward" size={18} color="#fff" />
-                    </>
-                )}
-            </Pressable>
-
-            {mode === "request" && (
-                <Pressable
-                    style={styles.secondaryButton}
-                    onPress={() => router.push({
-                        pathname: "/auth/reset-password",
-                        params: { email: normalizedEmail || undefined },
-                    } as never)}
-                >
-                    <Text style={styles.secondaryButtonText}>J'ai déjà un code</Text>
-                </Pressable>
-            )}
-        </ScrollView>
-    );
+      <View style={styles.footer}>
+        <Btn
+          tone={dark ? "accent" : "primary"}
+          size="lg"
+          full
+          iconRight="arrow-right"
+          disabled={busy}
+          onPress={isRequest ? requestReset : confirmReset}
+        >
+          {busy ? <ActivityIndicator color={colors.paper} /> : isRequest ? "Envoyer le lien" : "Changer le mot de passe"}
+        </Btn>
+        {isRequest ? (
+          <Pressable
+            style={styles.secondary}
+            onPress={() =>
+              router.push({ pathname: "/auth/reset-password", params: { email: normalizedEmail || undefined } } as never)
+            }
+          >
+            <Text style={[styles.secondaryText, { color: colors.accentInk, fontFamily: font.sansMedium }]}>
+              J'ai déjà un code
+            </Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.secondary} onPress={() => router.replace("/auth/sign-in")}>
+            <Text style={[styles.secondaryText, { color: colors.accentInk, fontFamily: font.sansMedium }]}>
+              Retour à la connexion
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    </View>
+  );
 }
 
-function AuthField({
-    label,
-    suffix,
-    ...inputProps
-}: React.ComponentProps<typeof TextInput> & { label: string; suffix?: React.ReactNode }) {
-    return (
-        <View style={styles.field}>
-            <Text style={styles.fieldLabel}>{label}</Text>
-            <View style={styles.inputShell}>
-                <TextInput
-                    {...inputProps}
-                    placeholderTextColor={theme.ink[500]}
-                    style={styles.input}
-                />
-                {suffix}
-            </View>
-        </View>
-    );
+function tint(hex: string, alpha: number): string {
+  if (hex.startsWith("#") && hex.length === 7) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return hex;
 }
 
 function looksLikeEmail(value: string): boolean {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 function resetRequestError(error: unknown): string | null {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("not enabled")) {
-        return "La réinitialisation n'est pas configurée pour le moment.";
-    }
-    return null;
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("not enabled")) {
+    return "La réinitialisation n'est pas configurée pour le moment.";
+  }
+  return null;
 }
 
 function resetConfirmError(error: unknown): string {
-    const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("Invalid code")) {
-        return "Code invalide ou expiré.";
-    }
-    if (message.includes("Le mot de passe doit")) {
-        return message;
-    }
-    return "Impossible de changer le mot de passe pour le moment.";
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes("Invalid code")) return "Code invalide ou expiré.";
+  if (message.includes("Le mot de passe doit")) return message;
+  return "Impossible de changer le mot de passe pour le moment.";
 }
 
 const styles = StyleSheet.create({
-    scroll: {
-        flexGrow: 1,
-        justifyContent: "center",
-        padding: theme.spacing.xl,
-        backgroundColor: theme.surface.default,
-    },
-    backButton: {
-        position: "absolute",
-        left: theme.spacing.xl,
-        top: theme.spacing.xl,
-        minHeight: 36,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.xs,
-    },
-    backButtonText: { color: theme.accent.primary, fontSize: 14, fontWeight: "800" },
-    iconShell: {
-        width: 56,
-        height: 56,
-        borderRadius: 18,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#EAF8F0",
-        marginBottom: theme.spacing.lg,
-    },
-    title: { fontSize: 32, lineHeight: 38, fontWeight: "800", color: theme.ink[900] },
-    subtitle: { marginTop: theme.spacing.sm, marginBottom: theme.spacing.xl, fontSize: 15, lineHeight: 22, color: theme.ink[500] },
-    field: { marginBottom: theme.spacing.md },
-    fieldLabel: { fontSize: 13, fontWeight: "800", color: theme.ink[700], marginBottom: 6 },
-    inputShell: {
-        minHeight: 50,
-        borderRadius: theme.radius.md,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        backgroundColor: theme.surface.raised,
-        flexDirection: "row",
-        alignItems: "center",
-        paddingHorizontal: theme.spacing.md,
-    },
-    input: { flex: 1, minHeight: 48, fontSize: 16, color: theme.ink[900] },
-    successBox: {
-        flexDirection: "row",
-        gap: theme.spacing.sm,
-        alignItems: "flex-start",
-        borderRadius: theme.radius.md,
-        borderWidth: 1,
-        borderColor: "#B7E2C4",
-        backgroundColor: "#F1FBF5",
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.md,
-    },
-    successText: { flex: 1, fontSize: 13, lineHeight: 18, color: theme.semantic.success },
-    errorBox: {
-        flexDirection: "row",
-        gap: theme.spacing.sm,
-        alignItems: "flex-start",
-        borderRadius: theme.radius.md,
-        borderWidth: 1,
-        borderColor: "#F0C3C1",
-        backgroundColor: "#FFF3F2",
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.md,
-    },
-    errorText: { flex: 1, fontSize: 13, lineHeight: 18, color: theme.semantic.danger },
-    primaryButton: {
-        minHeight: 50,
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.ink[900],
-        alignItems: "center",
-        justifyContent: "center",
-        flexDirection: "row",
-        gap: theme.spacing.sm,
-    },
-    primaryButtonText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-    disabled: { opacity: 0.5 },
-    secondaryButton: { minHeight: 48, alignItems: "center", justifyContent: "center", marginTop: theme.spacing.md },
-    secondaryButtonText: { color: theme.accent.primary, fontSize: 14, fontWeight: "800" },
+  root: { flex: 1 },
+  header: { paddingHorizontal: 24, paddingTop: 8 },
+  headerTop: { height: 44, flexDirection: "row", alignItems: "center", marginBottom: 18, marginLeft: -8 },
+  title: { fontSize: 40, lineHeight: 42, letterSpacing: -0.8 },
+  scroll: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 12 },
+  intro: { fontSize: 14.5, lineHeight: 22, marginBottom: 26 },
+  sentBox: { flexDirection: "row", gap: 12, padding: 14, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth, marginTop: 22 },
+  sentIcon: { width: 30, height: 30, borderRadius: 8, alignItems: "center", justifyContent: "center" },
+  sentTitle: { fontSize: 13.5, marginBottom: 2 },
+  sentBody: { fontSize: 12.5, lineHeight: 18 },
+  errorBox: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: 12,
+    marginTop: 16,
+  },
+  errorText: { flex: 1, fontSize: 13, lineHeight: 18 },
+  footer: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 18 },
+  secondary: { minHeight: 44, alignItems: "center", justifyContent: "center", marginTop: 8 },
+  secondaryText: { fontSize: 14 },
 });
