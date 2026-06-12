@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
     ArrowUpDown,
     Download,
@@ -18,6 +18,7 @@ import {
 import { cn } from "@/lib/utils"
 import { ContactsGrid, ContactsTable, type ContactsTableEntry } from "@/components/dashboard/contacts"
 import { Pagination } from "@/components/dashboard/primitives"
+import { SegmentSelector, type SegmentFilters } from "@/components/contacts/SegmentSelector"
 import { HeaderButton } from "@/components/dashboard/shell/HeaderButton"
 import { Skeleton } from "@/components/ui/skeleton"
 import {
@@ -68,6 +69,8 @@ export interface ContactsViewProps {
     onBulkAddTag?: (contactIds: string[], tagName: string) => void
     canDelete?: boolean
     canExport?: boolean
+    /** Controlled segment-driven filters — when this reference changes, internal toolbar state is reset accordingly */
+    appliedSegmentFilters?: SegmentFilters | null
 }
 
 /**
@@ -123,12 +126,29 @@ export function ContactsView({
     onBulkAddTag,
     canDelete,
     canExport,
+    appliedSegmentFilters,
 }: ContactsViewProps) {
     const [search, setSearch] = useState("")
     const [view, setView] = useState<ViewMode>("table")
     const [activeTag, setActiveTag] = useState<string | null>(null)
     const [sort, setSort] = useState<Sort>("recent")
     const [selected, setSelected] = useState<Set<string>>(new Set())
+
+    // Sync internal toolbar state when a segment is applied from outside
+    useEffect(() => {
+        if (!appliedSegmentFilters) return
+        const newSearch = appliedSegmentFilters.search ?? ""
+        const newTag = appliedSegmentFilters.tags?.[0] ?? null
+        const rawSort = appliedSegmentFilters.sort
+        const newSort: Sort =
+            rawSort === "old" || rawSort === "name" ? rawSort : "recent"
+        setSearch(newSearch)
+        setActiveTag(newTag)
+        setSort(newSort)
+        onSearch?.(newSearch)
+        onFilterByTag?.(newTag)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [appliedSegmentFilters])
 
     const entries = useMemo(() => buildEntries(contacts, sort), [contacts, sort])
     const byId = useMemo(() => new Map(contacts.map((c) => [c.id, c])), [contacts])
@@ -263,6 +283,23 @@ export function ContactsView({
                             </button>
                         ))}
                     </div>
+
+                    {/* Segment selector */}
+                    <SegmentSelector
+                        currentFilters={{ search: search || undefined, tags: activeTag ? [activeTag] : undefined, sort }}
+                        onApplySegment={(filters) => {
+                            const newSearch = filters.search ?? ""
+                            const newTag = filters.tags?.[0] ?? null
+                            const rawSort = filters.sort
+                            const newSort: Sort =
+                                rawSort === "old" || rawSort === "name" ? rawSort : "recent"
+                            setSearch(newSearch)
+                            setActiveTag(newTag)
+                            setSort(newSort)
+                            onSearch?.(newSearch)
+                            onFilterByTag?.(newTag)
+                        }}
+                    />
                 </div>
             </div>
 

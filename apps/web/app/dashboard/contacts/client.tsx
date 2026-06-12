@@ -40,6 +40,10 @@ import {
     Download,
     Upload,
     Plus,
+    Ban,
+    CheckCircle2,
+    Check,
+    X as XIcon,
 } from 'lucide-react';
 import { useCrmLink } from '@/hooks/use-crm-link';
 import {
@@ -54,6 +58,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { formatPhoneDisplay } from '@/lib/contacts/validation';
 import { PageHeader, HeaderButton } from '@/components/dashboard/shell';
+import { toast } from 'sonner';
 
 type RawContactTag = string | {
     id?: string;
@@ -141,6 +146,8 @@ function ContactDetailDrawer({
     const contactData = useQuery(api.contacts.get, { id: contactId as Id<"contacts"> });
     const timeline = useQuery(api.contacts.getContactTimeline, { contactId: contactId as Id<"contacts"> });
     const crmLink = useCrmLink(contactId);
+    const toggleBlock = useMutation(api.contacts.toggleBlock);
+    const removeNote = useMutation(api.contacts.removeNote);
 
     if (!contactData) {
         return (
@@ -243,6 +250,21 @@ function ContactDetailDrawer({
                         <Trash2 className="h-3.5 w-3.5" />
                         Supprimer
                     </button>
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            try {
+                                const blocked = await toggleBlock({ id: contactData._id });
+                                toast.success(blocked ? 'Contact bloqué' : 'Contact débloqué');
+                            } catch (e) {
+                                toast.error(e instanceof Error ? e.message : 'Action impossible');
+                            }
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)]"
+                    >
+                        <Ban className="h-3.5 w-3.5" />
+                        {contactData.isBlocked ? 'Débloquer' : 'Bloquer'}
+                    </button>
                 </div>
             </div>
 
@@ -308,7 +330,26 @@ function ContactDetailDrawer({
                         <div className="space-y-2">
                             {contactData.notes.filter(isContactNote).map((note, i) => (
                                 <div key={i} className="rounded-lg border border-[var(--ink-200)] bg-[var(--paper-warm)] p-3">
-                                    <p className="text-[13px] text-[var(--ink-700)]">{note.content}</p>
+                                    <div className="flex items-start justify-between gap-2">
+                                        <p className="text-[13px] text-[var(--ink-700)]">{note.content}</p>
+                                        {typeof note.createdAt === 'number' ? (
+                                            <button
+                                                type="button"
+                                                title="Supprimer la note"
+                                                onClick={async () => {
+                                                    try {
+                                                        await removeNote({ contactId: contactData._id, noteTimestamp: note.createdAt as number });
+                                                        toast.success('Note supprimée');
+                                                    } catch (e) {
+                                                        toast.error(e instanceof Error ? e.message : 'Suppression impossible');
+                                                    }
+                                                }}
+                                                className="shrink-0 rounded p-0.5 text-[var(--ink-soft)] transition-colors hover:text-[var(--status-danger)]"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </button>
+                                        ) : null}
+                                    </div>
                                     <div className="mt-1.5 flex items-center gap-2 font-mono text-[10px] text-[var(--ink-soft)]">
                                         {note.authorName ? <span>{note.authorName}</span> : null}
                                         {note.createdAt ? <span>{formatRelativeTime(note.createdAt)}</span> : null}
