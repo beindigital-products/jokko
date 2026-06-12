@@ -199,7 +199,6 @@ export const handleIncomingMessage = internalMutation({
             const button = message.button;
 
             if (interactive) {
-                console.log("Interactive Payload:", JSON.stringify(interactive));
 
                 if (interactive.type === "button_reply" || message.type === "button") {
                     const reply = interactive.button_reply;

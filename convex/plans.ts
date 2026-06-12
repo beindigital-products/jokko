@@ -189,13 +189,10 @@ export const seedPlans = internalMutation({
                 .first();
 
             if (existing) {
-                console.log(`[SEED] Plan "${planData.key}" already exists, updating...`);
                 await ctx.db.patch(existing._id, planData);
             } else {
-                console.log(`[SEED] Creating plan "${planData.key}"...`);
                 await ctx.db.insert("plans", planData);
             }
         }
-        console.log("[SEED] Plans seeded successfully.");
     },
 });

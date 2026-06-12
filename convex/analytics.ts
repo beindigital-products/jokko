@@ -177,7 +177,7 @@ export const getDashboardStats = query({
         const conversations = await ctx.db
             .query("conversations")
             .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-            .collect();
+            .take(5000);
 
         for (const conv of conversations) {
             // Scope KPIs to the selected period (createdAt).

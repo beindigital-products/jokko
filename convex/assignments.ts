@@ -3,7 +3,7 @@ import { query, mutation, internalAction, internalMutation, internalQuery } from
 import { internal, api } from "./_generated/api";
 import OpenAI from "openai";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { buildConversationFilter, canViewConversation, VisibilityContext } from "./lib/visibility";
+import { VisibilityContext } from "./lib/visibility";
 import { hasPermission, Role } from "./lib/permissions";
 import { Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
@@ -107,11 +107,10 @@ export const getConversationsQueue = query({
         const conversations = await ctx.db
             .query("conversations")
             .withIndex("by_org_status", (q) => q.eq("organizationId", organizationId).eq("status", "OPEN"))
-            .collect();
+            .take(500);
 
         const filtered = conversations.filter(c => {
             if (role === 'OWNER' || role === 'ADMIN') return true;
-            if (role === 'MANAGER') return true;
             if (role === 'AGENT') {
                 return !c.assignedTo || c.assignedTo === context.memberId;
             }
@@ -533,7 +532,7 @@ export const assign = mutation({
         // Prepare updates
         const updates: any = {
             assignedTo: args.memberId,
-            departmentId: membership.poleId, // From Pole (Service)
+            departmentId: membership.poleId ? String(membership.poleId) : undefined,
             assignedAt: Date.now(),
         };
 

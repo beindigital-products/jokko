@@ -36,8 +36,6 @@ export const submitToMeta = action({
         // Tokens are encrypted at-rest; decrypt before use (plaintext env tokens pass through).
         const accessToken = await decrypt(rawToken);
 
-        console.log("Sending payload to Meta:", JSON.stringify(payload, null, 2));
-
         // 4. Send to Meta Graph API
         const response = await fetch(`https://graph.facebook.com/v21.0/${businessAccountId}/message_templates`, {
             method: "POST",
@@ -55,8 +53,6 @@ export const submitToMeta = action({
             throw new Error(`Meta API Error: ${data.error?.message || 'Unknown error'}`);
         }
 
-        console.log("Meta API Success:", data);
-
         // Update status to PENDING and save Meta ID
         await ctx.runMutation(internal.templates.mutations.updateStatus, {
             id: args.templateId,
@@ -71,8 +67,6 @@ export const submitToMeta = action({
 export const syncFromMeta = action({
     args: {},
     handler: async (ctx) => {
-        console.log("Starting Template Sync from Meta...");
-
         // 1. Resolve org from auth context
         const localTemplates = await ctx.runQuery(api.templates.queries.listForSync);
         if (localTemplates.length === 0) {
@@ -112,8 +106,6 @@ export const syncFromMeta = action({
         const data = await response.json();
         const metaTemplates = data.data as Array<{ name: string, status: string, id: string }>;
 
-        console.log(`Fetched ${metaTemplates?.length || 0} templates from Meta`);
-
         if (!metaTemplates || metaTemplates.length === 0) {
             return { message: "No templates found on Meta", updated: 0 };
         }
@@ -127,7 +119,6 @@ export const syncFromMeta = action({
                 const newStatus = remote.status.toUpperCase();
 
                 if (local.status !== newStatus || local.metaTemplateId !== remote.id) {
-                    console.log(`Updating ${local.name}: ${local.status} -> ${newStatus}`);
                     await ctx.runMutation(internal.templates.mutations.updateStatus, {
                         id: local._id,
                         status: newStatus,

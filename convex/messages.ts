@@ -307,9 +307,8 @@ export const send = mutation({
  * a private note visible only to the team (Front/Intercom pattern). It
  * carries optional @mentions of teammates.
  *
- * The mentioned users currently discover the note when they open the
- * conversation. Proactive delivery (in-app notification + email) is wired
- * separately — see the TODO below.
+ * Notification in-app (MENTION) + email mention envoyés via
+ * internal.mention_emails.send (scheduler.runAfter) dans la boucle ci-dessous.
  */
 export const addInternalNote = mutation({
     args: {
@@ -354,10 +353,8 @@ export const addInternalNote = mutation({
         // lastMessageDirection here — an internal note must not masquerade
         // as the last customer message in the inbox list.
 
-        // Notify each mentioned teammate (except the author) so they can
-        // access the note from the bell / notifications page (the click
-        // navigates to the conversation via `link`). Email delivery stays
-        // deferred — see sendMentionEmail TODO below.
+        // Notifie chaque coéquipier mentionné (hors auteur) : notification in-app
+        // MENTION + email via internal.mention_emails.send (scheduler.runAfter).
         if (args.mentions && args.mentions.length > 0) {
             const author = await ctx.db.get(userId);
             const authorName = author?.name || author?.email || "Un coéquipier";

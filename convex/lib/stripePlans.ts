@@ -11,8 +11,8 @@ export const PLAN_PRICES: Record<string, { name: string; monthlyFCFA: number; ye
     PRO: { name: "Pro", monthlyFCFA: 70_000, yearlyFCFA: 672_000 },
 };
 
-export function planFromPriceId(priceId: string): string {
-    const map: Record<string, string> = {};
+export function planFromPriceId(priceId: string): "FREE" | "STARTER" | "BUSINESS" | "PRO" | "ENTERPRISE" {
+    const map: Record<string, "STARTER" | "BUSINESS" | "PRO"> = {};
     if (process.env.STRIPE_PRICE_STARTER) map[process.env.STRIPE_PRICE_STARTER] = "STARTER";
     if (process.env.STRIPE_PRICE_BUSINESS) map[process.env.STRIPE_PRICE_BUSINESS] = "BUSINESS";
     if (process.env.STRIPE_PRICE_PRO) map[process.env.STRIPE_PRICE_PRO] = "PRO";
@@ -20,7 +20,7 @@ export function planFromPriceId(priceId: string): string {
     if (process.env.STRIPE_PRICE_STARTER_YEARLY) map[process.env.STRIPE_PRICE_STARTER_YEARLY] = "STARTER";
     if (process.env.STRIPE_PRICE_BUSINESS_YEARLY) map[process.env.STRIPE_PRICE_BUSINESS_YEARLY] = "BUSINESS";
     if (process.env.STRIPE_PRICE_PRO_YEARLY) map[process.env.STRIPE_PRICE_PRO_YEARLY] = "PRO";
-    return map[priceId] || "FREE";
+    return map[priceId] ?? "FREE";
 }
 
 export function priceIdFromPlan(plan: string, interval: "month" | "year" = "month"): string | null {

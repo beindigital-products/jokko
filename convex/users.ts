@@ -43,41 +43,6 @@ export const currentUserRole = query({
 });
 
 
-/**
- * Get user by ID (authenticated only, scoped to org co-members)
- */
-export const get = query({
-    args: { id: v.id("users") },
-    handler: async (ctx, args) => {
-        const callerId = await getAuthUserId(ctx);
-        if (!callerId) throw new Error("Not authenticated");
-
-        const user = await ctx.db.get(args.id);
-        if (!user) return null;
-
-        // Allow reading own profile
-        if (callerId === args.id) return user;
-
-        // Verify caller shares at least one organization with target user
-        const callerMemberships = await ctx.db
-            .query("memberships")
-            .withIndex("by_user", (q) => q.eq("userId", callerId))
-            .collect();
-        const callerOrgIds = new Set(callerMemberships.map((m) => m.organizationId));
-
-        const targetMemberships = await ctx.db
-            .query("memberships")
-            .withIndex("by_user", (q) => q.eq("userId", args.id))
-            .collect();
-        const shares = targetMemberships.some((m) => callerOrgIds.has(m.organizationId));
-
-        if (!shares) throw new Error("Unauthorized");
-
-        // Strip sensitive fields
-        const { tokenIdentifier, ...safeUser } = user as any;
-        return safeUser;
-    },
-});
 
 /**
  * Complete user onboarding
@@ -143,32 +108,6 @@ export const ensureUser = mutation({
     },
 });
 
-/**
- * Diagnostic: who am I
- */
-export const whoAmI = query({
-    args: {},
-    handler: async (ctx) => {
-        const identity = await ctx.auth.getUserIdentity();
-
-        if (!identity) {
-            return { authenticated: false };
-        }
-
-        const user = await ctx.db
-            .query("users")
-            .withIndex("email", (q) => q.eq("email", identity.email!))
-            .first();
-
-        return {
-            authenticated: true,
-            email: identity.email,
-            name: identity.name,
-            userExistsInDB: !!user,
-            userId: user?._id,
-        };
-    },
-});
 // ... (existing code)
 
 // ... existing code ...

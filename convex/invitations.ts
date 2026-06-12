@@ -301,52 +301,6 @@ export const getByToken = query({
     }
 });
 
-// ACCEPT INVITATION & CREATE USER
-// This should probably be an action if we need to do complex auth stuff,
-// but usually creating a user is a mutation.
-// With Convex Auth, creating a user is handled by the auth adapter usually,
-// but we want to create a user AND link the invitation.
-export const accept = action({
-    args: {
-        token: v.string(),
-        password: v.string(),
-        name: v.string(),
-    },
-    handler: async (ctx, args) => {
-        // 1. Validate Invitation
-        const data = await ctx.runQuery(api.invitations.getByToken, { token: args.token });
-        if (!data || data.status !== "VALID" || !data.invitation) {
-            throw new Error("Invitation invalide ou expirée");
-        }
-
-        const { email } = data.invitation;
-
-        // 2. We explicitly use the Convex Auth "password" provider to sign up.
-        // But `signIn` from `convex/auth` is server-side only? No, it's usually client-side.
-        // Wait, we are in an Action here. We can't easily sign in the user into the browser session from here.
-        // The pattern for Convex Auth is usually: Client calls `signIn("password", { email, password, flow: "signUp" })`.
-        // BUT we need to also mark the invitation as accepted and link the user.
-
-        // Strategy:
-        // 1. Client calls `signIn("password", { email, password, flow: "signUp", name: args.name })`.
-        // 2. This creates the user in `users` table via the `Password` provider.
-        // 3. AFTER successful sign-in, the client calls a mutation `acceptInvitation` passing the token.
-        //    The mutation verifies the currently logged-in user matches the invitation email.
-        //    Then it accepts the invitation and creates the membership.
-
-        // However, the user wants "automatic" connection. The `signIn` function on client DOES that.
-        // So the flow on `app/invite/[token]/page.tsx` should be:
-        // 1. Fetch invitation details using `getByToken`.
-        // 2. Show form (Name, Password). Address is pre-filled from invitation.
-        // 3. On Submit:
-        //    await signIn("password", { email: invitation.email, password, name, flow: "signUp" })
-        // 4. If successful, call `api.invitations.acceptLink` (new mutation).
-        // 5. Redirect to dashboard.
-
-        return { success: true }; // Placeholder if we don't use this action directly for sign up
-    }
-});
-
 // ACTUALLY LINK USER TO INVITATION AFTER SIGN UP
 export const acceptLink = mutation({
     args: { token: v.string() },

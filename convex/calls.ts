@@ -11,7 +11,7 @@
  * Convex acts as a signaling relay between Meta and the agent's browser (WebRTC peer).
  */
 
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
@@ -28,8 +28,8 @@ import { callCostFcfa } from "./lib/callPricing";
  * USAGE transaction so the spend shows up in the credit history.
  */
 async function billOutboundCall(
-    ctx: any,
-    call: any,
+    ctx: MutationCtx,
+    call: { _id: string; direction: string; toPhone: string; organizationId: Id<"organizations">; [key: string]: unknown },
     durationSeconds: number | undefined,
 ) {
     if (call.direction !== "OUTBOUND") return;
@@ -139,7 +139,7 @@ export const handleCallWebhook = internalMutation({
 });
 
 async function handleInboundCall(
-    ctx: any,
+    ctx: MutationCtx,
     args: {
         callId: string;
         from: string;
@@ -230,7 +230,7 @@ async function handleInboundCall(
     console.log(`[CALLS] Inbound call ${callId} from ${from} - RINGING`);
 }
 
-async function handleCallTerminate(ctx: any, args: { callId: string }) {
+async function handleCallTerminate(ctx: MutationCtx, args: { callId: string }) {
     const call = await ctx.db
         .query("calls")
         .withIndex("by_external_call_id", (q: any) => q.eq("externalCallId", args.callId))
@@ -295,7 +295,7 @@ async function handleCallTerminate(ctx: any, args: { callId: string }) {
 }
 
 async function handleOutboundCallUpdate(
-    ctx: any,
+    ctx: MutationCtx,
     args: { callId: string; sdp?: string; sdpType?: string }
 ) {
     const call = await ctx.db
@@ -318,8 +318,8 @@ async function handleOutboundCallUpdate(
 }
 
 async function handlePermissionGranted(
-    ctx: any,
-    args: { from: string; to: string; phoneNumberId: string }
+    ctx: MutationCtx,
+    args: { callId?: string; from: string; to: string; phoneNumberId: string }
 ) {
     // Find the REQUESTING_PERMISSION call for this contact
     // The "from" is the user (contact), "to" is the business number
