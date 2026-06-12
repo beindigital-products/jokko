@@ -17,6 +17,7 @@ import { useMutation } from "convex/react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { Btn, Field, Icon, Micro, Screen, Wordmark, useTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
+import { canSubmitAuthForm } from "./lib/auth-form";
 import { validatePassword } from "./lib/password-validation";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -167,6 +168,8 @@ export function AuthScreen({ mode, redirectTo, inviteToken }: Props) {
   };
 
   const busy = status !== "idle";
+  // Gate the submit button (greyed until valid) — see canSubmitAuthForm.
+  const canSubmit = canSubmitAuthForm({ mode, email, password, acceptedTerms });
 
   return (
     <Screen>
@@ -254,6 +257,8 @@ export function AuthScreen({ mode, redirectTo, inviteToken }: Props) {
           icon="lock"
           secureTextEntry={!showPassword}
           onToggleSecure={() => setShowPassword((v) => !v)}
+          hint={mode === "sign-up" && password.length > 0 && !passwordValid.valid ? passwordValid.message : undefined}
+          error={mode === "sign-up" && password.length > 0 && !passwordValid.valid}
         />
 
         {mode === "sign-in" ? (
@@ -306,7 +311,7 @@ export function AuthScreen({ mode, redirectTo, inviteToken }: Props) {
           size="lg"
           full
           iconRight="arrow-right"
-          disabled={busy}
+          disabled={busy || !canSubmit}
           onPress={submitPassword}
         >
           {status === "password" ? <ActivityIndicator color={colors.paper} /> : copy.cta}
