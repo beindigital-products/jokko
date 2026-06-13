@@ -1,544 +1,200 @@
-import { useState } from "react";
-import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
-} from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { useMemo } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { usePaginatedQuery } from "convex/react";
-import { theme } from "@jokko/tokens";
+import { Icon, Micro, NavButton, Pill, useTheme, type IconName, type JokkoTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
-
-type ShortcutRecord = {
-    _id: Id<"shortcuts">;
-    shortcut: string;
-    text?: string;
-    type?: string;
-    createdAt: number;
-};
 
 type TemplateRecord = {
     _id: Id<"templates">;
     name: string;
-    category: string;
-    type: string;
-    language: string;
+    category?: string;
     status?: string;
     body?: string;
 };
 
-type HubTab = "shortcuts" | "templates";
+type ShortcutRecord = { _id: Id<"shortcuts"> };
+
+const SOON: { icon: IconName; label: string }[] = [
+    { icon: "sparkle", label: "Suggestions IA" },
+    { icon: "flag", label: "Tags automatiques" },
+    { icon: "users", label: "Files d'attente" },
+    { icon: "bolt", label: "Workflows" },
+];
 
 export function MobileHubScreen() {
-    const [tab, setTab] = useState<HubTab>("shortcuts");
-    const [search, setSearch] = useState("");
+    const router = useRouter();
+    const theme = useTheme();
+    const { colors, font } = theme;
+
+    const templatesPage = usePaginatedQuery(api.templates.queries.list, {}, { initialNumItems: 50 });
+    const shortcutsPage = usePaginatedQuery(api.shortcuts.list, {}, { initialNumItems: 50 });
+    const templates = useMemo(() => (templatesPage.results ?? []) as TemplateRecord[], [templatesPage.results]);
+    const shortcuts = (shortcutsPage.results ?? []) as ShortcutRecord[];
+
+    const approved = templates.filter((t) => t.status === "APPROVED").length;
+    const pending = templates.filter((t) => t.status === "PENDING" || t.status === "IN_REVIEW" || t.status === "PENDING_REVIEW").length;
+    const moreTemplates = templatesPage.status === "CanLoadMore";
+    const moreShortcuts = shortcutsPage.status === "CanLoadMore";
+
+    const openTemplates = () => router.push({ pathname: "/hub/list", params: { type: "templates" } });
+    const openShortcuts = () => router.push({ pathname: "/hub/list", params: { type: "shortcuts" } });
 
     return (
-        <View style={styles.root}>
+        <View style={[styles.root, { backgroundColor: colors.paper }]}>
             <View style={styles.header}>
-                <Text style={styles.eyebrow}>Réponses & modèles</Text>
-                <Text style={styles.title}>Hub</Text>
-                <Text style={styles.subtitle}>
-                    Accès rapide aux réponses sauvegardées et modèles WhatsApp officiels.
-                </Text>
-
-                <View style={styles.tabBar}>
-                    <TabButton
-                        label="Raccourcis"
-                        active={tab === "shortcuts"}
-                        onPress={() => setTab("shortcuts")}
-                    />
-                    <TabButton
-                        label="Modèles"
-                        active={tab === "templates"}
-                        onPress={() => setTab("templates")}
-                    />
+                <View style={styles.headerLeft}>
+                    <Micro>Outils & automatisations</Micro>
+                    <Text style={[styles.title, { fontFamily: font.display, color: colors.ink }]}>Hub</Text>
                 </View>
-
-                <View style={styles.searchBox}>
-                    <Ionicons name="search" size={18} color={theme.ink[500]} />
-                    <TextInput
-                        value={search}
-                        onChangeText={setSearch}
-                        placeholder={
-                            tab === "shortcuts" ? "Chercher /raccourci" : "Chercher un modèle"
-                        }
-                        placeholderTextColor={theme.ink[500]}
-                        style={styles.searchInput}
-                        returnKeyType="search"
-                        autoCapitalize="none"
-                    />
-                </View>
+                <NavButton icon="search" onPress={openTemplates} />
             </View>
 
-            {tab === "shortcuts" ? (
-                <ShortcutsList search={search} />
-            ) : (
-                <TemplatesList search={search} />
-            )}
+            <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+                {/* Two big tiles */}
+                <View style={styles.tiles}>
+                    <HubTile
+                        theme={theme}
+                        tone="ink"
+                        icon="sticky-note"
+                        title="Modèles WhatsApp"
+                        sub={`${approved} approuvé${approved > 1 ? "s" : ""}${pending > 0 ? ` · ${pending} en attente` : ""}`}
+                        stat={templates.length + (moreTemplates ? "+" : "")}
+                        onPress={openTemplates}
+                    />
+                    <HubTile
+                        theme={theme}
+                        tone="paper"
+                        icon="bolt"
+                        title="Réponses rapides"
+                        sub="Vos raccourcis d'équipe · /merci, /dispo…"
+                        stat={shortcuts.length + (moreShortcuts ? "+" : "")}
+                        onPress={openShortcuts}
+                    />
+                </View>
+
+                <SectionHeader theme={theme}>Bientôt disponible</SectionHeader>
+                <View style={styles.soonGrid}>
+                    {SOON.map((item) => (
+                        <View key={item.label} style={[styles.soonTile, { borderColor: colors.rule }]}>
+                            <Icon name={item.icon} size={20} color={colors.mute} strokeWidth={1.5} />
+                            <Text style={{ fontSize: 13, color: colors.ink3, fontFamily: font.sansMedium, marginTop: 8 }}>{item.label}</Text>
+                            <Text style={{ fontSize: 9.5, color: colors.mute, fontFamily: font.mono, marginTop: 4, letterSpacing: 0.6 }}>BIENTÔT</Text>
+                        </View>
+                    ))}
+                </View>
+
+                <SectionHeader theme={theme} action="Tout voir" onAction={openTemplates}>
+                    Modèles récents
+                </SectionHeader>
+                <View style={{ paddingHorizontal: 18 }}>
+                    {templates.length === 0 ? (
+                        <Text style={{ fontSize: 13.5, color: colors.mute, fontFamily: font.sans, paddingVertical: 8 }}>
+                            Aucun modèle pour l'instant.
+                        </Text>
+                    ) : (
+                        templates.slice(0, 5).map((template) => (
+                            <Pressable
+                                key={template._id}
+                                onPress={() => router.push(`/hub/templates/${template._id}`)}
+                                style={({ pressed }) => [styles.tplRow, { borderBottomColor: colors.rule2 }, pressed && { backgroundColor: colors.paper2 }]}
+                            >
+                                <View style={[styles.tplIcon, { backgroundColor: colors.paper2 }]}>
+                                    <Icon name="sticky-note" size={17} color={colors.ink3} strokeWidth={1.6} />
+                                </View>
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                    <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                                        <Text numberOfLines={1} style={{ fontSize: 14.5, color: colors.ink, fontFamily: font.sansMedium, flexShrink: 1 }}>
+                                            {template.name}
+                                        </Text>
+                                        {template.status && template.status !== "APPROVED" ? <Pill tone="warn" size="sm">en attente</Pill> : null}
+                                    </View>
+                                    {template.body ? (
+                                        <Text numberOfLines={1} style={{ fontSize: 12, color: colors.mute, fontFamily: font.sans, marginTop: 3 }}>
+                                            {template.body}
+                                        </Text>
+                                    ) : null}
+                                </View>
+                                {template.category ? <Pill tone={template.category.toLowerCase() === "marketing" ? "accent" : "mute"} size="sm">{template.category}</Pill> : null}
+                            </Pressable>
+                        ))
+                    )}
+                </View>
+            </ScrollView>
         </View>
     );
 }
 
-function TabButton({
-    label,
-    active,
+function HubTile({
+    theme,
+    tone,
+    icon,
+    title,
+    sub,
+    stat,
     onPress,
 }: {
-    label: string;
-    active: boolean;
+    theme: JokkoTheme;
+    tone: "ink" | "paper";
+    icon: IconName;
+    title: string;
+    sub: string;
+    stat: string;
     onPress: () => void;
 }) {
+    const { colors, font } = theme;
+    const ink = tone === "ink";
+    const fg = ink ? colors.paper : colors.ink;
+    const muted = ink ? "rgba(242,239,232,0.65)" : colors.mute;
     return (
         <Pressable
-            accessibilityRole="button"
             onPress={onPress}
             style={({ pressed }) => [
-                styles.tabButton,
-                active && styles.tabButtonActive,
+                styles.tile,
+                { backgroundColor: ink ? colors.ink : colors.card, borderColor: ink ? "transparent" : colors.rule, borderWidth: ink ? 0 : StyleSheet.hairlineWidth },
                 pressed && styles.pressed,
             ]}
         >
-            <Text style={[styles.tabButtonText, active && styles.tabButtonTextActive]}>{label}</Text>
+            <View style={[styles.tileIcon, { backgroundColor: ink ? "rgba(242,239,232,0.08)" : colors.paper2 }]}>
+                <Icon name={icon} size={25} color={fg} strokeWidth={1.6} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontFamily: font.serifItalic, fontSize: 22, color: fg }}>{title}</Text>
+                <Text style={{ fontSize: 12.5, color: muted, fontFamily: font.sans, marginTop: 3 }}>{sub}</Text>
+            </View>
+            <Text style={{ fontFamily: font.mono, fontSize: 30, color: fg, letterSpacing: -1 }}>{stat}</Text>
         </Pressable>
     );
 }
 
-function ShortcutsList({ search }: { search: string }) {
-    const router = useRouter();
-    const { results, status, loadMore, isLoading } = usePaginatedQuery(
-        api.shortcuts.list,
-        { search: search.trim() || undefined },
-        { initialNumItems: 30 },
-    );
-    const shortcuts = (results ?? []) as ShortcutRecord[];
-    const isLoadingMore = status === "LoadingMore";
-    const canLoadMore = status === "CanLoadMore" || isLoadingMore;
-
-    if (isLoading && shortcuts.length === 0) {
-        return (
-            <View style={styles.loading}>
-                <ActivityIndicator color={theme.accent.primary} />
-            </View>
-        );
-    }
-
-    if (shortcuts.length === 0) {
-        return (
-            <EmptyState
-                icon="grid-outline"
-                title={search ? "Aucun raccourci" : "Hub vide"}
-                body={
-                    search
-                        ? "Aucune réponse rapide ne correspond à cette recherche."
-                        : "Les réponses rapides créées sur le web apparaîtront ici."
-                }
-            />
-        );
-    }
-
+function SectionHeader({ children, theme, action, onAction }: { children: string; theme: JokkoTheme; action?: string; onAction?: () => void }) {
+    const { colors, font } = theme;
     return (
-        <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
-            {shortcuts.map((shortcut) => (
-                <ShortcutRow
-                    key={shortcut._id}
-                    shortcut={shortcut}
-                    onPress={() => router.push(`/hub/shortcuts/${shortcut._id}`)}
-                />
-            ))}
-            {canLoadMore ? (
-                <Pressable
-                    accessibilityRole="button"
-                    disabled={isLoadingMore}
-                    onPress={() => loadMore(30)}
-                    style={({ pressed }) => [
-                        styles.loadMoreButton,
-                        isLoadingMore && styles.disabled,
-                        pressed && !isLoadingMore && styles.pressed,
-                    ]}
-                >
-                    <Text style={styles.loadMoreText}>
-                        {isLoadingMore ? "Chargement..." : "Charger plus"}
-                    </Text>
+        <View style={styles.sectionHead}>
+            <Text style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: colors.mute }}>{children}</Text>
+            {action && onAction ? (
+                <Pressable onPress={onAction} hitSlop={8}>
+                    <Text style={{ fontSize: 12.5, color: colors.accentInk, fontFamily: font.sansMedium }}>{action}</Text>
                 </Pressable>
-            ) : (
-                <Text style={styles.endText}>Fin de la liste</Text>
-            )}
-        </ScrollView>
-    );
-}
-
-function TemplatesList({ search }: { search: string }) {
-    const router = useRouter();
-    const { results, status, loadMore, isLoading } = usePaginatedQuery(
-        api.templates.queries.list,
-        { search: search.trim() || undefined },
-        { initialNumItems: 30 },
-    );
-    const templates = (results ?? []) as TemplateRecord[];
-    const isLoadingMore = status === "LoadingMore";
-    const canLoadMore = status === "CanLoadMore" || isLoadingMore;
-
-    if (isLoading && templates.length === 0) {
-        return (
-            <View style={styles.loading}>
-                <ActivityIndicator color={theme.accent.primary} />
-            </View>
-        );
-    }
-
-    if (templates.length === 0) {
-        return (
-            <EmptyState
-                icon="document-text-outline"
-                title={search ? "Aucun modèle" : "Aucun modèle WhatsApp"}
-                body={
-                    search
-                        ? "Aucun modèle ne correspond à cette recherche."
-                        : "Les modèles approuvés par Meta apparaîtront ici une fois synchronisés."
-                }
-            />
-        );
-    }
-
-    return (
-        <ScrollView contentContainerStyle={styles.listContent} keyboardShouldPersistTaps="handled">
-            {templates.map((template) => (
-                <TemplateRow
-                    key={template._id}
-                    template={template}
-                    onPress={() => router.push(`/hub/templates/${template._id}`)}
-                />
-            ))}
-            {canLoadMore ? (
-                <Pressable
-                    accessibilityRole="button"
-                    disabled={isLoadingMore}
-                    onPress={() => loadMore(30)}
-                    style={({ pressed }) => [
-                        styles.loadMoreButton,
-                        isLoadingMore && styles.disabled,
-                        pressed && !isLoadingMore && styles.pressed,
-                    ]}
-                >
-                    <Text style={styles.loadMoreText}>
-                        {isLoadingMore ? "Chargement..." : "Charger plus"}
-                    </Text>
-                </Pressable>
-            ) : (
-                <Text style={styles.endText}>Fin de la liste</Text>
-            )}
-        </ScrollView>
-    );
-}
-
-function ShortcutRow({
-    shortcut,
-    onPress,
-}: {
-    shortcut: ShortcutRecord;
-    onPress: () => void;
-}) {
-    return (
-        <Pressable
-            accessibilityRole="button"
-            onPress={onPress}
-            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-        >
-            <View style={styles.rowIcon}>
-                <Ionicons
-                    name={getShortcutIcon(shortcut.type)}
-                    size={20}
-                    color={theme.accent.primary}
-                />
-            </View>
-            <View style={styles.rowText}>
-                <View style={styles.rowTitleLine}>
-                    <Text style={styles.rowTitle}>{shortcut.shortcut}</Text>
-                    <Text style={styles.rowTag}>{shortcut.type || "TEXT"}</Text>
-                </View>
-                <Text style={styles.rowBody} numberOfLines={2}>
-                    {shortcut.text || "Réponse rapide sans texte."}
-                </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.ink[500]} />
-        </Pressable>
-    );
-}
-
-function TemplateRow({
-    template,
-    onPress,
-}: {
-    template: TemplateRecord;
-    onPress: () => void;
-}) {
-    const status = (template.status ?? "PENDING").toUpperCase();
-    const tone = templateStatusTone(status);
-    return (
-        <Pressable
-            accessibilityRole="button"
-            onPress={onPress}
-            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-        >
-            <View style={styles.rowIcon}>
-                <Ionicons name="document-text-outline" size={20} color={theme.accent.primary} />
-            </View>
-            <View style={styles.rowText}>
-                <View style={styles.rowTitleLine}>
-                    <Text style={styles.rowTitle} numberOfLines={1}>
-                        {template.name}
-                    </Text>
-                    <View style={[styles.statusPill, { backgroundColor: tone.bg }]}>
-                        <Text style={[styles.statusPillText, { color: tone.fg }]}>{status}</Text>
-                    </View>
-                </View>
-                <Text style={styles.rowBody} numberOfLines={2}>
-                    {template.body ?? `${template.category} · ${template.language}`}
-                </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.ink[500]} />
-        </Pressable>
-    );
-}
-
-function EmptyState({
-    icon,
-    title,
-    body,
-}: {
-    icon: React.ComponentProps<typeof Ionicons>["name"];
-    title: string;
-    body: string;
-}) {
-    return (
-        <View style={styles.emptyState}>
-            <View style={styles.emptyIcon}>
-                <Ionicons name={icon} size={30} color={theme.accent.primary} />
-            </View>
-            <Text style={styles.emptyTitle}>{title}</Text>
-            <Text style={styles.emptyBody}>{body}</Text>
+            ) : null}
         </View>
     );
 }
 
-function getShortcutIcon(type?: string): React.ComponentProps<typeof Ionicons>["name"] {
-    if (type === "IMAGE") return "image-outline";
-    if (type === "VIDEO") return "videocam-outline";
-    if (type === "AUDIO") return "mic-outline";
-    if (type === "DOCUMENT") return "document-text-outline";
-    return "chatbox-ellipses-outline";
-}
-
-function templateStatusTone(status: string): { bg: string; fg: string } {
-    switch (status) {
-        case "APPROVED":
-            return { bg: "#DCFCE7", fg: "#166534" };
-        case "PENDING":
-            return { bg: "#FEF3C7", fg: "#92400E" };
-        case "REJECTED":
-            return { bg: "#FEE2E2", fg: "#991B1B" };
-        default:
-            return { bg: "#E0E7FF", fg: "#3730A3" };
-    }
-}
-
 const styles = StyleSheet.create({
-    root: { flex: 1, backgroundColor: theme.surface.default },
-    header: {
-        paddingHorizontal: theme.spacing.xl,
-        paddingTop: theme.spacing.xl,
-        paddingBottom: theme.spacing.lg,
-        borderBottomWidth: 1,
-        borderBottomColor: theme.ink[300],
-    },
-    eyebrow: {
-        fontSize: 13,
-        lineHeight: 18,
-        color: theme.accent.primary,
-        fontWeight: "800",
-        textTransform: "uppercase",
-    },
-    title: {
-        marginTop: theme.spacing.xs,
-        fontSize: 32,
-        lineHeight: 38,
-        color: theme.ink[900],
-        fontWeight: "800",
-    },
-    subtitle: {
-        marginTop: theme.spacing.sm,
-        maxWidth: 340,
-        fontSize: 14,
-        lineHeight: 20,
-        color: theme.ink[500],
-        fontWeight: "600",
-    },
-    tabBar: {
-        flexDirection: "row",
-        gap: theme.spacing.sm,
-        marginTop: theme.spacing.lg,
-    },
-    tabButton: {
-        paddingVertical: 8,
-        paddingHorizontal: theme.spacing.md,
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    tabButtonActive: {
-        backgroundColor: theme.ink[900],
-        borderColor: theme.ink[900],
-    },
-    tabButtonText: {
-        fontSize: 13,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    tabButtonTextActive: {
-        color: "#fff",
-    },
-    searchBox: {
-        minHeight: 46,
-        marginTop: theme.spacing.md,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-        paddingHorizontal: theme.spacing.md,
-        borderRadius: theme.radius.lg,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    searchInput: {
-        flex: 1,
-        minWidth: 0,
-        fontSize: 15,
-        color: theme.ink[900],
-        paddingVertical: theme.spacing.sm,
-    },
-    listContent: {
-        padding: theme.spacing.md,
-        paddingBottom: theme.spacing.xl,
-    },
-    row: {
-        minHeight: 88,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.md,
-        padding: theme.spacing.md,
-        marginBottom: theme.spacing.sm,
-        borderRadius: theme.radius.lg,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    rowIcon: {
-        width: 46,
-        height: 46,
-        borderRadius: 16,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#EEF2FF",
-    },
-    rowText: { flex: 1, minWidth: 0 },
-    rowTitleLine: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-    },
-    rowTitle: {
-        flex: 1,
-        minWidth: 0,
-        fontSize: 16,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    rowTag: {
-        fontSize: 11,
-        fontWeight: "800",
-        color: theme.accent.primary,
-    },
-    rowBody: {
-        marginTop: 4,
-        fontSize: 13,
-        lineHeight: 19,
-        color: theme.ink[500],
-        fontWeight: "600",
-    },
-    statusPill: {
-        paddingHorizontal: theme.spacing.sm,
-        paddingVertical: 3,
-        borderRadius: theme.radius.pill,
-    },
-    statusPillText: {
-        fontSize: 10,
-        fontWeight: "800",
-    },
-    loadMoreButton: {
-        minHeight: 46,
-        borderRadius: theme.radius.pill,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.ink[900],
-        marginTop: theme.spacing.sm,
-    },
-    loadMoreText: {
-        color: "#fff",
-        fontSize: 14,
-        fontWeight: "800",
-    },
-    endText: {
-        paddingVertical: theme.spacing.md,
-        textAlign: "center",
-        color: theme.ink[500],
-        fontSize: 12,
-        fontWeight: "700",
-    },
-    emptyState: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: theme.spacing.xl,
-    },
-    emptyIcon: {
-        width: 68,
-        height: 68,
-        borderRadius: 22,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        marginBottom: theme.spacing.lg,
-    },
-    emptyTitle: {
-        fontSize: 24,
-        lineHeight: 30,
-        fontWeight: "800",
-        color: theme.ink[900],
-        textAlign: "center",
-    },
-    emptyBody: {
-        marginTop: theme.spacing.sm,
-        maxWidth: 320,
-        fontSize: 15,
-        lineHeight: 22,
-        color: theme.ink[500],
-        textAlign: "center",
-    },
-    loading: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-    },
-    disabled: { opacity: 0.55 },
-    pressed: { opacity: 0.65 },
+    root: { flex: 1 },
+    header: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: 12, paddingHorizontal: 18, paddingTop: 12, paddingBottom: 14 },
+    headerLeft: { flex: 1, minWidth: 0, gap: 6 },
+    title: { fontSize: 40, lineHeight: 42, letterSpacing: -1 },
+    content: { paddingBottom: 90 },
+    tiles: { paddingHorizontal: 18, gap: 12 },
+    tile: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 18 },
+    tileIcon: { width: 56, height: 56, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    sectionHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 22, paddingTop: 26, paddingBottom: 10 },
+    soonGrid: { paddingHorizontal: 18, flexDirection: "row", flexWrap: "wrap", gap: 10 },
+    soonTile: { width: "47.5%", flexGrow: 1, padding: 14, borderRadius: 14, borderWidth: 1, borderStyle: "dashed" },
+    tplRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: StyleSheet.hairlineWidth },
+    tplIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    pressed: { opacity: 0.85 },
 });
