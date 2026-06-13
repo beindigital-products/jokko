@@ -481,7 +481,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
                             {contactName}
                         </Text>
                         <Text numberOfLines={1} style={{ fontSize: 11.5, color: isResolved ? colors.mute : colors.good, marginTop: 1, fontFamily: font.sans }}>
-                            {isResolved ? statusLabel(conversation.status) : `en ligne · ${conversation.channel}`}
+                            {isResolved ? statusLabel(conversation.status) : `en ligne · ${conversation.channelLabel || conversation.channel}`}
                         </Text>
                     </View>
                 </Pressable>

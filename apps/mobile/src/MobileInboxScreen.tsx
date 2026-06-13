@@ -31,6 +31,7 @@ type ConversationRowRecord = MobileConversationSearchFields & {
     _id: Id<"conversations">;
     status: string;
     channel: string;
+    whatsappChannelId?: string | null;
     lastMessageDirection?: string;
     tags?: string[];
 };
@@ -57,6 +58,7 @@ export function MobileInboxScreen() {
     const [filter, setFilter] = useState<MobileInboxFilter>("all");
     const [search, setSearch] = useState("");
     const [searchOpen, setSearchOpen] = useState(false);
+    const [channelFilter, setChannelFilter] = useState<string | null>(null);
 
     const activeOrganization = session?.organization ?? organizations?.[0] ?? null;
     const currentUserId = session?.membership?.userId ?? null;
@@ -88,11 +90,25 @@ export function MobileInboxScreen() {
             : "skip",
     ) as ConversationRowRecord[] | undefined;
 
+    // Multi-number: an org can centralize several WhatsApp numbers. Resolve each
+    // channel's label client-side so the inbox can show + filter by number.
+    const channels = useQuery(
+        api.channels.list,
+        activeOrganization ? { organizationId: activeOrganization._id } : "skip",
+    ) as { _id: string; label?: string; displayPhoneNumber?: string }[] | undefined;
+    const multiNumber = (channels?.length ?? 0) > 1;
+    const channelMap = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const ch of channels ?? []) map.set(ch._id, ch.label || ch.displayPhoneNumber || "Numéro");
+        return map;
+    }, [channels]);
+    const channelLabelFor = (id?: string | null) => (multiNumber && id ? channelMap.get(id) : undefined);
+
     const source = filter === "archived" ? archivedConversations : allConversations;
-    const visibleConversations = useMemo(
-        () => filterMobileConversations((source ?? []) as ConversationRowRecord[], filter, search, currentUserId),
-        [source, filter, search, currentUserId],
-    );
+    const visibleConversations = useMemo(() => {
+        const base = filterMobileConversations((source ?? []) as ConversationRowRecord[], filter, search, currentUserId);
+        return channelFilter ? base.filter((c) => c.whatsappChannelId === channelFilter) : base;
+    }, [source, filter, search, currentUserId, channelFilter]);
     const counts = useMemo(
         () => computeInboxCounts((allConversations ?? []) as ConversationRowRecord[], currentUserId),
         [allConversations, currentUserId],
@@ -186,6 +202,27 @@ export function MobileInboxScreen() {
                 </ScrollView>
             </View>
 
+            {multiNumber ? (
+                <View style={styles.chipsWrap}>
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.chips}
+                        keyboardShouldPersistTaps="handled"
+                    >
+                        <FilterChip label="Tous les numéros" active={channelFilter === null} onPress={() => setChannelFilter(null)} />
+                        {(channels ?? []).map((ch) => (
+                            <FilterChip
+                                key={ch._id}
+                                label={ch.label || ch.displayPhoneNumber || "Numéro"}
+                                active={channelFilter === ch._id}
+                                onPress={() => setChannelFilter((cur) => (cur === ch._id ? null : ch._id))}
+                            />
+                        ))}
+                    </ScrollView>
+                </View>
+            ) : null}
+
             {isListLoading ? (
                 <InboxSkeleton />
             ) : visibleConversations.length === 0 ? (
@@ -206,9 +243,9 @@ export function MobileInboxScreen() {
                     keyboardShouldPersistTaps="handled"
                     showsVerticalScrollIndicator={false}
                 >
-                    <Section title="Épinglés" rows={groups.pinned} breathingId={breathingId} onOpen={openConversation} actions={actions} />
-                    <Section title="Aujourd'hui" rows={groups.today} breathingId={breathingId} onOpen={openConversation} actions={actions} />
-                    <Section title="Plus tôt" rows={groups.earlier} breathingId={breathingId} onOpen={openConversation} actions={actions} count={false} />
+                    <Section title="Épinglés" rows={groups.pinned} breathingId={breathingId} onOpen={openConversation} actions={actions} channelLabelFor={channelLabelFor} />
+                    <Section title="Aujourd'hui" rows={groups.today} breathingId={breathingId} onOpen={openConversation} actions={actions} channelLabelFor={channelLabelFor} />
+                    <Section title="Plus tôt" rows={groups.earlier} breathingId={breathingId} onOpen={openConversation} actions={actions} channelLabelFor={channelLabelFor} count={false} />
                 </ScrollView>
             )}
         </View>
@@ -221,6 +258,7 @@ function Section({
     breathingId,
     onOpen,
     actions,
+    channelLabelFor,
     count = true,
 }: {
     title: string;
@@ -228,6 +266,7 @@ function Section({
     breathingId?: string;
     onOpen: (id: string) => void;
     actions: RowActions;
+    channelLabelFor?: (id?: string | null) => string | undefined;
     count?: boolean;
 }) {
     if (rows.length === 0) return null;
@@ -241,6 +280,7 @@ function Section({
                     breathing={conversation._id === breathingId}
                     onPress={() => onOpen(conversation._id)}
                     actions={actions}
+                    channelLabel={channelLabelFor?.(conversation.whatsappChannelId)}
                 />
             ))}
         </Fragment>
@@ -252,11 +292,13 @@ function InboxRow({
     breathing,
     onPress,
     actions,
+    channelLabel,
 }: {
     conversation: ConversationRowRecord;
     breathing: boolean;
     onPress: () => void;
     actions: RowActions;
+    channelLabel?: string;
 }) {
     const { colors, font } = useTheme();
     const swipeRef = useRef<Swipeable>(null);
@@ -329,6 +371,13 @@ function InboxRow({
                                 {name}
                             </Text>
                             {conversation.isPinned ? <Icon name="pin" size={11} color={colors.mute} strokeWidth={2} /> : null}
+                            {channelLabel ? (
+                                <View style={[styles.channelTag, { backgroundColor: colors.paper2 }]}>
+                                    <Text numberOfLines={1} style={{ fontSize: 9, fontFamily: font.monoMedium, color: colors.mute, letterSpacing: 0.3 }}>
+                                        {channelLabel}
+                                    </Text>
+                                </View>
+                            ) : null}
                         </View>
                         <Text
                             style={{
@@ -548,6 +597,7 @@ const styles = StyleSheet.create({
     rowBody: { flex: 1, minWidth: 0 },
     rowTop: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
     rowName: { flexDirection: "row", alignItems: "center", gap: 6, flex: 1, minWidth: 0 },
+    channelTag: { flexShrink: 0, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
     rowBottom: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginTop: 3 },
     previewWrap: { flexDirection: "row", alignItems: "center", gap: 5, flex: 1, minWidth: 0 },
     rowTrailing: { flexDirection: "row", alignItems: "center", gap: 6 },

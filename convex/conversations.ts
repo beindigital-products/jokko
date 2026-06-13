@@ -162,9 +162,12 @@ export const getById = query({
 
         const contact = conversation.contactId ? await ctx.db.get(conversation.contactId) : null;
         const assignee = conversation.assignedTo ? await ctx.db.get(conversation.assignedTo) : null;
+        // Which WhatsApp number this conversation is on (multi-number orgs).
+        const channel = conversation.whatsappChannelId ? await ctx.db.get(conversation.whatsappChannelId) : null;
 
         return {
             ...conversation,
+            channelLabel: channel ? channel.label || channel.displayPhoneNumber || undefined : undefined,
             contact: contact ? {
                 _id: contact._id,
                 name: contact.name,
