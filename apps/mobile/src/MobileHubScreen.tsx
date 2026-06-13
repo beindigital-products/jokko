@@ -40,6 +40,7 @@ export function MobileHubScreen() {
 
     const openTemplates = () => router.push({ pathname: "/hub/list", params: { type: "templates" } });
     const openShortcuts = () => router.push({ pathname: "/hub/list", params: { type: "shortcuts" } });
+    const openSearch = () => router.push({ pathname: "/hub/list", params: { type: "templates", focus: "1" } });
 
     return (
         <View style={[styles.root, { backgroundColor: colors.paper }]}>
@@ -48,7 +49,7 @@ export function MobileHubScreen() {
                     <Micro>Outils & automatisations</Micro>
                     <Text style={[styles.title, { fontFamily: font.display, color: colors.ink }]}>Hub</Text>
                 </View>
-                <NavButton icon="search" onPress={openTemplates} />
+                <NavButton icon="search" onPress={openSearch} />
             </View>
 
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>

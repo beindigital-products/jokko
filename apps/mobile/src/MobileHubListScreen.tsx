@@ -2,20 +2,22 @@ import { useState } from "react";
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { usePaginatedQuery } from "convex/react";
-import { Icon, NavButton, Pill, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
+import { Btn, Icon, NavButton, Pill, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { ShortcutSheet } from "./conversation/ShortcutSheet";
 
 type HubListType = "templates" | "shortcuts";
 
 type TemplateRecord = { _id: Id<"templates">; name: string; category?: string; status?: string; body?: string };
 type ShortcutRecord = { _id: Id<"shortcuts">; shortcut: string; text?: string };
 
-export function MobileHubListScreen({ type }: { type: HubListType }) {
+export function MobileHubListScreen({ type, focusSearch = false }: { type: HubListType; focusSearch?: boolean }) {
     const router = useRouter();
     const theme = useTheme();
     const { colors, font } = theme;
     const [search, setSearch] = useState("");
+    const [sheetOpen, setSheetOpen] = useState(false);
     const isTemplates = type === "templates";
     const query = search.trim() || undefined;
 
@@ -37,7 +39,11 @@ export function MobileHubListScreen({ type }: { type: HubListType }) {
                 <Text style={{ flex: 1, textAlign: "center", fontFamily: font.sansSemibold, fontSize: 15, color: colors.ink }}>
                     {isTemplates ? "Modèles WhatsApp" : "Réponses rapides"}
                 </Text>
-                <View style={{ width: 40 }} />
+                {isTemplates ? (
+                    <View style={{ width: 40 }} />
+                ) : (
+                    <NavButton icon="plus" onPress={() => setSheetOpen(true)} />
+                )}
             </View>
 
             <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.rule }]}>
@@ -48,6 +54,7 @@ export function MobileHubListScreen({ type }: { type: HubListType }) {
                     placeholder={isTemplates ? "Chercher un modèle" : "Chercher un raccourci"}
                     placeholderTextColor={colors.mute}
                     autoCapitalize="none"
+                    autoFocus={focusSearch}
                     style={{ flex: 1, fontSize: 15, color: colors.ink, fontFamily: font.sans, paddingVertical: 0 }}
                     returnKeyType="search"
                 />
@@ -82,11 +89,20 @@ export function MobileHubListScreen({ type }: { type: HubListType }) {
                             <Text style={{ marginTop: 6, fontSize: 14, color: colors.mute, fontFamily: font.sans, textAlign: "center", maxWidth: 280 }}>
                                 {search ? "Essaie une autre recherche." : isTemplates ? "Crée tes modèles depuis le tableau de bord web." : "Ajoute des raccourcis pour répondre plus vite."}
                             </Text>
+                            {!isTemplates && !search ? (
+                                <View style={{ marginTop: 16 }}>
+                                    <Btn tone="accent" icon="plus" onPress={() => setSheetOpen(true)}>
+                                        Nouveau raccourci
+                                    </Btn>
+                                </View>
+                            ) : null}
                         </View>
                     )
                 }
                 ListFooterComponent={page.status === "LoadingMore" ? <View style={styles.footer}><ActivityIndicator color={colors.mute} /></View> : null}
             />
+
+            <ShortcutSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} />
         </View>
     );
 }
@@ -120,7 +136,7 @@ function ShortcutRow({ theme, shortcut, onPress }: { theme: JokkoTheme; shortcut
                 <Icon name="bolt" size={18} color={colors.accentInk} strokeWidth={1.6} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-                <Text numberOfLines={1} style={{ fontSize: 14.5, color: colors.ink, fontFamily: font.monoMedium }}>/{shortcut.shortcut}</Text>
+                <Text numberOfLines={1} style={{ fontSize: 14.5, color: colors.ink, fontFamily: font.monoMedium }}>/{shortcut.shortcut.replace(/^\//, "")}</Text>
                 {shortcut.text ? (
                     <Text numberOfLines={1} style={{ fontSize: 12.5, color: colors.mute, fontFamily: font.sans, marginTop: 3 }}>{shortcut.text}</Text>
                 ) : null}
