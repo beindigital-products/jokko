@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as SecureStore from "expo-secure-store";
+import * as WebBrowser from "expo-web-browser";
 import { useRouter } from "expo-router";
+import { useMutation } from "convex/react";
+import { useAuthActions } from "@convex-dev/auth/react";
 import { theme } from "@jokko/tokens";
+import { api } from "../../../convex/_generated/api";
 import {
     PRIVACY_CONSENT_STORAGE_KEY,
     buildPrivacyConsentUpdate,
@@ -16,8 +20,14 @@ import {
 
 type SaveStatus = "idle" | "saving";
 
+declare const process: { env: { EXPO_PUBLIC_WEB_APP_URL?: string; EXPO_PUBLIC_WEB_URL?: string } };
+const WEB_BASE = (process.env.EXPO_PUBLIC_WEB_APP_URL ?? process.env.EXPO_PUBLIC_WEB_URL ?? "https://app.jokko.io").replace(/\/+$/, "");
+
 export function PrivacySettingsScreen() {
     const router = useRouter();
+    const deleteAccount = useMutation(api.users.deleteAccount);
+    const { signOut } = useAuthActions();
+    const [deleting, setDeleting] = useState(false);
     const [loaded, setLoaded] = useState(false);
     const [savedConsent, setSavedConsent] = useState<PrivacyConsent | null>(null);
     const [draft, setDraft] = useState<PrivacyConsent>(() => createDefaultPrivacyConsent());
@@ -84,6 +94,39 @@ export function PrivacySettingsScreen() {
 
     const revokeAll = () => {
         void persistConsent(revokePrivacyConsent(), "Consentement révoqué pour les diagnostics optionnels.");
+    };
+
+    const openLegal = (path: string) => {
+        void WebBrowser.openBrowserAsync(`${WEB_BASE}${path}`);
+    };
+
+    const confirmDeleteAccount = () => {
+        Alert.alert(
+            "Supprimer mon compte ?",
+            "Cette action est définitive. Tes données personnelles seront supprimées et tu seras déconnecté.",
+            [
+                { text: "Annuler", style: "cancel" },
+                {
+                    text: "Supprimer définitivement",
+                    style: "destructive",
+                    onPress: async () => {
+                        setDeleting(true);
+                        try {
+                            await deleteAccount({});
+                            await signOut();
+                            router.replace("/welcome");
+                        } catch (error) {
+                            Alert.alert(
+                                "Suppression impossible",
+                                error instanceof Error ? error.message : "Réessaie plus tard.",
+                            );
+                        } finally {
+                            setDeleting(false);
+                        }
+                    },
+                },
+            ],
+        );
     };
 
     if (!loaded) {
@@ -164,7 +207,41 @@ export function PrivacySettingsScreen() {
                 <Ionicons name="close-circle-outline" size={18} color={theme.semantic.danger} />
                 <Text style={styles.dangerActionText}>Révoquer tous les choix optionnels</Text>
             </Pressable>
+
+            <Text style={styles.sectionHeader}>Légal</Text>
+            <View style={styles.linkGroup}>
+                <LegalRow label="Politique de confidentialité" onPress={() => openLegal("/privacy")} />
+                <LegalRow label="Conditions générales" onPress={() => openLegal("/terms")} last />
+            </View>
+
+            <Text style={styles.sectionHeader}>Compte</Text>
+            <Pressable
+                accessibilityRole="button"
+                disabled={deleting}
+                onPress={confirmDeleteAccount}
+                style={({ pressed }) => [styles.deleteButton, deleting && styles.disabled, pressed && !deleting && styles.pressed]}
+            >
+                <Ionicons name="trash-outline" size={18} color="#fff" />
+                <Text style={styles.deleteButtonText}>{deleting ? "Suppression..." : "Supprimer mon compte"}</Text>
+            </Pressable>
+            <Text style={styles.deleteHint}>
+                Suppression définitive de ton compte et de tes données personnelles. Si tu es seul propriétaire d'une
+                organisation avec des membres, transfère d'abord la propriété.
+            </Text>
         </ScrollView>
+    );
+}
+
+function LegalRow({ label, onPress, last = false }: { label: string; onPress: () => void; last?: boolean }) {
+    return (
+        <Pressable
+            accessibilityRole="button"
+            onPress={onPress}
+            style={({ pressed }) => [styles.linkRow, last && styles.linkRowLast, pressed && styles.pressed]}
+        >
+            <Text style={styles.linkRowText}>{label}</Text>
+            <Ionicons name="open-outline" size={18} color={theme.ink[500]} />
+        </Pressable>
     );
 }
 
@@ -343,5 +420,60 @@ const styles = StyleSheet.create({
     },
     pressed: {
         opacity: 0.65,
+    },
+    sectionHeader: {
+        marginTop: theme.spacing.xl,
+        marginBottom: theme.spacing.sm,
+        fontSize: 12,
+        fontWeight: "800",
+        textTransform: "uppercase",
+        color: theme.ink[500],
+    },
+    linkGroup: {
+        borderRadius: theme.radius.lg,
+        overflow: "hidden",
+        borderWidth: 1,
+        borderColor: theme.ink[300],
+        backgroundColor: theme.surface.raised,
+    },
+    linkRow: {
+        minHeight: 52,
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: theme.spacing.md,
+        paddingHorizontal: theme.spacing.lg,
+        paddingVertical: theme.spacing.md,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.ink[300],
+    },
+    linkRowLast: {
+        borderBottomWidth: 0,
+    },
+    linkRowText: {
+        fontSize: 15,
+        fontWeight: "700",
+        color: theme.ink[900],
+    },
+    deleteButton: {
+        minHeight: 50,
+        borderRadius: theme.radius.pill,
+        backgroundColor: theme.semantic.danger,
+        alignItems: "center",
+        justifyContent: "center",
+        flexDirection: "row",
+        gap: theme.spacing.sm,
+        paddingHorizontal: theme.spacing.lg,
+    },
+    deleteButtonText: {
+        color: "#fff",
+        fontSize: 15,
+        fontWeight: "800",
+    },
+    deleteHint: {
+        marginTop: theme.spacing.sm,
+        fontSize: 12,
+        lineHeight: 17,
+        color: theme.ink[500],
     },
 });

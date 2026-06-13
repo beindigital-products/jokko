@@ -21,6 +21,7 @@ import {
 } from "@expo-google-fonts/instrument-serif";
 import { theme } from "@jokko/tokens";
 import { MobileAppProviders } from "../src/MobileAppProviders";
+import { ErrorBoundary } from "../src/ErrorBoundary";
 
 export default function RootLayout() {
   // v2 design fonts — JetBrains Mono (display) + Geist (sans/mono) + Instrument
@@ -47,22 +48,24 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={styles.root}>
       <SafeAreaProvider>
-        <MobileAppProviders>
-          {/* Edge-to-edge: each screen paints its own background to all four
-              edges and applies safe-area insets via the <Screen> primitive, so
-              dark/full-bleed screens never show white safe-area bands. */}
-          <KeyboardAvoidingView
-            style={styles.root}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-          >
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                contentStyle: { backgroundColor: theme.paper.white },
-              }}
-            />
-          </KeyboardAvoidingView>
-        </MobileAppProviders>
+        <ErrorBoundary>
+          <MobileAppProviders>
+            {/* Edge-to-edge: each screen paints its own background to all four
+                edges and applies safe-area insets via the <Screen> primitive, so
+                dark/full-bleed screens never show white safe-area bands. */}
+            <KeyboardAvoidingView
+              style={styles.root}
+              behavior={Platform.OS === "ios" ? "padding" : "height"}
+            >
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  contentStyle: { backgroundColor: theme.paper.white },
+                }}
+              />
+            </KeyboardAvoidingView>
+          </MobileAppProviders>
+        </ErrorBoundary>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
