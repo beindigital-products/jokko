@@ -12,7 +12,7 @@ import {
     TextInput,
     View,
 } from "react-native";
-import { useMutation, usePaginatedQuery, useQuery } from "convex/react";
+import { useAction, useMutation, usePaginatedQuery, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { Avatar, Btn, Icon, NavButton, tint, useTheme, type IconName } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
@@ -68,6 +68,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [uploading, setUploading] = useState<(StagedMedia & { progress: number })[]>([]);
     const [noteMode, setNoteMode] = useState(false);
     const [pickedMentions, setPickedMentions] = useState<PickedMention[]>([]);
+    const [draftingAi, setDraftingAi] = useState(false);
     const stagedKey = useRef(0);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
@@ -87,6 +88,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const archiveConversation = useMutation(api.conversations.archive);
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
     const addInternalNote = useMutation(api.messages.addInternalNote);
+    const generateReplyDraft = useAction(api.ai.generateReplyDraft);
     const requestOutboundCall = useMutation(api.calls.requestOutboundCall);
     const { results, status, loadMore } = usePaginatedQuery(
         api.messages.list,
@@ -169,6 +171,27 @@ export function MobileConversationScreen({ conversationId }: Props) {
             setError(e instanceof Error ? e.message : "Note non enregistrée. Réessaie.");
         } finally {
             setIsSending(false);
+        }
+    };
+
+    // AI assist: suggest a reply draft from the conversation context, drop it into
+    // the composer for the agent to review/edit/send. Backend is plan-gated + has a
+    // canned fallback when no AI key.
+    const generateAiDraft = async () => {
+        if (!typedConversationId || draftingAi) return;
+        setDraftingAi(true);
+        try {
+            const res = await generateReplyDraft({ conversationId: typedConversationId });
+            if (res?.draft) {
+                setDraft(res.draft);
+                void Haptics.selectionAsync();
+            } else if (res?.error) {
+                Alert.alert("Brouillon IA indisponible", res.error);
+            }
+        } catch (e) {
+            Alert.alert("Brouillon IA indisponible", e instanceof Error ? e.message : "Réessaie plus tard.");
+        } finally {
+            setDraftingAi(false);
         }
     };
 
@@ -705,6 +728,28 @@ export function MobileConversationScreen({ conversationId }: Props) {
                         </View>
                     ) : null}
 
+                    {draft.trim().length === 0 && staged.length === 0 && conversation.lastMessageDirection === "INBOUND" ? (
+                        <Pressable
+                            accessibilityRole="button"
+                            onPress={() => void generateAiDraft()}
+                            disabled={draftingAi}
+                            style={({ pressed }) => [
+                                styles.aiSuggest,
+                                { backgroundColor: colors.accentSoft, borderColor: tint(colors.accent, 0.3) },
+                                pressed && { opacity: 0.7 },
+                            ]}
+                        >
+                            {draftingAi ? (
+                                <ActivityIndicator size="small" color={colors.accentInk} />
+                            ) : (
+                                <Icon name="sparkle" size={15} color={colors.accentInk} strokeWidth={1.8} />
+                            )}
+                            <Text style={{ fontSize: 13, fontFamily: font.sansMedium, color: colors.accentInk }}>
+                                {draftingAi ? "Génération…" : "Suggérer une réponse"}
+                            </Text>
+                        </Pressable>
+                    ) : null}
+
                     {/* Composer */}
                     <View style={[styles.composer, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
                         {!voiceActive ? (
@@ -959,6 +1004,7 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     sendButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+    aiSuggest: { flexDirection: "row", alignItems: "center", alignSelf: "center", gap: 7, marginBottom: 8, paddingHorizontal: 14, height: 34, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
     modeToggle: { flexDirection: "row", alignSelf: "center", gap: 6, paddingTop: 8, paddingBottom: 2 },
     modeBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
     noteInputWrap: {
