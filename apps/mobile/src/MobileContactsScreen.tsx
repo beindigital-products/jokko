@@ -38,14 +38,13 @@ export function MobileContactsScreen() {
     const sections = useMemo(() => {
         const groups = new Map<string, ContactRecord[]>();
         for (const contact of contacts) {
-            const first = displayName(contact).trim().charAt(0).toUpperCase();
-            const key = /[A-ZÀ-Ý]/.test(first) ? first : "#";
+            const key = sectionLetter(displayName(contact));
             const bucket = groups.get(key);
             if (bucket) bucket.push(contact);
             else groups.set(key, [contact]);
         }
         return Array.from(groups.entries())
-            .sort((a, b) => a[0].localeCompare(b[0], "fr"))
+            .sort((a, b) => letterRank(a[0]) - letterRank(b[0]))
             .map(([title, data]) => ({
                 title,
                 data: data.sort((x, y) => displayName(x).localeCompare(displayName(y), "fr")),
@@ -176,18 +175,43 @@ function ContactRow({ contact, theme, onPress }: { contact: ContactRecord; theme
     );
 }
 
-function AlphabetRail({ sections, onJump, theme }: { sections: { title: string }[]; onJump: (index: number) => void; theme: JokkoTheme }) {
+const RAIL_LETTERS = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ", "#"];
+
+function letterRank(title: string): number {
+    return title === "#" ? 27 : title.charCodeAt(0) - 64;
+}
+
+function sectionLetter(name: string): string {
+    const base = (name.trim().charAt(0) || "#").normalize("NFD").charAt(0).toUpperCase();
+    return /[A-Z]/.test(base) ? base : "#";
+}
+
+function AlphabetRail({ sections, onJump, theme }: { sections: { title: string }[]; onJump: (sectionIndex: number) => void; theme: JokkoTheme }) {
     const { colors, font } = theme;
     const heightRef = useRef(0);
-    const lastIndex = useRef(-1);
+    const lastLetter = useRef(-1);
+    const present = useMemo(() => new Set(sections.map((s) => s.title)), [sections]);
+
+    // A tapped/scrubbed letter jumps to its section, or to the nearest earlier one.
+    const resolveTarget = (letter: string): number => {
+        const exact = sections.findIndex((s) => s.title === letter);
+        if (exact >= 0) return exact;
+        const rank = letterRank(letter);
+        let best = 0;
+        for (let i = 0; i < sections.length; i++) {
+            if (letterRank(sections[i].title) <= rank) best = i;
+            else break;
+        }
+        return best;
+    };
 
     const handleTouch = (locationY: number) => {
         const height = heightRef.current;
-        if (height <= 0 || sections.length === 0) return;
-        const index = Math.max(0, Math.min(sections.length - 1, Math.floor((locationY / height) * sections.length)));
-        if (index !== lastIndex.current) {
-            lastIndex.current = index;
-            onJump(index);
+        if (height <= 0) return;
+        const index = Math.max(0, Math.min(RAIL_LETTERS.length - 1, Math.floor((locationY / height) * RAIL_LETTERS.length)));
+        if (index !== lastLetter.current) {
+            lastLetter.current = index;
+            onJump(resolveTarget(RAIL_LETTERS[index]));
             void Haptics.selectionAsync().catch(() => undefined);
         }
     };
@@ -203,12 +227,15 @@ function AlphabetRail({ sections, onJump, theme }: { sections: { title: string }
             onResponderGrant={(event) => handleTouch(event.nativeEvent.locationY)}
             onResponderMove={(event) => handleTouch(event.nativeEvent.locationY)}
             onResponderRelease={() => {
-                lastIndex.current = -1;
+                lastLetter.current = -1;
             }}
         >
-            {sections.map((section) => (
-                <Text key={section.title} style={{ fontSize: 10, lineHeight: 12, color: colors.accentInk, fontFamily: font.monoMedium }}>
-                    {section.title}
+            {RAIL_LETTERS.map((letter) => (
+                <Text
+                    key={letter}
+                    style={{ fontSize: 9.5, lineHeight: 11.5, fontFamily: font.monoMedium, color: present.has(letter) ? colors.accentInk : colors.mute2 }}
+                >
+                    {letter}
                 </Text>
             ))}
         </View>
