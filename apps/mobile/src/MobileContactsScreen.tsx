@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { usePaginatedQuery } from "convex/react";
 import { Avatar, Icon, Micro, NavButton, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { ContactActions } from "./conversation/ContactActions";
 
 type ContactRecord = {
     _id: Id<"contacts">;
@@ -22,6 +23,7 @@ export function MobileContactsScreen() {
     const { colors, font } = theme;
     const [search, setSearch] = useState("");
     const [searchOpen, setSearchOpen] = useState(false);
+    const [actionsOpen, setActionsOpen] = useState(false);
 
     const { results, status, loadMore, isLoading } = usePaginatedQuery(
         api.contacts.list,
@@ -61,12 +63,7 @@ export function MobileContactsScreen() {
                 </View>
                 <View style={styles.headerIcons}>
                     <NavButton icon="search" onPress={() => setSearchOpen((open) => !open)} />
-                    <NavButton
-                        icon="plus"
-                        onPress={() =>
-                            Alert.alert("Ajouter un contact", "Les contacts se créent automatiquement à la première conversation WhatsApp.")
-                        }
-                    />
+                    <NavButton icon="plus" onPress={() => setActionsOpen(true)} />
                 </View>
             </View>
 
@@ -139,6 +136,8 @@ export function MobileContactsScreen() {
                     ) : null
                 }
             />
+
+            <ContactActions visible={actionsOpen} onClose={() => setActionsOpen(false)} />
         </View>
     );
 }
