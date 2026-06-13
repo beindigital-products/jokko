@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
+import * as Haptics from "expo-haptics";
 import { useRouter } from "expo-router";
 import { usePaginatedQuery } from "convex/react";
 import { Avatar, Icon, Micro, NavButton, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
@@ -53,6 +54,11 @@ export function MobileContactsScreen() {
 
     const isSearching = search.trim().length > 0;
 
+    const listRef = useRef<SectionList<ContactRecord>>(null);
+    const jumpToSection = (sectionIndex: number) => {
+        listRef.current?.scrollToLocation({ sectionIndex, itemIndex: 0, animated: false, viewPosition: 0 });
+    };
+
     return (
         <View style={[styles.root, { backgroundColor: colors.paper }]}>
             {/* Header — eyebrow + title on the left, icons aligned to the title baseline on the right. */}
@@ -87,9 +93,12 @@ export function MobileContactsScreen() {
                 </View>
             ) : null}
 
+            <View style={styles.listArea}>
             <SectionList
+                ref={listRef}
                 sections={sections}
                 keyExtractor={(item) => item._id}
+                onScrollToIndexFailed={() => undefined}
                 stickySectionHeadersEnabled
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
@@ -136,6 +145,8 @@ export function MobileContactsScreen() {
                     ) : null
                 }
             />
+                {sections.length > 1 ? <AlphabetRail sections={sections} onJump={jumpToSection} theme={theme} /> : null}
+            </View>
 
             <ContactActions visible={actionsOpen} onClose={() => setActionsOpen(false)} />
         </View>
@@ -162,6 +173,45 @@ function ContactRow({ contact, theme, onPress }: { contact: ContactRecord; theme
             </View>
             {contact.isWhatsApp ? <Icon name="whatsapp" size={18} color={colors.waGreen} strokeWidth={1.6} /> : null}
         </Pressable>
+    );
+}
+
+function AlphabetRail({ sections, onJump, theme }: { sections: { title: string }[]; onJump: (index: number) => void; theme: JokkoTheme }) {
+    const { colors, font } = theme;
+    const heightRef = useRef(0);
+    const lastIndex = useRef(-1);
+
+    const handleTouch = (locationY: number) => {
+        const height = heightRef.current;
+        if (height <= 0 || sections.length === 0) return;
+        const index = Math.max(0, Math.min(sections.length - 1, Math.floor((locationY / height) * sections.length)));
+        if (index !== lastIndex.current) {
+            lastIndex.current = index;
+            onJump(index);
+            void Haptics.selectionAsync().catch(() => undefined);
+        }
+    };
+
+    return (
+        <View
+            style={styles.rail}
+            onLayout={(event) => {
+                heightRef.current = event.nativeEvent.layout.height;
+            }}
+            onStartShouldSetResponder={() => true}
+            onMoveShouldSetResponder={() => true}
+            onResponderGrant={(event) => handleTouch(event.nativeEvent.locationY)}
+            onResponderMove={(event) => handleTouch(event.nativeEvent.locationY)}
+            onResponderRelease={() => {
+                lastIndex.current = -1;
+            }}
+        >
+            {sections.map((section) => (
+                <Text key={section.title} style={{ fontSize: 10, lineHeight: 12, color: colors.accentInk, fontFamily: font.monoMedium }}>
+                    {section.title}
+                </Text>
+            ))}
+        </View>
     );
 }
 
@@ -199,8 +249,19 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         borderWidth: StyleSheet.hairlineWidth,
     },
-    listContent: { paddingBottom: 90 },
+    listContent: { paddingBottom: 90, paddingRight: 14 },
     emptyContent: { flexGrow: 1 },
+    listArea: { flex: 1 },
+    rail: {
+        position: "absolute",
+        right: 0,
+        top: 0,
+        bottom: 0,
+        width: 22,
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 16,
+    },
     sectionHeader: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 18, paddingTop: 14, paddingBottom: 4 },
     sectionRule: { flex: 1, height: StyleSheet.hairlineWidth },
     row: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 18, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth },
