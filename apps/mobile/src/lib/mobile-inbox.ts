@@ -1,4 +1,4 @@
-export type MobileInboxFilter = "all" | "unread" | "mine" | "archived";
+export type MobileInboxFilter = "all" | "unread" | "mine" | "resolved" | "archived";
 
 export type MobileConversationSearchFields = {
     _id: string;

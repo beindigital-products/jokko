@@ -26,6 +26,7 @@ export const list = query({
             v.literal("unread"),
             v.literal("unassigned"),
             v.literal("archived"),
+            v.literal("resolved"),
             v.literal("mine"),
             v.literal("star")
         ),
@@ -37,11 +38,14 @@ export const list = query({
         let conversations;
 
         // Apply basic status filtering
-        if (args.filter === "archived") {
+        if (args.filter === "archived" || args.filter === "resolved") {
+            // Both are "closed" states stored on the conversation; surface each on
+            // its own tab so a resolved/archived thread stays reachable (to reopen).
+            const status = args.filter === "archived" ? "ARCHIVED" : "RESOLVED";
             conversations = await ctx.db
                 .query("conversations")
                 .withIndex("by_org_status", (q) =>
-                    q.eq("organizationId", args.organizationId).eq("status", "ARCHIVED")
+                    q.eq("organizationId", args.organizationId).eq("status", status)
                 )
                 .order("desc") // Most recent first
                 .take(CONVERSATION_LIST_LIMIT);

@@ -47,6 +47,7 @@ const FILTERS: { key: MobileInboxFilter; label: string }[] = [
     { key: "all", label: "Tout" },
     { key: "unread", label: "Non lus" },
     { key: "mine", label: "Assignés à moi" },
+    { key: "resolved", label: "Résolus" },
     { key: "archived", label: "Archives" },
 ];
 
@@ -89,6 +90,12 @@ export function MobileInboxScreen() {
             ? { organizationId: activeOrganization._id, filter: "archived" }
             : "skip",
     ) as ConversationRowRecord[] | undefined;
+    const resolvedConversations = useQuery(
+        api.conversations.list,
+        activeOrganization && filter === "resolved"
+            ? { organizationId: activeOrganization._id, filter: "resolved" }
+            : "skip",
+    ) as ConversationRowRecord[] | undefined;
 
     // Multi-number: an org can centralize several WhatsApp numbers. Resolve each
     // channel's label client-side so the inbox can show + filter by number.
@@ -104,7 +111,8 @@ export function MobileInboxScreen() {
     }, [channels]);
     const channelLabelFor = (id?: string | null) => (multiNumber && id ? channelMap.get(id) : undefined);
 
-    const source = filter === "archived" ? archivedConversations : allConversations;
+    const source =
+        filter === "archived" ? archivedConversations : filter === "resolved" ? resolvedConversations : allConversations;
     const visibleConversations = useMemo(() => {
         const base = filterMobileConversations((source ?? []) as ConversationRowRecord[], filter, search, currentUserId);
         return channelFilter ? base.filter((c) => c.whatsappChannelId === channelFilter) : base;
@@ -117,7 +125,12 @@ export function MobileInboxScreen() {
     const breathingId = groups.today[0]?._id;
 
     const isBootstrapping = session === undefined && organizations === undefined;
-    const isListLoading = filter === "archived" ? archivedConversations === undefined : allConversations === undefined;
+    const isListLoading =
+        filter === "archived"
+            ? archivedConversations === undefined
+            : filter === "resolved"
+              ? resolvedConversations === undefined
+              : allConversations === undefined;
 
     const openConversation = (id: string) =>
         router.push({ pathname: "/conversations/[id]", params: { id } } as never);
@@ -188,7 +201,9 @@ export function MobileInboxScreen() {
                                   ? counts.unread
                                   : item.key === "mine"
                                     ? counts.mine
-                                    : archivedConversations?.length;
+                                    : item.key === "resolved"
+                                      ? resolvedConversations?.length
+                                      : archivedConversations?.length;
                         return (
                             <FilterChip
                                 key={item.key}
@@ -228,14 +243,30 @@ export function MobileInboxScreen() {
             ) : visibleConversations.length === 0 ? (
                 <InboxMessage
                     icon={search ? "search" : "inbox"}
-                    title={search ? "Aucun résultat" : filter === "archived" ? "Aucune archive" : "Aucune conversation"}
+                    title={
+                        search
+                            ? "Aucun résultat"
+                            : filter === "archived"
+                              ? "Aucune archive"
+                              : filter === "resolved"
+                                ? "Aucune conversation résolue"
+                                : "Aucune conversation"
+                    }
                     body={
                         search
                             ? "Essayez un autre nom, numéro ou extrait de message."
-                            : "Connectez WhatsApp Business ou attendez le premier message entrant."
+                            : filter === "archived"
+                              ? "Les conversations archivées apparaîtront ici."
+                              : filter === "resolved"
+                                ? "Les conversations marquées comme résolues apparaîtront ici."
+                                : "Connectez WhatsApp Business ou attendez le premier message entrant."
                     }
-                    cta={search ? undefined : "Configurer WhatsApp"}
-                    onCta={search ? undefined : () => router.replace("/onboarding")}
+                    cta={search || filter === "archived" || filter === "resolved" ? undefined : "Configurer WhatsApp"}
+                    onCta={
+                        search || filter === "archived" || filter === "resolved"
+                            ? undefined
+                            : () => router.replace("/onboarding")
+                    }
                 />
             ) : (
                 <ScrollView
