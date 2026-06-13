@@ -52,11 +52,19 @@ export const list = query({
                     .withIndex("by_message", (q) => q.eq("messageId", msg._id))
                     .collect();
 
+                // Internal notes show their author to the team — resolve the name.
+                let senderName: string | undefined;
+                if (msg.isInternal && msg.senderId) {
+                    const sender = await ctx.db.get(msg.senderId);
+                    senderName = sender?.name || sender?.email || undefined;
+                }
+
                 return {
                     ...msg,
                     id: msg._id,
                     timestamp: msg._creationTime, // Use creation time as timestamp
                     mediaUrl,
+                    senderName,
                     reactions: reactions.map((r) => ({
                         userId: r.userId,
                         emoji: r.emoji,

@@ -27,9 +27,11 @@ import { GlassReply, type GlassReaction } from "./conversation/GlassReply";
 import { MediaPicker } from "./conversation/MediaPicker";
 import { MessageBubble, type ConversationMessage } from "./conversation/MessageBubble";
 import { ShortcutPopover } from "./conversation/ShortcutPopover";
+import { MentionPopover } from "./conversation/MentionPopover";
 import { TemplatePicker } from "./conversation/TemplatePicker";
 import { VoiceNoteRecorder } from "./conversation/VoiceNoteRecorder";
 import { uploadFileToConvex } from "./conversation/upload";
+import { activeMentionQuery, applyMention, resolveMentions, type PickedMention } from "./lib/mention-parse";
 
 type Props = {
     conversationId: string | null;
@@ -62,6 +64,8 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [voiceActive, setVoiceActive] = useState(false);
     const [staged, setStaged] = useState<StagedMedia[]>([]);
     const [uploading, setUploading] = useState<(StagedMedia & { progress: number })[]>([]);
+    const [noteMode, setNoteMode] = useState(false);
+    const [pickedMentions, setPickedMentions] = useState<PickedMention[]>([]);
     const stagedKey = useRef(0);
     const typedConversationId = conversationId as Id<"conversations"> | null;
     const conversation = useQuery(
@@ -80,6 +84,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const reopenConversation = useMutation(api.conversations.reopen);
     const archiveConversation = useMutation(api.conversations.archive);
     const generateUploadUrl = useMutation(api.files.generateUploadUrl);
+    const addInternalNote = useMutation(api.messages.addInternalNote);
     const requestOutboundCall = useMutation(api.calls.requestOutboundCall);
     const { results, status, loadMore } = usePaginatedQuery(
         api.messages.list,
@@ -112,7 +117,8 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const contactName = conversation?.contact?.name || conversation?.contact?.phoneNumber || "Contact inconnu";
     const contactPhone = conversation?.contact?.phoneNumber;
     const canSend = draft.trim().length > 0 && !isSending && Boolean(typedConversationId);
-    const showShortcutPopover = draft.startsWith("/") && !draft.includes(" ");
+    const showShortcutPopover = !noteMode && draft.startsWith("/") && !draft.includes(" ");
+    const mentionQuery = noteMode ? activeMentionQuery(draft) : null;
 
     useEffect(() => {
         if (!typedConversationId || !conversation || conversation.unreadCount <= 0) return;
@@ -133,6 +139,32 @@ export function MobileConversationScreen({ conversationId }: Props) {
             setDraft(content);
             if (replyToId) setReplyingTo(replyingTo);
             setError("Message non envoyé. Vérifie le canal WhatsApp ou réessaie.");
+        } finally {
+            setIsSending(false);
+        }
+    };
+
+    // Insert a picked teammate into the note draft + remember it for the mentions payload.
+    const pickMention = (mention: PickedMention) => {
+        setDraft((current) => applyMention(current, mention.name));
+        setPickedMentions((prev) => [...prev, mention]);
+    };
+
+    const submitNote = async () => {
+        if (!typedConversationId) return;
+        const content = draft.trim();
+        if (!content || isSending) return;
+        const mentions = resolveMentions(draft, pickedMentions).map((m) => ({ userId: m.userId as Id<"users">, name: m.name }));
+        setDraft("");
+        setPickedMentions([]);
+        setError(null);
+        setIsSending(true);
+        try {
+            await addInternalNote({ conversationId: typedConversationId, content, mentions: mentions.length ? mentions : undefined });
+            void Haptics.selectionAsync();
+        } catch (e) {
+            setDraft(content);
+            setError(e instanceof Error ? e.message : "Note non enregistrée. Réessaie.");
         } finally {
             setIsSending(false);
         }
@@ -554,7 +586,49 @@ export function MobileConversationScreen({ conversationId }: Props) {
                 </View>
             ) : null}
 
-            {windowExpired ? (
+            {typedConversationId && !voiceActive ? (
+                <View style={styles.modeToggle}>
+                    <Pressable onPress={() => setNoteMode(false)} style={[styles.modeBtn, !noteMode && { backgroundColor: colors.card }]}>
+                        <Icon name="whatsapp" size={14} color={!noteMode ? colors.ink : colors.mute} strokeWidth={1.8} />
+                        <Text style={{ fontSize: 12.5, fontFamily: font.sansMedium, color: !noteMode ? colors.ink : colors.mute }}>Répondre</Text>
+                    </Pressable>
+                    <Pressable onPress={() => setNoteMode(true)} style={[styles.modeBtn, noteMode && { backgroundColor: tint(colors.warn, 0.18) }]}>
+                        <Icon name="reply" size={14} color={noteMode ? colors.warn : colors.mute} strokeWidth={1.8} />
+                        <Text style={{ fontSize: 12.5, fontFamily: font.sansMedium, color: noteMode ? colors.warn : colors.mute }}>Note interne</Text>
+                    </Pressable>
+                </View>
+            ) : null}
+
+            {noteMode ? (
+                /* Internal note — team-only, never sent to WhatsApp, so always allowed (even past the 24h window). */
+                <>
+                    {mentionQuery !== null ? <MentionPopover query={mentionQuery} onSelect={pickMention} /> : null}
+                    <View style={[styles.composer, { borderTopColor: tint(colors.warn, 0.3), backgroundColor: tint(colors.warn, 0.05) }]}>
+                        <View style={[styles.noteInputWrap, { backgroundColor: colors.card, borderColor: tint(colors.warn, 0.45) }]}>
+                            <Icon name="reply" size={16} color={colors.warn} strokeWidth={1.8} />
+                            <TextInput
+                                value={draft}
+                                onChangeText={setDraft}
+                                placeholder="Note interne · tapez @ pour mentionner"
+                                placeholderTextColor={colors.mute}
+                                style={{ flex: 1, fontSize: 15.5, lineHeight: 20, color: colors.ink, fontFamily: font.sans, padding: 0, maxHeight: 100 }}
+                                multiline
+                                maxLength={2000}
+                            />
+                        </View>
+                        {draft.trim().length > 0 ? (
+                            <Pressable
+                                accessibilityRole="button"
+                                disabled={isSending || !typedConversationId}
+                                onPress={() => void submitNote()}
+                                style={({ pressed }) => [styles.sendButton, { backgroundColor: colors.warn, opacity: isSending || !typedConversationId ? 0.45 : pressed ? 0.8 : 1 }]}
+                            >
+                                {isSending ? <ActivityIndicator color="#fff" /> : <Icon name="send" size={18} color="#fff" strokeWidth={2} />}
+                            </Pressable>
+                        ) : null}
+                    </View>
+                </>
+            ) : windowExpired ? (
                 /* 24h service window expired — free-form locked, only templates re-open it. */
                 <View style={[styles.gate, { borderTopColor: colors.rule2, backgroundColor: colors.paper }]}>
                     <Btn tone="accent" size="lg" full icon="sticky-note" onPress={() => setTemplateGateOpen(true)}>
@@ -867,6 +941,19 @@ const styles = StyleSheet.create({
         lineHeight: 20,
     },
     sendButton: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+    modeToggle: { flexDirection: "row", alignSelf: "center", gap: 6, paddingTop: 8, paddingBottom: 2 },
+    modeBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+    noteInputWrap: {
+        flex: 1,
+        minHeight: 44,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        borderRadius: 22,
+        borderWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: 14,
+        paddingVertical: 11,
+    },
     stateIcon: { width: 64, height: 64, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1 },
     menuScrim: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(10,10,10,0.4)" },
     menuSheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 36, paddingTop: 8 },

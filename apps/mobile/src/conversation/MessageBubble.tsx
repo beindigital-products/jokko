@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Icon, tint, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -17,6 +18,9 @@ export type ConversationMessage = {
     fileSize?: number | null;
     replyToId?: Id<"messages"> | null;
     isStarred?: boolean | null;
+    isInternal?: boolean | null;
+    mentions?: { userId: Id<"users">; name: string }[] | null;
+    senderName?: string | null;
     reactions?: { userId: Id<"users">; emoji: string; createdAt: number }[];
 };
 
@@ -39,6 +43,12 @@ export function MessageBubble({ message, replyTo, onRetry, onEdit, onDelete, onR
     const reactions = message.reactions ?? [];
     const isMedia = ["IMAGE", "VIDEO", "AUDIO", "DOCUMENT", "STICKER"].includes(message.type);
     const fg = outbound ? colors.bubbleOutInk : colors.ink;
+
+    // Internal notes are team-only annotations — render a distinct amber card,
+    // not a WhatsApp bubble (no swipe-reply / reactions / send-state).
+    if (message.isInternal) {
+        return <InternalNote message={message} theme={theme} />;
+    }
 
     const bubble = (
         <Pressable
@@ -356,4 +366,58 @@ const styles = StyleSheet.create({
     chipGhost: { borderWidth: StyleSheet.hairlineWidth },
     chipText: { fontSize: 12.5 },
     pressed: { opacity: 0.7 },
+});
+
+// ── Internal note (team-only) ────────────────────────────────────────────────
+
+function InternalNote({ message, theme }: { message: ConversationMessage; theme: JokkoTheme }) {
+    const { colors, font } = theme;
+    return (
+        <View style={noteStyles.wrap}>
+            <View style={[noteStyles.card, { backgroundColor: tint(colors.warn, 0.1), borderColor: tint(colors.warn, 0.35) }]}>
+                <View style={noteStyles.head}>
+                    <Icon name="reply" size={11} color={colors.warn} strokeWidth={2.2} />
+                    <Text style={{ fontFamily: font.monoMedium, fontSize: 9.5, letterSpacing: 0.6, color: colors.warn }}>
+                        NOTE INTERNE{message.senderName ? ` · ${message.senderName.toUpperCase()}` : ""}
+                    </Text>
+                </View>
+                <Text style={{ fontSize: 14.5, lineHeight: 20, color: colors.ink, fontFamily: font.sans, marginTop: 5 }}>
+                    {renderNoteContent(message.content ?? "", message.mentions ?? [], colors.accentInk, font.sansMedium)}
+                </Text>
+                <Text style={{ fontFamily: font.mono, fontSize: 9.5, color: colors.mute, textAlign: "right", marginTop: 5 }}>
+                    {formatMessageTime(message.timestamp)}
+                </Text>
+            </View>
+        </View>
+    );
+}
+
+/** Render note text with @mentions highlighted in the accent colour. */
+function renderNoteContent(content: string, mentions: { name: string }[], accent: string, mentionFont: string): ReactNode {
+    if (mentions.length === 0) return content;
+    const names = [...new Set(mentions.map((m) => m.name))].sort((a, b) => b.length - a.length);
+    const escaped = names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    const re = new RegExp(`(@(?:${escaped.join("|")}))`, "g");
+    return content.split(re).map((part, i) =>
+        part.startsWith("@") && names.includes(part.slice(1)) ? (
+            <Text key={i} style={{ color: accent, fontFamily: mentionFont }}>
+                {part}
+            </Text>
+        ) : (
+            part
+        ),
+    );
+}
+
+const noteStyles = StyleSheet.create({
+    wrap: { paddingHorizontal: 14, paddingVertical: 6, alignItems: "center" },
+    card: {
+        maxWidth: "92%",
+        borderRadius: 14,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderStyle: "dashed",
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+    },
+    head: { flexDirection: "row", alignItems: "center", gap: 6 },
 });
