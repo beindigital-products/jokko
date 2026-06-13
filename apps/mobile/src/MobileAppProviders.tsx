@@ -7,6 +7,7 @@ import { MOBILE_AUTH_STORAGE_NAMESPACE, secureAuthStorage } from "./lib/auth-sto
 import { createMobileI18n } from "./lib/mobile-i18n";
 import { PrivacyConsentGate } from "./PrivacyConsentGate";
 import { AppLockGate } from "./AppLockGate";
+import { PushNavigation } from "./PushNavigation";
 import { callsAvailable } from "./lib/call-env";
 
 // Audio calls need react-native-webrtc — a native module absent from Expo Go.
@@ -39,6 +40,7 @@ export function MobileAppProviders({ children }: { children: ReactNode }) {
             <PrivacyConsentGate>
                 <AppLockGate>{children}</AppLockGate>
             </PrivacyConsentGate>
+            <PushNavigation />
         </I18nextProvider>
     );
 
