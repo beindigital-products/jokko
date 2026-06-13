@@ -21,6 +21,7 @@ import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import * as WebBrowser from "expo-web-browser";
 import { ForwardSheet } from "./conversation/ForwardSheet";
+import { AssignSheet } from "./conversation/AssignSheet";
 import { MediaViewer } from "./conversation/MediaViewer";
 import { callsAvailable } from "./lib/call-env";
 import { GlassReply, type GlassReaction } from "./conversation/GlassReply";
@@ -56,6 +57,7 @@ export function MobileConversationScreen({ conversationId }: Props) {
     const [isSending, setIsSending] = useState(false);
     const [isMutating, setIsMutating] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [assignOpen, setAssignOpen] = useState(false);
     const [templateGateOpen, setTemplateGateOpen] = useState(false);
     const [replyingTo, setReplyingTo] = useState<ConversationMessage | null>(null);
     const [reactingTo, setReactingTo] = useState<ConversationMessage | null>(null);
@@ -766,6 +768,15 @@ export function MobileConversationScreen({ conversationId }: Props) {
                         {canAssignToMe ? (
                             <MenuRow icon="user" label="M'attribuer" disabled={isMutating} onPress={() => runConversationAction(() => assignToMe({ id: typedConversationId! }), "M'attribuer")} />
                         ) : null}
+                        <MenuRow
+                            icon="users"
+                            label="Attribuer à un coéquipier"
+                            disabled={isMutating}
+                            onPress={() => {
+                                setMenuOpen(false);
+                                setAssignOpen(true);
+                            }}
+                        />
                         {isResolved ? (
                             <MenuRow icon="rotate" label="Rouvrir" disabled={isMutating} onPress={() => runConversationAction(() => reopenConversation({ id: typedConversationId! }), "Rouvrir")} />
                         ) : (
@@ -776,6 +787,13 @@ export function MobileConversationScreen({ conversationId }: Props) {
                     </View>
                 </Pressable>
             </Modal>
+
+            <AssignSheet
+                visible={assignOpen}
+                conversationId={typedConversationId}
+                currentAssigneeId={conversation?.assignedTo?._id ?? null}
+                onClose={() => setAssignOpen(false)}
+            />
         </View>
     );
 }
