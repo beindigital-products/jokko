@@ -1,8 +1,18 @@
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { useRef, useState } from "react";
+import {
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Pressable,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    View,
+} from "react-native";
 import { useRouter } from "expo-router";
-import { useQuery } from "convex/react";
-import { theme } from "@jokko/tokens";
+import { useMutation, useQuery } from "convex/react";
+import { Avatar, Icon, NavButton, useTheme, type IconName, type JokkoTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -16,18 +26,11 @@ type ContactDetailRecord = {
     email?: string | null;
     company?: string | null;
     jobTitle?: string | null;
-    address?: string | null;
     city?: string | null;
     country?: string | null;
     isWhatsApp?: boolean | null;
     isBlocked?: boolean | null;
     createdAt: number;
-    updatedAt?: number;
-    whatsappOptIn?: {
-        status: "granted" | "revoked" | "unknown";
-        source?: string;
-        at?: number;
-    };
     tags?: Array<{ id?: string; name: string; color?: string }>;
     notes?: Array<{ content: string; authorName?: string | null; createdAt: number }>;
 };
@@ -35,518 +38,320 @@ type ContactDetailRecord = {
 type ConversationHistoryRecord = {
     _id: Id<"conversations">;
     status: string;
-    createdAt: number;
     lastMessageAt: number;
     preview?: string | null;
-    channel?: string | null;
 };
 
-type Props = {
-    contactId: string | null;
-};
+type Props = { contactId: string | null };
 
 export function MobileContactDetailScreen({ contactId }: Props) {
     const router = useRouter();
+    const theme = useTheme();
+    const { colors, font } = theme;
     const typedContactId = contactId as Id<"contacts"> | null;
-    const contact = useQuery(
-        api.contacts.get,
-        typedContactId ? { id: typedContactId } : "skip",
-    ) as ContactDetailRecord | null | undefined;
+
+    const contact = useQuery(api.contacts.get, typedContactId ? { id: typedContactId } : "skip") as
+        | ContactDetailRecord
+        | null
+        | undefined;
     const conversations = useQuery(
         api.conversations.listByContact,
-        contact && typedContactId
-            ? { contactId: typedContactId, organizationId: contact.organizationId }
-            : "skip",
+        contact && typedContactId ? { contactId: typedContactId, organizationId: contact.organizationId } : "skip",
     ) as ConversationHistoryRecord[] | undefined;
+    const updateContact = useMutation(api.contacts.update);
 
-    if (!typedContactId) {
+    const [noteDraft, setNoteDraft] = useState("");
+    const [tagDraft, setTagDraft] = useState("");
+    const [addingTag, setAddingTag] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const noteInputRef = useRef<TextInput>(null);
+
+    const goBack = () => {
+        if (router.canGoBack()) router.back();
+        else router.replace("/contacts");
+    };
+
+    if (!typedContactId || contact === null) {
         return (
-            <StateScreen
-                icon="person-circle-outline"
-                title="Contact introuvable"
-                body="Le lien ouvert ne contient pas de contact valide."
-                onBack={() => router.replace("/contacts")}
-            />
+            <View style={[styles.center, { backgroundColor: colors.paper }]}>
+                <Text style={{ fontFamily: font.display, fontSize: 18, color: colors.ink }}>Contact introuvable</Text>
+                <Pressable onPress={goBack} style={({ pressed }) => [styles.backLink, pressed && styles.pressed]}>
+                    <Text style={{ fontFamily: font.sansMedium, fontSize: 14, color: colors.accentInk }}>Retour</Text>
+                </Pressable>
+            </View>
         );
     }
 
     if (contact === undefined) {
         return (
-            <View style={styles.loading}>
-                <ActivityIndicator color={theme.accent.primary} />
+            <View style={[styles.center, { backgroundColor: colors.paper }]}>
+                <ActivityIndicator color={colors.accent} />
             </View>
         );
     }
 
-    if (contact === null) {
-        return (
-            <StateScreen
-                icon="person-circle-outline"
-                title="Contact indisponible"
-                body="Ce contact n'existe pas dans l'organisation active ou n'est plus accessible."
-                onBack={() => router.replace("/contacts")}
-            />
-        );
-    }
-
-    const displayName = getContactDisplayName(contact);
+    const displayName = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(" ") || contact.phone;
     const tags = contact.tags ?? [];
-    const notes = contact.notes ?? [];
-    const recentConversations = conversations?.slice(0, 4) ?? [];
+    const tagNames = tags.map((tag) => tag.name);
+    const notes = (contact.notes ?? []).slice().sort((a, b) => b.createdAt - a.createdAt);
+    const recent = conversations?.slice(0, 4) ?? [];
+    const subtitle = [contact.phone, contact.city?.toUpperCase()].filter(Boolean).join(" · ");
+
+    const runUpdate = async (args: { tags: string[]; addNote?: string }, label: string) => {
+        if (busy) return;
+        setBusy(true);
+        try {
+            await updateContact({ id: contact._id, ...args });
+        } catch (error) {
+            Alert.alert(label, error instanceof Error ? error.message : "Action impossible.");
+            throw error;
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const submitTag = async () => {
+        const name = tagDraft.trim();
+        setTagDraft("");
+        setAddingTag(false);
+        if (!name || tagNames.includes(name)) return;
+        await runUpdate({ tags: [...tagNames, name] }, "Tag").catch(() => undefined);
+    };
+
+    const removeTag = (name: string) => {
+        void runUpdate({ tags: tagNames.filter((n) => n !== name) }, "Tag").catch(() => undefined);
+    };
+
+    const submitNote = async () => {
+        const content = noteDraft.trim();
+        if (!content) return;
+        setNoteDraft("");
+        await runUpdate({ tags: tagNames, addNote: content }, "Note").catch(() => setNoteDraft(content));
+    };
+
+    const openMessage = () => {
+        if (recent[0]) router.push(`/conversations/${recent[0]._id}`);
+        else Alert.alert("Message", "Aucune conversation avec ce contact pour l'instant.");
+    };
+
+    const callContact = async () => {
+        const url = `tel:${contact.phone.replace(/[^\d+]/g, "")}`;
+        try {
+            if (await Linking.canOpenURL(url)) await Linking.openURL(url);
+            else Alert.alert("Appel indisponible", "Les appels ne sont pas disponibles sur cet appareil.");
+        } catch {
+            Alert.alert("Appel", "Impossible de lancer l'appel.");
+        }
+    };
 
     return (
-        <ScrollView contentContainerStyle={styles.content}>
-            <View style={styles.header}>
-                <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Retour contacts"
-                    onPress={() => router.replace("/contacts")}
-                    hitSlop={10}
-                    style={({ pressed }) => [styles.iconButton, pressed && styles.pressed]}
-                >
-                    <Ionicons name="chevron-back" size={20} color={theme.ink[900]} />
-                </Pressable>
-                <View style={[styles.avatar, contact.isWhatsApp && styles.avatarWhatsapp]}>
-                    <Text style={styles.avatarText}>{getContactInitials(displayName)}</Text>
-                </View>
-                <Text style={styles.title}>{displayName}</Text>
-                <Text style={styles.phone}>{contact.phone}</Text>
-                <View style={styles.statusRow}>
-                    <StatusPill icon="logo-whatsapp" label={contact.isWhatsApp ? "WhatsApp" : "Hors WhatsApp"} accent={Boolean(contact.isWhatsApp)} />
-                    <StatusPill icon="shield-checkmark-outline" label={getOptInLabel(contact.whatsappOptIn?.status)} accent={contact.whatsappOptIn?.status === "granted"} />
-                    {contact.isBlocked ? <StatusPill icon="ban-outline" label="Bloqué" accent /> : null}
-                </View>
+        <View style={{ flex: 1, backgroundColor: colors.paper }}>
+            <View style={[styles.navBar, { borderBottomColor: colors.rule2 }]}>
+                <NavButton icon="chevron-left" onPress={goBack} />
+                <Text numberOfLines={1} style={{ flex: 1, textAlign: "center", fontFamily: font.sansSemibold, fontSize: 15, color: colors.ink }}>
+                    {displayName}
+                </Text>
+                <View style={{ width: 40 }} />
             </View>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Informations</Text>
-                <InfoRow icon="call-outline" label="Téléphone" value={contact.phone} />
-                <InfoRow icon="mail-outline" label="Email" value={contact.email} />
-                <InfoRow icon="business-outline" label="Société" value={formatCompany(contact)} />
-                <InfoRow icon="location-outline" label="Adresse" value={formatLocation(contact)} />
-                <InfoRow icon="calendar-outline" label="Créé" value={formatDate(contact.createdAt)} />
-            </View>
+            <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+                {/* Editorial header */}
+                <View style={styles.head}>
+                    <Avatar name={displayName} size={88} status={contact.isWhatsApp ? "online" : undefined} />
+                    <Text style={{ fontFamily: font.display, fontSize: 32, letterSpacing: -0.5, color: colors.ink, marginTop: 16 }}>
+                        {displayName}
+                    </Text>
+                    {subtitle ? (
+                        <Text style={{ fontFamily: font.mono, fontSize: 12, color: colors.mute, marginTop: 7, letterSpacing: 0.3 }}>{subtitle}</Text>
+                    ) : null}
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Tags</Text>
-                {tags.length > 0 ? (
+                    {/* Tags */}
                     <View style={styles.tagsRow}>
                         {tags.map((tag) => (
-                            <View key={tag.id ?? tag.name} style={styles.tagPill}>
-                                <Text style={styles.tagText}>{tag.name}</Text>
-                            </View>
+                            <Pressable key={tag.id ?? tag.name} onPress={() => removeTag(tag.name)} disabled={busy}>
+                                <View style={[styles.tagPill, { backgroundColor: colors.paper2, borderColor: colors.rule }]}>
+                                    <Text style={{ fontSize: 12.5, fontFamily: font.sansMedium, color: colors.ink2 }}>{tag.name}</Text>
+                                    <Icon name="close" size={12} color={colors.mute} strokeWidth={2} />
+                                </View>
+                            </Pressable>
                         ))}
-                    </View>
-                ) : (
-                    <Text style={styles.emptyText}>Aucun tag</Text>
-                )}
-            </View>
-
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Conversations</Text>
-                {conversations === undefined ? (
-                    <ActivityIndicator color={theme.accent.primary} />
-                ) : recentConversations.length > 0 ? (
-                    recentConversations.map((conversation) => (
-                        <Pressable
-                            key={conversation._id}
-                            accessibilityRole="button"
-                            onPress={() => router.push({
-                                pathname: "/conversations/[id]",
-                                params: { id: conversation._id },
-                            } as never)}
-                            style={({ pressed }) => [styles.historyRow, pressed && styles.pressed]}
-                        >
-                            <View style={styles.historyIcon}>
-                                <Ionicons name="chatbubble-outline" size={18} color={theme.accent.primary} />
+                        {addingTag ? (
+                            <View style={[styles.tagPill, { backgroundColor: colors.card, borderColor: colors.accent }]}>
+                                <TextInput
+                                    autoFocus
+                                    value={tagDraft}
+                                    onChangeText={setTagDraft}
+                                    onSubmitEditing={() => void submitTag()}
+                                    onBlur={() => void submitTag()}
+                                    placeholder="tag"
+                                    placeholderTextColor={colors.mute}
+                                    style={{ minWidth: 56, fontSize: 12.5, color: colors.ink, fontFamily: font.sansMedium, padding: 0 }}
+                                    returnKeyType="done"
+                                />
                             </View>
-                            <View style={styles.historyText}>
-                                <Text style={styles.historyTitle}>{getConversationStatusLabel(conversation.status)}</Text>
-                                <Text style={styles.historyPreview} numberOfLines={2}>
-                                    {conversation.preview || "Conversation sans aperçu."}
+                        ) : (
+                            <Pressable onPress={() => setAddingTag(true)} disabled={busy}>
+                                <View style={[styles.tagPill, styles.tagPillDashed, { borderColor: colors.rule }]}>
+                                    <Icon name="plus" size={13} color={colors.mute} strokeWidth={2} />
+                                    <Text style={{ fontSize: 12.5, fontFamily: font.sansMedium, color: colors.mute }}>ajouter</Text>
+                                </View>
+                            </Pressable>
+                        )}
+                    </View>
+                </View>
+
+                {/* Action grid */}
+                <View style={styles.actionGrid}>
+                    <ActionCard icon="whatsapp" label="Message" theme={theme} onPress={openMessage} />
+                    <ActionCard icon="phone" label="Appeler" theme={theme} onPress={() => void callContact()} />
+                    <ActionCard icon="sticky-note" label="Note" theme={theme} onPress={() => noteInputRef.current?.focus()} />
+                </View>
+
+                {/* Notes */}
+                <SectionHeader theme={theme}>Notes</SectionHeader>
+                <View style={styles.sectionBody}>
+                    <View style={[styles.noteComposer, { backgroundColor: colors.card, borderColor: colors.rule }]}>
+                        <TextInput
+                            ref={noteInputRef}
+                            value={noteDraft}
+                            onChangeText={setNoteDraft}
+                            placeholder="Ajouter une note interne…"
+                            placeholderTextColor={colors.mute}
+                            style={{ flex: 1, fontSize: 14, lineHeight: 19, color: colors.ink, fontFamily: font.sans, maxHeight: 110 }}
+                            multiline
+                        />
+                        <Pressable
+                            accessibilityLabel="Enregistrer la note"
+                            onPress={() => void submitNote()}
+                            disabled={busy || noteDraft.trim().length === 0}
+                            style={({ pressed }) => [
+                                styles.noteSend,
+                                { backgroundColor: colors.ink, opacity: noteDraft.trim().length === 0 ? 0.35 : pressed ? 0.8 : 1 },
+                            ]}
+                        >
+                            {busy ? <ActivityIndicator size="small" color={colors.paper} /> : <Icon name="arrow-up-right" size={16} color={colors.paper} strokeWidth={2} />}
+                        </Pressable>
+                    </View>
+                    {notes.length === 0 ? (
+                        <Text style={{ fontSize: 13, color: colors.mute, fontFamily: font.sans, paddingHorizontal: 4, paddingTop: 10 }}>
+                            Aucune note pour l'instant.
+                        </Text>
+                    ) : (
+                        notes.map((note) => (
+                            <View key={`${note.createdAt}-${note.content}`} style={[styles.noteRow, { borderColor: colors.rule }]}>
+                                <Text style={{ fontSize: 14, lineHeight: 20, color: colors.ink, fontFamily: font.sans }}>{note.content}</Text>
+                                <Text style={{ fontSize: 11, color: colors.mute, fontFamily: font.mono, marginTop: 6 }}>
+                                    {[note.authorName || "Agent", formatDate(note.createdAt)].join(" · ")}
                                 </Text>
                             </View>
-                            <Text style={styles.historyDate}>{formatShortDate(conversation.lastMessageAt)}</Text>
-                        </Pressable>
-                    ))
-                ) : (
-                    <Text style={styles.emptyText}>Aucune conversation</Text>
-                )}
-            </View>
+                        ))
+                    )}
+                </View>
 
-            <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Notes</Text>
-                {notes.length > 0 ? (
-                    notes.slice(0, 3).map((note) => (
-                        <View key={`${note.createdAt}-${note.content}`} style={styles.noteRow}>
-                            <Text style={styles.noteBody}>{note.content}</Text>
-                            <Text style={styles.noteMeta}>
-                                {[note.authorName || "Agent", formatShortDate(note.createdAt)].filter(Boolean).join(" · ")}
-                            </Text>
+                {/* Informations */}
+                <SectionHeader theme={theme}>Informations</SectionHeader>
+                <View style={styles.sectionBody}>
+                    {contact.email ? <InfoRow icon="mail" label="E-mail" value={contact.email} theme={theme} /> : null}
+                    {contact.company ? (
+                        <InfoRow icon="building" label="Entreprise" value={[contact.company, contact.jobTitle].filter(Boolean).join(" · ")} theme={theme} />
+                    ) : null}
+                    {contact.city || contact.country ? (
+                        <InfoRow icon="globe" label="Localisation" value={[contact.city, contact.country].filter(Boolean).join(", ")} theme={theme} />
+                    ) : null}
+                    <InfoRow icon="clock" label="Premier contact" value={formatDate(contact.createdAt)} theme={theme} />
+                </View>
+
+                {/* Recent conversations */}
+                {recent.length > 0 ? (
+                    <>
+                        <SectionHeader theme={theme}>Conversations récentes</SectionHeader>
+                        <View style={styles.sectionBody}>
+                            {recent.map((conversation) => (
+                                <Pressable
+                                    key={conversation._id}
+                                    onPress={() => router.push(`/conversations/${conversation._id}`)}
+                                    style={({ pressed }) => [styles.convRow, { borderColor: colors.rule, backgroundColor: pressed ? colors.paper2 : colors.card }]}
+                                >
+                                    <View style={[styles.convIcon, { backgroundColor: colors.paper2 }]}>
+                                        <Icon name="whatsapp" size={17} color={colors.waGreen} strokeWidth={1.6} />
+                                    </View>
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <Text numberOfLines={1} style={{ fontSize: 14, color: colors.ink, fontFamily: font.sansMedium }}>
+                                            {conversation.preview?.trim() || "Conversation"}
+                                        </Text>
+                                        <Text style={{ fontSize: 11.5, color: colors.mute, fontFamily: font.mono, marginTop: 2 }}>
+                                            {formatDate(conversation.lastMessageAt)} · {conversation.status === "RESOLVED" ? "résolue" : "ouverte"}
+                                        </Text>
+                                    </View>
+                                    <Icon name="chevron-right" size={18} color={colors.mute2} />
+                                </Pressable>
+                            ))}
                         </View>
-                    ))
-                ) : (
-                    <Text style={styles.emptyText}>Aucune note</Text>
-                )}
-            </View>
-        </ScrollView>
-    );
-}
-
-function StateScreen({
-    icon,
-    title,
-    body,
-    onBack,
-}: {
-    icon: keyof typeof Ionicons.glyphMap;
-    title: string;
-    body: string;
-    onBack: () => void;
-}) {
-    return (
-        <View style={styles.state}>
-            <View style={styles.emptyIcon}>
-                <Ionicons name={icon} size={30} color={theme.accent.primary} />
-            </View>
-            <Text style={styles.stateTitle}>{title}</Text>
-            <Text style={styles.stateBody}>{body}</Text>
-            <Pressable
-                accessibilityRole="button"
-                onPress={onBack}
-                style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-            >
-                <Text style={styles.backButtonText}>Retour contacts</Text>
-            </Pressable>
+                    </>
+                ) : null}
+            </ScrollView>
         </View>
     );
 }
 
-function StatusPill({ icon, label, accent = false }: { icon: keyof typeof Ionicons.glyphMap; label: string; accent?: boolean }) {
+function ActionCard({ icon, label, theme, onPress }: { icon: IconName; label: string; theme: JokkoTheme; onPress: () => void }) {
+    const { colors, font } = theme;
     return (
-        <View style={[styles.statusPill, accent && styles.statusPillAccent]}>
-            <Ionicons name={icon} size={14} color={accent ? theme.accent.primary : theme.ink[500]} />
-            <Text style={[styles.statusText, accent && styles.statusTextAccent]}>{label}</Text>
-        </View>
+        <Pressable onPress={onPress} style={({ pressed }) => [styles.actionCard, { backgroundColor: colors.card, borderColor: colors.rule }, pressed && styles.pressed]}>
+            <Icon name={icon} size={22} color={colors.ink} strokeWidth={1.6} />
+            <Text style={{ fontSize: 11, color: colors.ink3, fontFamily: font.sansMedium, marginTop: 7 }}>{label}</Text>
+        </Pressable>
     );
 }
 
-function InfoRow({ icon, label, value }: { icon: keyof typeof Ionicons.glyphMap; label: string; value?: string | null }) {
+function InfoRow({ icon, label, value, theme }: { icon: IconName; label: string; value: string; theme: JokkoTheme }) {
+    const { colors, font } = theme;
     return (
-        <View style={styles.infoRow}>
-            <View style={styles.infoIcon}>
-                <Ionicons name={icon} size={17} color={theme.ink[500]} />
+        <View style={[styles.infoRow, { borderColor: colors.rule }]}>
+            <View style={[styles.infoIcon, { backgroundColor: colors.paper2 }]}>
+                <Icon name={icon} size={17} color={colors.ink3} strokeWidth={1.6} />
             </View>
-            <Text style={styles.infoLabel}>{label}</Text>
-            <Text style={styles.infoValue} numberOfLines={2}>{value || "-"}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={{ fontSize: 11.5, color: colors.mute, fontFamily: font.mono, letterSpacing: 0.3 }}>{label}</Text>
+                <Text style={{ fontSize: 14.5, color: colors.ink, fontFamily: font.sans, marginTop: 2 }}>{value}</Text>
+            </View>
         </View>
     );
 }
 
-function getContactDisplayName(contact: ContactDetailRecord): string {
-    const fullName = contact.name?.trim();
-    if (fullName) return fullName;
-    const composed = [contact.firstName, contact.lastName].filter(Boolean).join(" ").trim();
-    return composed || contact.phone || "Contact inconnu";
-}
-
-function getContactInitials(displayName: string): string {
-    const parts = displayName.trim().split(/\s+/).filter(Boolean);
-    if (parts.length === 0) return "?";
-    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
-function getOptInLabel(status?: string): string {
-    if (status === "granted") return "Opt-in valide";
-    if (status === "revoked") return "Opt-in révoqué";
-    return "Opt-in inconnu";
-}
-
-function getConversationStatusLabel(status: string): string {
-    if (status === "OPEN") return "Ouverte";
-    if (status === "SNOOZED") return "En attente";
-    if (status === "RESOLVED") return "Résolue";
-    if (status === "ARCHIVED") return "Archivée";
-    return status;
-}
-
-function formatCompany(contact: ContactDetailRecord): string | null {
-    return [contact.company, contact.jobTitle].filter(Boolean).join(" · ") || null;
-}
-
-function formatLocation(contact: ContactDetailRecord): string | null {
-    return [contact.address, contact.city, contact.country].filter(Boolean).join(", ") || null;
+function SectionHeader({ children, theme }: { children: string; theme: JokkoTheme }) {
+    const { colors, font } = theme;
+    return (
+        <Text style={{ fontFamily: font.mono, fontSize: 11, letterSpacing: 1, textTransform: "uppercase", color: colors.mute, paddingHorizontal: 22, paddingTop: 26, paddingBottom: 10 }}>
+            {children}
+        </Text>
+    );
 }
 
 function formatDate(timestamp: number): string {
     const date = new Date(timestamp);
-    if (Number.isNaN(date.getTime())) return "-";
-    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
-}
-
-function formatShortDate(timestamp: number): string {
-    const date = new Date(timestamp);
     if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+    return date.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
 }
 
 const styles = StyleSheet.create({
-    content: {
-        flexGrow: 1,
-        padding: theme.spacing.xl,
-        backgroundColor: theme.surface.default,
-    },
-    header: {
-        alignItems: "flex-start",
-        paddingBottom: theme.spacing.xl,
-    },
-    iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: theme.radius.md,
-        alignItems: "center",
-        justifyContent: "center",
-        marginBottom: theme.spacing.xl,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    avatar: {
-        width: 72,
-        height: 72,
-        borderRadius: 24,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    avatarWhatsapp: {
-        borderColor: theme.accent.primary,
-        backgroundColor: "#EEF2FF",
-    },
-    avatarText: {
-        fontSize: 22,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    title: {
-        marginTop: theme.spacing.lg,
-        fontSize: 31,
-        lineHeight: 37,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    phone: {
-        marginTop: theme.spacing.xs,
-        fontSize: 16,
-        lineHeight: 22,
-        fontWeight: "700",
-        color: theme.ink[500],
-    },
-    statusRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: theme.spacing.sm,
-        marginTop: theme.spacing.lg,
-    },
-    statusPill: {
-        minHeight: 30,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.xs,
-        paddingHorizontal: theme.spacing.md,
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-    },
-    statusPillAccent: {
-        borderColor: theme.accent.primary,
-    },
-    statusText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: theme.ink[500],
-    },
-    statusTextAccent: {
-        color: theme.accent.primary,
-    },
-    section: {
-        borderRadius: theme.radius.lg,
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        padding: theme.spacing.lg,
-        marginBottom: theme.spacing.md,
-    },
-    sectionTitle: {
-        marginBottom: theme.spacing.md,
-        fontSize: 17,
-        lineHeight: 22,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    infoRow: {
-        minHeight: 44,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.sm,
-        paddingVertical: theme.spacing.xs,
-    },
-    infoIcon: {
-        width: 30,
-        height: 30,
-        borderRadius: theme.radius.md,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.sunken,
-    },
-    infoLabel: {
-        width: 86,
-        fontSize: 13,
-        fontWeight: "800",
-        color: theme.ink[500],
-    },
-    infoValue: {
-        flex: 1,
-        minWidth: 0,
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: "700",
-        color: theme.ink[900],
-        textAlign: "right",
-    },
-    tagsRow: {
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: theme.spacing.sm,
-    },
-    tagPill: {
-        minHeight: 28,
-        justifyContent: "center",
-        borderRadius: theme.radius.pill,
-        paddingHorizontal: theme.spacing.md,
-        backgroundColor: theme.surface.sunken,
-    },
-    tagText: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: theme.ink[700],
-    },
-    historyRow: {
-        minHeight: 74,
-        flexDirection: "row",
-        alignItems: "center",
-        gap: theme.spacing.md,
-        paddingVertical: theme.spacing.sm,
-    },
-    historyIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: theme.radius.md,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "#EEF2FF",
-    },
-    historyText: {
-        flex: 1,
-        minWidth: 0,
-    },
-    historyTitle: {
-        fontSize: 14,
-        fontWeight: "800",
-        color: theme.ink[900],
-    },
-    historyPreview: {
-        marginTop: 3,
-        fontSize: 13,
-        lineHeight: 18,
-        fontWeight: "600",
-        color: theme.ink[500],
-    },
-    historyDate: {
-        fontSize: 12,
-        fontWeight: "800",
-        color: theme.ink[500],
-    },
-    noteRow: {
-        paddingVertical: theme.spacing.sm,
-        borderTopWidth: 1,
-        borderTopColor: theme.ink[300],
-    },
-    noteBody: {
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: "600",
-        color: theme.ink[900],
-    },
-    noteMeta: {
-        marginTop: 5,
-        fontSize: 12,
-        fontWeight: "800",
-        color: theme.ink[500],
-    },
-    emptyText: {
-        fontSize: 14,
-        lineHeight: 20,
-        fontWeight: "700",
-        color: theme.ink[500],
-    },
-    loading: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.default,
-    },
-    state: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        padding: theme.spacing.xl,
-        backgroundColor: theme.surface.default,
-    },
-    emptyIcon: {
-        width: 68,
-        height: 68,
-        borderRadius: 22,
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: theme.surface.raised,
-        borderWidth: 1,
-        borderColor: theme.ink[300],
-        marginBottom: theme.spacing.lg,
-    },
-    stateTitle: {
-        fontSize: 24,
-        lineHeight: 30,
-        fontWeight: "800",
-        color: theme.ink[900],
-        textAlign: "center",
-    },
-    stateBody: {
-        marginTop: theme.spacing.sm,
-        maxWidth: 320,
-        fontSize: 15,
-        lineHeight: 22,
-        color: theme.ink[500],
-        textAlign: "center",
-    },
-    backButton: {
-        minHeight: 46,
-        justifyContent: "center",
-        paddingHorizontal: theme.spacing.xl,
-        borderRadius: theme.radius.pill,
-        backgroundColor: theme.ink[900],
-        marginTop: theme.spacing.xl,
-    },
-    backButtonText: {
-        fontSize: 14,
-        fontWeight: "800",
-        color: "#fff",
-    },
-    pressed: {
-        opacity: 0.65,
-    },
+    center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
+    backLink: { paddingHorizontal: 16, paddingVertical: 8 },
+    navBar: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
+    content: { paddingBottom: 48 },
+    head: { paddingHorizontal: 24, paddingTop: 24, alignItems: "flex-start" },
+    tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 18 },
+    tagPill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
+    tagPillDashed: { borderStyle: "dashed", backgroundColor: "transparent" },
+    actionGrid: { flexDirection: "row", gap: 8, paddingHorizontal: 18, paddingTop: 22 },
+    actionCard: { flex: 1, alignItems: "center", paddingVertical: 13, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+    sectionBody: { paddingHorizontal: 18, gap: 8 },
+    noteComposer: { flexDirection: "row", alignItems: "flex-end", gap: 8, padding: 10, borderRadius: 14, borderWidth: StyleSheet.hairlineWidth },
+    noteSend: { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center" },
+    noteRow: { padding: 12, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+    infoRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 11, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+    infoIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    convRow: { flexDirection: "row", alignItems: "center", gap: 12, padding: 11, borderRadius: 12, borderWidth: StyleSheet.hairlineWidth },
+    convIcon: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    pressed: { opacity: 0.7 },
 });
