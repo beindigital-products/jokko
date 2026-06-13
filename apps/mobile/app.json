@@ -198,7 +198,13 @@
           "microphonePermission": "Jokko utilise le microphone pour les notes vocales et les appels audio."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Jokko utilise Face ID pour verrouiller l'accès à vos conversations."
+        }
+      ]
     ],
     "extra": {
       "router": {},

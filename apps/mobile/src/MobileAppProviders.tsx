@@ -6,6 +6,7 @@ import { resolveConvexUrl } from "@jokko/convex-client";
 import { MOBILE_AUTH_STORAGE_NAMESPACE, secureAuthStorage } from "./lib/auth-storage";
 import { createMobileI18n } from "./lib/mobile-i18n";
 import { PrivacyConsentGate } from "./PrivacyConsentGate";
+import { AppLockGate } from "./AppLockGate";
 import { callsAvailable } from "./lib/call-env";
 
 // Audio calls need react-native-webrtc — a native module absent from Expo Go.
@@ -35,7 +36,9 @@ export function MobileAppProviders({ children }: { children: ReactNode }) {
 
     const content = (
         <I18nextProvider i18n={i18n}>
-            <PrivacyConsentGate>{children}</PrivacyConsentGate>
+            <PrivacyConsentGate>
+                <AppLockGate>{children}</AppLockGate>
+            </PrivacyConsentGate>
         </I18nextProvider>
     );
 

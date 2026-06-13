@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "convex/react";
@@ -7,6 +7,7 @@ import { useAuthActions } from "@convex-dev/auth/react";
 import { Avatar, Icon, Micro, Pill, Row, SectionHead, useTheme, Wordmark, type JokkoTheme, type PillTone } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { disableAppLock, enableAppLock, getBiometricAvailability, useAppLock } from "./lib/app-lock-store";
 
 type OrgLite = { _id: Id<"organizations">; name: string; plan?: string };
 
@@ -26,6 +27,21 @@ export function MobileSettingsScreen() {
     const invites = useQuery(api.invitations.list, {}) as { invitations?: unknown[] } | undefined;
 
     const [switcherOpen, setSwitcherOpen] = useState(false);
+
+    const lock = useAppLock();
+    const [bio, setBio] = useState<{ available: boolean; label: string }>({ available: false, label: "biométrie" });
+    useEffect(() => {
+        void getBiometricAvailability().then(setBio);
+    }, []);
+
+    const toggleLock = async (next: boolean) => {
+        if (next) {
+            const ok = await enableAppLock();
+            if (!ok) Alert.alert("Activation impossible", "L'authentification biométrique a échoué ou a été annulée.");
+        } else {
+            await disableAppLock();
+        }
+    };
 
     const org = session?.organization;
     const roleUpper = (role ?? "").toUpperCase();
@@ -121,6 +137,22 @@ export function MobileSettingsScreen() {
                 <Row icon="globe" title="Langue" right={<ValueText theme={theme}>Français</ValueText>} accessory="none" />
 
                 <SectionHead>Compte</SectionHead>
+                {bio.available ? (
+                    <Row
+                        icon="lock"
+                        title={`Verrouillage ${bio.label}`}
+                        sub="Exiger la biométrie à l'ouverture de l'app"
+                        accessory="none"
+                        right={
+                            <Switch
+                                value={lock.enabled}
+                                onValueChange={(v) => void toggleLock(v)}
+                                trackColor={{ false: colors.rule, true: colors.accent }}
+                                thumbColor="#fff"
+                            />
+                        }
+                    />
+                ) : null}
                 <Row icon="shield" title="Confidentialité & sécurité" sub="Consentement, RGPD, suppression" onPress={() => router.push("/settings/privacy")} />
                 <Row icon="bolt" title="Facturation" sub={`Plan ${planLabel(org?.plan)}`} onPress={() => router.push("/settings/billing")} />
                 <Row icon="logout" title="Se déconnecter" danger accessory="none" onPress={doSignOut} />
