@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { ActivityIndicator, Alert, Pressable, SectionList, StyleSheet, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { usePaginatedQuery } from "convex/react";
-import { Avatar, Icon, NavBar, NavButton, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
+import { Avatar, Icon, Micro, NavButton, useTheme, type JokkoTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
 
@@ -53,22 +53,22 @@ export function MobileContactsScreen() {
 
     return (
         <View style={[styles.root, { backgroundColor: colors.paper }]}>
-            <NavBar
-                large
-                title="Contacts"
-                eyebrow={`${contacts.length}${status === "CanLoadMore" ? "+" : ""} dans cet espace`}
-                right={
-                    <>
-                        <NavButton icon="search" onPress={() => setSearchOpen((open) => !open)} />
-                        <NavButton
-                            icon="plus"
-                            onPress={() =>
-                                Alert.alert("Ajouter un contact", "Les contacts se créent automatiquement à la première conversation WhatsApp.")
-                            }
-                        />
-                    </>
-                }
-            />
+            {/* Header — eyebrow + title on the left, icons aligned to the title baseline on the right. */}
+            <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                    <Micro>{`${contacts.length}${status === "CanLoadMore" ? "+" : ""} dans cet espace`}</Micro>
+                    <Text style={[styles.title, { fontFamily: font.display, color: colors.ink }]}>Contacts</Text>
+                </View>
+                <View style={styles.headerIcons}>
+                    <NavButton icon="search" onPress={() => setSearchOpen((open) => !open)} />
+                    <NavButton
+                        icon="plus"
+                        onPress={() =>
+                            Alert.alert("Ajouter un contact", "Les contacts se créent automatiquement à la première conversation WhatsApp.")
+                        }
+                    />
+                </View>
+            </View>
 
             {searchOpen ? (
                 <View style={[styles.searchBox, { backgroundColor: colors.card, borderColor: colors.rule }]}>
@@ -177,6 +177,18 @@ function displayName(contact: ContactRecord): string {
 
 const styles = StyleSheet.create({
     root: { flex: 1 },
+    header: {
+        flexDirection: "row",
+        alignItems: "flex-end",
+        justifyContent: "space-between",
+        gap: 12,
+        paddingHorizontal: 18,
+        paddingTop: 12,
+        paddingBottom: 14,
+    },
+    headerLeft: { flex: 1, minWidth: 0, gap: 6 },
+    title: { fontSize: 40, lineHeight: 42, letterSpacing: -1 },
+    headerIcons: { flexDirection: "row", alignItems: "center", gap: 2, marginBottom: 2 },
     searchBox: {
         flexDirection: "row",
         alignItems: "center",
