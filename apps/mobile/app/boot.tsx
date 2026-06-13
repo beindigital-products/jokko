@@ -4,7 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { useRouter } from "expo-router";
 import { useConvexAuth, useQuery } from "convex/react";
 import { useTranslation } from "react-i18next";
-import { theme } from "@jokko/tokens";
+import { Wordmark } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import { FIRST_LAUNCH_SEEN_STORAGE_KEY, parseFirstLaunchSeen } from "../src/lib/first-launch";
 
@@ -52,19 +52,24 @@ export default function BootRoute() {
 
     return (
         <View style={styles.root}>
-            <ActivityIndicator color={theme.accent.primary} />
-            <Text style={styles.text}>{t("app.loading")}</Text>
+            <View style={styles.center}>
+                <Wordmark size={40} color="#F2EFE8" />
+                <ActivityIndicator color="#6938EF" style={{ marginTop: 24 }} />
+            </View>
+            <Text style={styles.caption}>{t("app.loading")}</Text>
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    root: {
-        flex: 1,
-        alignItems: "center",
-        justifyContent: "center",
-        gap: theme.spacing.md,
-        backgroundColor: theme.surface.default,
+    root: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#0A0A0A" },
+    center: { alignItems: "center" },
+    caption: {
+        position: "absolute",
+        bottom: 60,
+        fontSize: 11,
+        letterSpacing: 1.2,
+        textTransform: "uppercase",
+        color: "rgba(242,239,232,0.45)",
     },
-    text: { fontSize: 14, color: theme.ink[500], fontWeight: "700" },
 });

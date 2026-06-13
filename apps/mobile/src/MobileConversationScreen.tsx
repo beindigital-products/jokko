@@ -479,10 +479,22 @@ export function MobileConversationScreen({ conversationId }: Props) {
                     ) : null}
                     {messages.length === 0 ? (
                         <View style={styles.threadEmpty}>
-                            <Text style={{ fontSize: 17, fontFamily: font.display, color: colors.ink }}>Aucun message</Text>
-                            <Text style={{ marginTop: 6, maxWidth: 260, textAlign: "center", fontSize: 14, lineHeight: 20, color: colors.mute, fontFamily: font.sans }}>
-                                Le fil se remplira dès le premier message entrant.
+                            <Text style={{ fontSize: 27, lineHeight: 30, textAlign: "center", fontFamily: font.serifItalic, color: colors.ink }}>
+                                Écrivez le{"\n"}premier message.
                             </Text>
+                            <Text style={{ marginTop: 12, maxWidth: 250, textAlign: "center", fontSize: 13.5, lineHeight: 19, color: colors.mute, fontFamily: font.sans }}>
+                                Le fil démarre ici. Un raccourci ou un modèle pour répondre plus vite.
+                            </Text>
+                            <View style={{ flexDirection: "row", gap: 8, marginTop: 22 }}>
+                                {["/dispo", "/merci", "+ modèle"].map((label) => (
+                                    <View
+                                        key={label}
+                                        style={{ paddingHorizontal: 11, height: 28, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.rule, alignItems: "center", justifyContent: "center" }}
+                                    >
+                                        <Text style={{ fontFamily: font.monoMedium, fontSize: 11.5, color: colors.ink3, letterSpacing: 0.3 }}>{label}</Text>
+                                    </View>
+                                ))}
+                            </View>
                         </View>
                     ) : (
                         renderedThread
