@@ -188,9 +188,14 @@ export const get = query({
             }
         }
 
+        const profilePictureUrl = contact.profilePictureStorageId
+            ? await ctx.storage.getUrl(contact.profilePictureStorageId)
+            : null;
+
         return {
             ...contact,
             id: contact._id, // Client expects 'id'
+            profilePictureUrl,
             tags: tags.filter(t => t).map(t => ({ id: t!._id, name: t!.name, color: t!.color || '#808080' })),
             notes: enrichedNotes // Return structured array
         };
@@ -298,6 +303,7 @@ export const update = mutation({
         country: v.optional(v.string()),
         notes: v.optional(v.string()), // Legacy string override
         addNote: v.optional(v.string()), // New structured append
+        profilePictureStorageId: v.optional(v.id("_storage")),
         tags: v.array(v.string()),
     },
     handler: async (ctx, args) => {

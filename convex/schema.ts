@@ -408,6 +408,9 @@ export default defineSchema({
         company: v.optional(v.string()),
         jobTitle: v.optional(v.string()),
 
+        // Profile picture (uploaded avatar; falls back to initials when absent)
+        profilePictureStorageId: v.optional(v.id("_storage")),
+
         // Metadata
         notes: v.optional(v.union(
             v.string(),

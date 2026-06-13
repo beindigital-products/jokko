@@ -10,6 +10,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import {
   Animated,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -33,12 +34,14 @@ export function Avatar({
   tone,
   ring = false,
   status,
+  imageUrl,
 }: {
   name?: string;
   size?: number;
   tone?: string;
   ring?: boolean;
   status?: "online" | "offline";
+  imageUrl?: string | null;
 }) {
   const { colors, font } = useTheme();
   const initials = avatarInitials(name);
@@ -53,18 +56,23 @@ export function Avatar({
         backgroundColor: bg,
         alignItems: "center",
         justifyContent: "center",
+        overflow: "hidden",
       }}
     >
-      <Text
-        style={{
-          color: "#F2EFE8",
-          fontFamily: font.sansMedium,
-          fontSize: size * 0.36,
-          letterSpacing: -0.4,
-        }}
-      >
-        {initials}
-      </Text>
+      {imageUrl ? (
+        <Image source={{ uri: imageUrl }} style={{ width: size, height: size }} resizeMode="cover" />
+      ) : (
+        <Text
+          style={{
+            color: "#F2EFE8",
+            fontFamily: font.sansMedium,
+            fontSize: size * 0.36,
+            letterSpacing: -0.4,
+          }}
+        >
+          {initials}
+        </Text>
+      )}
     </View>
   );
 

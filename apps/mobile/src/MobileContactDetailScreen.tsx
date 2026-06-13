@@ -10,16 +10,20 @@ import {
     TextInput,
     View,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "convex/react";
 import { Avatar, Icon, NavButton, useTheme, type IconName, type JokkoTheme } from "@jokko/ui-mobile";
 import { api } from "../../../convex/_generated/api";
 import type { Id } from "../../../convex/_generated/dataModel";
+import { EditContactSheet } from "./conversation/EditContactSheet";
+import { uploadFileToConvex } from "./conversation/upload";
 
 type ContactDetailRecord = {
     _id: Id<"contacts">;
     organizationId: Id<"organizations">;
     phone: string;
+    profilePictureUrl?: string | null;
     name?: string | null;
     firstName?: string | null;
     lastName?: string | null;
@@ -59,11 +63,14 @@ export function MobileContactDetailScreen({ contactId }: Props) {
         contact && typedContactId ? { contactId: typedContactId, organizationId: contact.organizationId } : "skip",
     ) as ConversationHistoryRecord[] | undefined;
     const updateContact = useMutation(api.contacts.update);
+    const generateUploadUrl = useMutation(api.files.generateUploadUrl);
 
     const [noteDraft, setNoteDraft] = useState("");
     const [tagDraft, setTagDraft] = useState("");
     const [addingTag, setAddingTag] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
+    const [uploadingAvatar, setUploadingAvatar] = useState(false);
     const noteInputRef = useRef<TextInput>(null);
 
     const goBack = () => {
@@ -144,6 +151,27 @@ export function MobileContactDetailScreen({ contactId }: Props) {
         }
     };
 
+    const pickAvatar = async () => {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+            Alert.alert("Accès photos refusé", "Autorise la photothèque dans Réglages pour changer la photo.");
+            return;
+        }
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], allowsEditing: true, aspect: [1, 1], quality: 0.8 });
+        if (result.canceled || !result.assets[0]) return;
+        const asset = result.assets[0];
+        setUploadingAvatar(true);
+        try {
+            const uploadUrl = await generateUploadUrl({});
+            const storageId = await uploadFileToConvex(uploadUrl, asset.uri, asset.mimeType ?? "image/jpeg");
+            await updateContact({ id: contact._id, tags: tagNames, profilePictureStorageId: storageId as Id<"_storage"> });
+        } catch (error) {
+            Alert.alert("Photo de profil", error instanceof Error ? error.message : "Mise à jour impossible.");
+        } finally {
+            setUploadingAvatar(false);
+        }
+    };
+
     return (
         <View style={{ flex: 1, backgroundColor: colors.paper }}>
             <View style={[styles.navBar, { borderBottomColor: colors.rule2 }]}>
@@ -151,13 +179,22 @@ export function MobileContactDetailScreen({ contactId }: Props) {
                 <Text numberOfLines={1} style={{ flex: 1, textAlign: "center", fontFamily: font.sansSemibold, fontSize: 15, color: colors.ink }}>
                     {displayName}
                 </Text>
-                <View style={{ width: 40 }} />
+                <NavButton icon="edit" onPress={() => setEditOpen(true)} />
             </View>
 
             <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
                 {/* Editorial header */}
                 <View style={styles.head}>
-                    <Avatar name={displayName} size={88} status={contact.isWhatsApp ? "online" : undefined} />
+                    <Pressable onPress={() => void pickAvatar()} disabled={uploadingAvatar} accessibilityLabel="Changer la photo">
+                        <Avatar name={displayName} size={88} imageUrl={contact.profilePictureUrl} />
+                        <View style={[styles.avatarBadge, { backgroundColor: colors.ink, borderColor: colors.paper }]}>
+                            {uploadingAvatar ? (
+                                <ActivityIndicator size="small" color={colors.paper} />
+                            ) : (
+                                <Icon name="camera" size={13} color={colors.paper} strokeWidth={1.7} />
+                            )}
+                        </View>
+                    </Pressable>
                     <Text style={{ fontFamily: font.display, fontSize: 32, letterSpacing: -0.5, color: colors.ink, marginTop: 16 }}>
                         {displayName}
                     </Text>
@@ -290,6 +327,8 @@ export function MobileContactDetailScreen({ contactId }: Props) {
                     </>
                 ) : null}
             </ScrollView>
+
+            <EditContactSheet visible={editOpen} contact={contact} tagNames={tagNames} onClose={() => setEditOpen(false)} />
         </View>
     );
 }
@@ -340,6 +379,7 @@ const styles = StyleSheet.create({
     navBar: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth },
     content: { paddingBottom: 48 },
     head: { paddingHorizontal: 24, paddingTop: 24, alignItems: "flex-start" },
+    avatarBadge: { position: "absolute", right: -2, bottom: -2, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center", borderWidth: 2 },
     tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginTop: 18 },
     tagPill: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 11, paddingVertical: 6, borderRadius: 999, borderWidth: StyleSheet.hairlineWidth },
     tagPillDashed: { borderStyle: "dashed", backgroundColor: "transparent" },
