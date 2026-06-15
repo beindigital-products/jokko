@@ -23,7 +23,7 @@ export function Button({ href, children }: ButtonProps) {
     return (
         <EmailButton
             href={href}
-            className="bg-emerald-500 text-white px-7 py-3.5 rounded-lg font-semibold text-sm no-underline text-center block"
+            className="bg-[#693BEF] text-white px-7 py-3.5 rounded-lg font-semibold text-sm no-underline text-center block"
         >
             {children}
         </EmailButton>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthActions } from "@convex-dev/auth/react";
 import * as Sentry from "@sentry/nextjs";
 import { motion } from "framer-motion";
@@ -340,9 +341,13 @@ function AuthField({
 function MobileLogo() {
     return (
         <Link href="/" className="inline-flex items-center gap-2.5">
-            <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-sm font-bold text-white shadow-[0_8px_24px_-6px_var(--accent-glow)]">
-                J
-            </span>
+            <Image
+                src="/logo-mark.png"
+                alt=""
+                width={36}
+                height={36}
+                className="h-9 w-9 object-contain"
+            />
             <span className="font-display text-xl font-semibold tracking-tight">
                 Jokko
             </span>
@@ -402,9 +407,13 @@ function RecoveryBrandingPanel() {
 
             <div className="relative flex h-full flex-col p-10">
                 <Link href="/" className="inline-flex items-center gap-2.5">
-                    <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-sm font-bold text-white shadow-[0_8px_24px_-6px_var(--accent-glow)]">
-                        J
-                    </span>
+                    <Image
+                        src="/logo-mark.png"
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="h-9 w-9 object-contain brightness-0 invert"
+                    />
                     <span className="font-display text-xl font-semibold tracking-tight text-white">
                         Jokko
                     </span>

@@ -1,6 +1,7 @@
 'use client'
 
 import * as Sentry from "@sentry/nextjs"
+import Image from "next/image"
 import { useEffect } from "react"
 
 export default function Error({
@@ -17,6 +18,14 @@ export default function Error({
 
     return (
         <div className="flex w-full flex-col items-center justify-center py-20 text-center">
+            <Image
+                src="/logo-mark.png"
+                alt="Jokko"
+                width={40}
+                height={40}
+                className="mb-6 h-10 w-10"
+                priority
+            />
             <h2 className="text-2xl font-bold">Une erreur est survenue</h2>
 
             {process.env.NODE_ENV === 'development' ? (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useMutation } from "convex/react";
@@ -112,10 +113,13 @@ export function Footer() {
         <div className="grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-sm font-bold text-white shadow-[0_8px_24px_-6px_var(--accent-glow)]">
-                J
-                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--whatsapp)] ring-2 ring-[var(--surface-dark)]" />
-              </span>
+              <Image
+                src="/logo-mark.png"
+                alt=""
+                width={36}
+                height={36}
+                className="h-9 w-9 object-contain brightness-0 invert"
+              />
               <span className="font-display text-xl font-semibold tracking-tight text-white">
                 Jokko
               </span>

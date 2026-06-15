@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { Search } from "lucide-react"
 
@@ -181,6 +182,22 @@ export function DashboardSidebar({
         >
             {/* Org card + search */}
             <SidebarHeader className="gap-2 p-3 group-data-[collapsible=icon]:p-2">
+                <Link
+                    href={basePath}
+                    aria-label="Jokko — tableau de bord"
+                    className="flex items-center gap-2 px-1 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0"
+                >
+                    <Image
+                        src="/logo-mark.png"
+                        alt="Jokko"
+                        width={22}
+                        height={22}
+                        className="h-[22px] w-[22px] shrink-0"
+                    />
+                    <span className="font-display text-[15px] font-semibold tracking-tight text-[var(--ink-900)] group-data-[collapsible=icon]:hidden">
+                        Jokko
+                    </span>
+                </Link>
                 <OrgSwitcher
                     name={org.name}
                     initial={org.initial}
