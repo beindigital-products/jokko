@@ -31,10 +31,10 @@ import {
 } from "@react-email/components";
 import * as React from "react";
 
-// Emails need an absolute, publicly-reachable image URL (relative paths and
-// auth-gated assets break in mail clients). The Next app serves /logo.png on
-// the marketing domain; SITE_URL overrides it per environment.
-const SITE_URL = process.env.SITE_URL || "https://www.jokko.co";
+// Le logo de marque vit toujours sur le domaine marketing, quel que soit
+// l'environnement d'envoi (asset servi sans auth-gate, cf. proxy.ts) — on fige
+// l'URL plutôt que de dépendre d'un SITE_URL/APP_URL parfois pointé sur le dev.
+const LOGO_URL = "https://www.jokko.co/logo.png";
 
 interface LayoutProps {
     preview: string;
@@ -51,7 +51,7 @@ export function Layout({ preview, children }: LayoutProps) {
                     <Container className="mx-auto py-10 px-4">
                         <Section className="bg-white rounded-xl p-10 shadow-sm">
                             <Img
-                                src={`${SITE_URL}/logo.png`}
+                                src={LOGO_URL}
                                 alt="Jokko"
                                 width="132"
                                 height="35"
