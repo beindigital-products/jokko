@@ -1,14 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import {
   Search,
-  CheckCheck,
-  Check,
   Clock,
   Phone,
-  MoreVertical,
+  MoreHorizontal,
   Paperclip,
   Smile,
   Send,
@@ -17,50 +16,63 @@ import {
   Building2,
   Tag as TagIcon,
   Inbox,
-  UserX,
-  ChevronDown,
+  UserRound,
+  Sparkles,
+  Check,
+  ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Avatar, type AvatarColor } from "@/components/dashboard/primitives/Avatar";
+import { Chip, type ChipTone } from "@/components/dashboard/primitives/Chip";
+
+// ============================================
+// Data — a slice of the real product (West-African support inbox)
+// ============================================
 
 type Step = 0 | 1 | 2 | 3 | 4;
+type Win = "ok" | "warn" | "danger";
 
 interface Thread {
   id: string;
   name: string;
   initials: string;
+  color: AvatarColor;
   preview: string;
   time: string;
   unread?: number;
-  assignee?: string;
-  window?: "ok" | "warn" | "danger";
+  window?: Win;
   windowLabel?: string;
   active?: boolean;
   section: "mine" | "unassigned";
-  pinned?: boolean;
 }
+
+const WIN_TONE: Record<Win, ChipTone> = {
+  ok: "good",
+  warn: "warn",
+  danger: "danger",
+};
 
 const threads: Thread[] = [
   {
     id: "1",
     name: "Aïssatou Diop",
     initials: "AD",
+    color: "violet",
     preview: "Bonjour, ma commande #4821 est-elle…",
     time: "10:24",
     unread: 2,
-    assignee: "Moi",
     window: "ok",
     windowLabel: "23h45",
     active: true,
     section: "mine",
-    pinned: true,
   },
   {
     id: "2",
     name: "Moussa Fall",
     initials: "MF",
+    color: "emerald",
     preview: "Merci beaucoup pour votre retour 🙏",
     time: "10:21",
-    assignee: "Moi",
     window: "ok",
     windowLabel: "18h",
     section: "mine",
@@ -69,6 +81,7 @@ const threads: Thread[] = [
     id: "3",
     name: "Awa Sarr",
     initials: "AS",
+    color: "amber",
     preview: "Bonjour, livrez-vous à Thiès ?",
     time: "09:52",
     unread: 1,
@@ -80,6 +93,7 @@ const threads: Thread[] = [
     id: "4",
     name: "Coumba Sow",
     initials: "CS",
+    color: "sky",
     preview: "Je voudrais changer la taille du produit",
     time: "09:41",
     window: "ok",
@@ -90,81 +104,79 @@ const threads: Thread[] = [
     id: "5",
     name: "Ibrahima Ndiaye",
     initials: "IN",
+    color: "crimson",
     preview: "Parfait, j'attends le lien de paiement.",
     time: "Hier",
-    assignee: "Moi",
     window: "danger",
     windowLabel: "Fermée",
     section: "mine",
   },
 ];
 
-const messages = [
-  {
-    role: "in" as const,
-    text: "Bonjour, ma commande #4821 est-elle bien expédiée ?",
-    time: "10:22",
-  },
-  { role: "in" as const, text: "J'attends depuis 3 jours 😕", time: "10:24" },
+const incoming: { text: string; time: string }[] = [
+  { text: "Bonjour, ma commande #4821 est-elle bien expédiée ?", time: "10:22" },
+  { text: "J'attends depuis 3 jours 😕", time: "10:24" },
 ];
 
 const replyText =
   "Bonjour Aïssatou 👋 Votre commande #4821 est partie hier soir. Suivi : AB123456 — livraison prévue demain matin. Désolés pour l'attente !";
 
+// ============================================
+// Root — auto-playing demo loop (typing → IA draft → send → sent)
+// ============================================
+
 export function InboxMockup() {
   const [step, setStep] = useState<Step>(0);
-  const [typedChars, setTypedChars] = useState(0);
+  const [typed, setTyped] = useState(0);
 
   useEffect(() => {
+    let timers: ReturnType<typeof setTimeout>[] = [];
     const cycle = () => {
       setStep(0);
-      setTypedChars(0);
-      const t1 = setTimeout(() => setStep(1), 1800);
-      const t2 = setTimeout(() => setStep(2), 3200);
-      const t3 = setTimeout(() => setStep(3), 6400);
-      const t4 = setTimeout(() => setStep(4), 7400);
-      const t5 = setTimeout(cycle, 10200);
-      return () => {
-        clearTimeout(t1);
-        clearTimeout(t2);
-        clearTimeout(t3);
-        clearTimeout(t4);
-        clearTimeout(t5);
-      };
+      setTyped(0);
+      timers = [
+        setTimeout(() => setStep(1), 1800), // contact typing
+        setTimeout(() => setStep(2), 3200), // IA drafts reply
+        setTimeout(() => setStep(3), 6600), // sending
+        setTimeout(() => setStep(4), 7500), // sent bubble
+        setTimeout(cycle, 10500), // loop
+      ];
     };
-    const cleanup = cycle();
-    return cleanup;
+    cycle();
+    return () => timers.forEach(clearTimeout);
   }, []);
 
+  // Typewriter for the IA-drafted reply (only during step 2).
   useEffect(() => {
     if (step !== 2) return;
-    const total = replyText.length;
     let current = 0;
-    const interval = setInterval(() => {
+    const id = setInterval(() => {
       current += 3;
-      setTypedChars(Math.min(current, total));
-      if (current >= total) {
-        clearInterval(interval);
-      }
+      setTyped(Math.min(current, replyText.length));
+      if (current >= replyText.length) clearInterval(id);
     }, 22);
-    return () => clearInterval(interval);
+    return () => clearInterval(id);
   }, [step]);
 
   return (
-    <div className="relative w-full">
+    <div data-testid="inbox-mockup" className="relative w-full">
+      {/* Cobalt + hint-of-pink glow (no WhatsApp green) */}
       <div
         aria-hidden
-        className="pointer-events-none absolute -inset-8 -z-10 rounded-[2.5rem] opacity-60 blur-3xl"
+        className="pointer-events-none absolute -inset-8 -z-10 rounded-[2.5rem] opacity-70 blur-3xl"
         style={{
           background:
-            "radial-gradient(ellipse at 30% 20%, var(--accent-glow) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(5, 150, 105, 0.18) 0%, transparent 55%)",
+            "radial-gradient(ellipse at 25% 15%, var(--accent-glow) 0%, transparent 55%), radial-gradient(ellipse at 85% 85%, var(--accent-hot-pink-soft) 0%, transparent 55%)",
         }}
       />
 
-      <div className="relative grid grid-cols-[240px_1fr_210px] overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-[0_40px_100px_-20px_rgba(20,20,26,0.35)] md:h-[540px]">
-        <ThreadList activeId={threads.find((t) => t.active)?.id || "1"} />
-        <ConversationPanel step={step} typedChars={typedChars} />
-        <CustomerPanel />
+      <div className="relative overflow-hidden rounded-3xl border border-[var(--ink-200)] bg-[var(--paper-white)] shadow-[0_40px_100px_-20px_rgba(20,20,26,0.20)]">
+        <ChromeBar />
+        <div className="grid grid-cols-1 md:h-[520px] md:grid-cols-[240px_1fr] lg:grid-cols-[240px_1fr_220px]">
+          <ThreadList />
+          <ConversationPanel step={step} typed={typed} />
+          <CustomerPanel />
+        </div>
       </div>
 
       <FloatingAssignToast show={step === 0} />
@@ -174,49 +186,79 @@ export function InboxMockup() {
 }
 
 // ============================================
-// THREAD LIST (left sidebar — matches ContactList.tsx)
+// Browser chrome — frames the preview as "the dashboard"
 // ============================================
 
-function ThreadList({ activeId }: { activeId: string }) {
+function ChromeBar() {
+  return (
+    <div className="flex items-center gap-3 border-b border-[var(--ink-100)] bg-[var(--paper-warm)] px-4 py-2.5">
+      <div className="flex gap-1.5">
+        {[0, 1, 2].map((i) => (
+          <span key={i} className="h-2.5 w-2.5 rounded-full bg-[var(--ink-200)]" />
+        ))}
+      </div>
+      <div className="mx-auto hidden items-center gap-1.5 rounded-full border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1 font-mono text-[10px] text-[var(--ink-soft)] sm:flex">
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--status-good)]" />
+        app.jokko.co/conversations
+      </div>
+      <Image
+        src="/logo-mark.png"
+        alt=""
+        aria-hidden
+        width={18}
+        height={18}
+        className="h-[18px] w-[18px] shrink-0"
+      />
+    </div>
+  );
+}
+
+// ============================================
+// Left — thread list (mirrors ConversationListItem.tsx)
+// ============================================
+
+function ThreadList() {
   const totalUnread = threads.reduce((acc, t) => acc + (t.unread || 0), 0);
   const mine = threads.filter((t) => t.section === "mine");
   const unassigned = threads.filter((t) => t.section === "unassigned");
 
   return (
-    <aside className="hidden flex-col border-r border-gray-200 bg-white md:flex">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-gray-100 px-3 py-3">
-        <div className="flex items-center gap-2">
-          <h2 className="text-[15px] font-bold tracking-tight text-gray-900">
-            Conversations
-          </h2>
-          {totalUnread > 0 && (
-            <div className="flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-1.5 py-0.5">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
-              <span className="text-[9px] font-semibold text-green-700">
-                {totalUnread} non lus
-              </span>
-            </div>
-          )}
-        </div>
+    <aside className="hidden flex-col overflow-hidden border-r border-[var(--ink-200)] bg-[var(--paper-white)] md:flex md:h-[520px]">
+      <div className="flex items-center justify-between px-3 py-3">
+        <h2 className="text-[14px] font-bold tracking-tight text-[var(--ink-900)]">
+          Conversations
+        </h2>
+        {totalUnread > 0 && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent-muted)] px-1.5 py-0.5 font-mono text-[9px] font-semibold text-[var(--accent)]">
+            <motion.span
+              className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]"
+              animate={{ opacity: [1, 0.3, 1] }}
+              transition={{ duration: 1.6, repeat: Infinity }}
+            />
+            {totalUnread} non lus
+          </span>
+        )}
       </div>
 
       {/* Scope toggle */}
-      <div className="px-3 pt-2">
-        <div className="flex rounded-lg bg-gray-100 p-0.5">
-          <button className="flex-1 rounded-md bg-white px-2 py-1 text-[10px] font-semibold text-gray-900 shadow-sm">
-            Toutes
+      <div className="px-3">
+        <div className="flex rounded-lg bg-[var(--ink-100)] p-0.5">
+          <button className="flex-1 rounded-md bg-[var(--paper-white)] px-2 py-1 text-[10px] font-semibold text-[var(--ink-900)] shadow-sm">
+            Tous
           </button>
-          <button className="flex-1 rounded-md px-2 py-1 text-[10px] font-medium text-gray-500">
-            Mes
+          <button className="flex-1 rounded-md px-2 py-1 text-[10px] font-medium text-[var(--ink-500)]">
+            Les miens
           </button>
         </div>
       </div>
 
       {/* Search */}
-      <div className="mx-3 mt-2 flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-[10px] text-gray-400">
+      <div className="mx-3 mt-2 flex items-center gap-1.5 rounded-lg border border-[var(--ink-200)] bg-[var(--paper-white)] px-2 py-1.5 font-mono text-[10px] text-[var(--ink-400)]">
         <Search className="h-3 w-3" />
-        <span>Rechercher…</span>
+        Rechercher…
+        <span className="ml-auto rounded border border-[var(--ink-200)] px-1 text-[9px]">
+          ⌘K
+        </span>
       </div>
 
       {/* Filter pills */}
@@ -225,19 +267,18 @@ function ThreadList({ activeId }: { activeId: string }) {
           Tout
         </FilterPill>
         <FilterPill icon={Mail}>Non lus</FilterPill>
-        <FilterPill icon={UserX}>Non assign.</FilterPill>
+        <FilterPill icon={UserRound}>Non assign.</FilterPill>
       </div>
 
-      {/* Thread sections */}
-      <div className="flex-1 overflow-y-auto pb-2">
-        <SectionDivider title="Mes conversations" count={mine.length} />
+      {/* Sections */}
+      <div className="flex-1 overflow-hidden">
+        <SectionLabel title="Mes conversations" count={mine.length} />
         {mine.map((t) => (
-          <ContactListItem key={t.id} thread={t} active={t.id === activeId} />
+          <ThreadRow key={t.id} thread={t} />
         ))}
-
-        <SectionDivider title="Non assignées" count={unassigned.length} />
+        <SectionLabel title="Non assignées" count={unassigned.length} />
         {unassigned.map((t) => (
-          <ContactListItem key={t.id} thread={t} active={t.id === activeId} />
+          <ThreadRow key={t.id} thread={t} />
         ))}
       </div>
     </aside>
@@ -256,10 +297,10 @@ function FilterPill({
   return (
     <button
       className={cn(
-        "flex shrink-0 items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium transition-colors",
+        "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.04em] transition-colors",
         active
-          ? "bg-gradient-to-r from-[#14532d] to-[#059669] text-white shadow-sm"
-          : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+          ? "bg-[var(--accent)] text-white"
+          : "border border-[var(--ink-200)] bg-[var(--paper-white)] text-[var(--ink-600)] hover:bg-[var(--paper-warm)]"
       )}
     >
       <Icon className="h-2.5 w-2.5" />
@@ -268,295 +309,243 @@ function FilterPill({
   );
 }
 
-function SectionDivider({ title, count }: { title: string; count: number }) {
+function SectionLabel({ title, count }: { title: string; count: number }) {
   return (
-    <div className="flex items-center justify-between px-3 pb-1.5 pt-3">
-      <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+    <div className="flex items-center justify-between px-3 pb-1 pt-3">
+      <span className="font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
         {title}
       </span>
-      <span className="rounded-full bg-gray-100 px-1.5 py-0.5 text-[9px] font-semibold text-gray-500">
+      <span className="rounded-full bg-[var(--ink-100)] px-1.5 font-mono text-[9px] font-semibold text-[var(--ink-500)]">
         {count}
       </span>
     </div>
   );
 }
 
-function ContactListItem({ thread, active }: { thread: Thread; active: boolean }) {
-  const hasUnread = (thread.unread || 0) > 0;
+function ThreadRow({ thread }: { thread: Thread }) {
+  const unread = (thread.unread || 0) > 0;
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        "flex cursor-pointer items-start gap-2.5 border-l-2 px-3 py-2.5 transition-colors",
-        active
-          ? "border-l-green-600 bg-green-50/70"
-          : "border-transparent hover:bg-gray-50/70"
+        "flex w-full items-start gap-2.5 px-3 py-2.5 text-left transition-colors",
+        thread.active
+          ? "border-l-2 border-l-[var(--accent)] bg-[var(--accent-muted)]/40"
+          : "border-l-2 border-l-transparent hover:bg-[var(--paper-warm)]"
       )}
     >
-      {/* Avatar */}
-      <div className="relative shrink-0">
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] text-[11px] font-semibold text-white shadow-sm">
-          {thread.initials}
-        </div>
-        {hasUnread && (
-          <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-green-500" />
-        )}
-      </div>
-
-      {/* Content */}
+      <Avatar
+        initials={thread.initials}
+        color={thread.color}
+        status={thread.active ? "online" : undefined}
+      />
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-1">
-          <p
+          <span
             className={cn(
-              "truncate text-[12px]",
-              hasUnread ? "font-semibold text-gray-900" : "font-medium text-gray-800"
+              "truncate text-[12.5px] text-[var(--ink-900)]",
+              unread ? "font-bold" : "font-semibold"
             )}
           >
             {thread.name}
-          </p>
-          <span
-            className={cn(
-              "shrink-0 text-[9px]",
-              hasUnread ? "font-semibold text-green-700" : "text-gray-400"
-            )}
-          >
+          </span>
+          <span className="shrink-0 font-mono text-[9px] text-[var(--ink-soft)]">
             {thread.time}
           </span>
         </div>
-        <p
-          className={cn(
-            "mt-0.5 truncate text-[10px]",
-            hasUnread ? "text-gray-700" : "text-gray-500"
-          )}
-        >
+        <p className="mt-0.5 truncate text-[11px] text-[var(--ink-soft)]">
           {thread.preview}
         </p>
         <div className="mt-1 flex items-center gap-1">
           {thread.window && thread.windowLabel && (
-            <WindowPill variant={thread.window} label={thread.windowLabel} />
+            <Chip tone={WIN_TONE[thread.window]}>
+              <Clock className="h-2.5 w-2.5" />
+              {thread.windowLabel}
+            </Chip>
           )}
-          {hasUnread && (
-            <span className="ml-auto flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-green-500 px-1 text-[9px] font-semibold text-white">
+          {unread && (
+            <span className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[var(--accent)] px-1 font-mono text-[9px] font-bold text-white">
               {thread.unread}
             </span>
           )}
         </div>
       </div>
-    </div>
-  );
-}
-
-function WindowPill({
-  variant,
-  label,
-}: {
-  variant: "ok" | "warn" | "danger";
-  label: string;
-}) {
-  const styles = {
-    ok: "bg-green-50 text-green-700 border-green-200",
-    warn: "bg-orange-50 text-orange-700 border-orange-200",
-    danger: "bg-red-50 text-red-700 border-red-200",
-  }[variant];
-  return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0 text-[8px] font-medium",
-        styles
-      )}
-    >
-      <Clock className="h-2 w-2" />
-      {label}
-    </span>
+    </button>
   );
 }
 
 // ============================================
-// CONVERSATION PANEL (center — matches ConversationView.tsx)
+// Center — conversation (mirrors ConversationHeader + MessageBubble)
 // ============================================
 
-function ConversationPanel({
-  step,
-  typedChars,
-}: {
-  step: Step;
-  typedChars: number;
-}) {
-  const shownReply = replyText.slice(0, typedChars);
+function ConversationPanel({ step, typed }: { step: Step; typed: number }) {
+  const shown = replyText.slice(0, typed);
   return (
-    <main className="flex flex-col bg-gray-50/30">
+    <main className="flex min-w-0 flex-col overflow-hidden bg-[var(--paper-warm)] md:h-[520px]">
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-2.5">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] text-[11px] font-semibold text-white shadow-sm">
-            AD
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[13px] font-semibold text-gray-900">
-              Aïssatou Diop
-            </p>
-            <div className="mt-0.5 flex items-center gap-1.5">
-              <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-green-200 bg-green-50 px-1.5 py-0 text-[9px] font-medium text-green-700">
-                <Clock className="h-2 w-2" />
-                23h45
+      <div className="flex items-center justify-between gap-2 border-b border-[var(--ink-200)] bg-[var(--paper-white)] px-4 py-2.5">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Avatar initials="AD" color="violet" status="online" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="truncate text-[13px] font-semibold text-[var(--ink-900)]">
+                Aïssatou Diop
               </span>
-              <AssignmentBadge />
+              <span className="hidden font-mono text-[11px] text-[var(--ink-soft)] lg:inline">
+                +221 77 834 12 48
+              </span>
+            </div>
+            <div className="mt-0.5 flex items-center gap-1.5">
+              <Chip tone="good">
+                <Clock className="h-2.5 w-2.5" />
+                23h45
+              </Chip>
+              <Chip tone="accent">
+                <span className="flex h-3 w-3 items-center justify-center rounded-full bg-[var(--accent)] text-[7px] font-bold text-white">
+                  S
+                </span>
+                Santiago
+              </Chip>
             </div>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-0.5 text-gray-500">
+        <div className="flex shrink-0 items-center gap-1">
           <IconBtn>
             <Phone className="h-3.5 w-3.5" />
           </IconBtn>
           <IconBtn>
-            <MoreVertical className="h-3.5 w-3.5" />
+            <MoreHorizontal className="h-3.5 w-3.5" />
           </IconBtn>
         </div>
       </div>
 
-      {/* Messages area (WhatsApp beige background) */}
+      {/* Messages (paper-warm + subtle dot grid, no WhatsApp beige) */}
       <div
-        className="flex flex-1 flex-col gap-1.5 overflow-y-auto px-4 py-3"
+        className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-4 py-3"
         style={{
-          backgroundColor: "#efeae2",
           backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'%3E%3Cg fill='%23d4cfc6' fill-opacity='0.35' fill-rule='evenodd'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E\")",
+            "radial-gradient(circle at 1px 1px, rgba(20,20,26,0.04) 1px, transparent 0)",
+          backgroundSize: "22px 22px",
         }}
       >
-        {/* Date separator */}
         <div className="mb-1 flex justify-center">
-          <span className="rounded-md bg-white/80 px-2 py-0.5 text-[9px] font-medium text-gray-600 shadow-sm">
+          <span className="rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-2 py-0.5 font-mono text-[9px] font-medium text-[var(--ink-soft)]">
             Aujourd&apos;hui
           </span>
         </div>
 
-        {messages.map((m, i) => (
-          <WhatsAppBubble key={i} role={m.role} text={m.text} time={m.time} />
+        {incoming.map((m, i) => (
+          <InBubble key={i} text={m.text} time={m.time} />
         ))}
 
+        <AnimatePresence>{step === 1 && <TypingBubble />}</AnimatePresence>
         <AnimatePresence>
-          {step === 1 && (
-            <motion.div
-              key="typing"
-              initial={{ opacity: 0, y: 6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              className="flex items-center gap-1 self-start rounded-2xl rounded-bl-sm bg-white px-3 py-2 shadow-sm"
-            >
-              {[0, 1, 2].map((i) => (
-                <motion.span
-                  key={i}
-                  className="h-1.5 w-1.5 rounded-full bg-gray-400"
-                  animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
-                  transition={{
-                    duration: 0.9,
-                    repeat: Infinity,
-                    delay: i * 0.15,
-                  }}
-                />
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Agent reply (step 2: typing in input, step 3: sending, step 4: sent bubble) */}
-        <AnimatePresence>
-          {step === 4 && (
-            <motion.div
-              key="sent"
-              initial={{ opacity: 0, y: 12, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="relative max-w-[78%] self-end rounded-2xl rounded-br-sm bg-green-100 px-3 py-2 shadow-sm"
-            >
-              <p className="whitespace-pre-wrap text-[11.5px] leading-relaxed text-gray-900">
-                {replyText}
-              </p>
-              <div className="mt-1 flex items-center justify-end gap-1 text-[9px] text-gray-500">
-                <span>10:25</span>
-                <CheckCheck className="h-3 w-3 text-blue-500" />
-              </div>
-            </motion.div>
-          )}
+          {step === 4 && <OutBubble text={replyText} time="10:25" />}
         </AnimatePresence>
       </div>
 
-      {/* Input */}
-      <div className="border-t border-gray-200 bg-white px-3 py-2">
-        <div className="flex items-center gap-2 rounded-full bg-gray-50 px-3 py-1.5">
-          <Smile className="h-3.5 w-3.5 shrink-0 text-gray-500" />
-          <Paperclip className="h-3.5 w-3.5 shrink-0 text-gray-500" />
-          <div className="flex-1 text-[11px] text-gray-500">
-            {step === 2 && typedChars > 0 ? (
-              <span className="text-gray-900">
-                {shownReply}
-                <span className="ml-0.5 inline-block h-2.5 w-0.5 animate-pulse bg-green-600 align-middle" />
-              </span>
-            ) : step === 3 ? (
-              <span className="italic text-gray-400">Envoi en cours…</span>
-            ) : (
-              <span className="text-gray-400">Écrire un message…</span>
-            )}
-          </div>
-          <motion.button
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] text-white shadow-sm"
-            animate={step === 3 ? { scale: [1, 1.15, 1] } : { scale: 1 }}
-            transition={{ duration: 0.4 }}
-          >
-            {step === 2 && typedChars > 0 ? (
-              <Send className="h-3 w-3" />
-            ) : step === 3 ? (
-              <Send className="h-3 w-3" />
-            ) : (
-              <Mic className="h-3 w-3" />
-            )}
-          </motion.button>
-        </div>
-      </div>
+      <Composer step={step} shown={shown} />
     </main>
   );
 }
 
-function AssignmentBadge() {
+function InBubble({ text, time }: { text: string; time: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-1.5 py-0 text-[9px] font-semibold text-green-700">
-      <div className="flex h-3 w-3 items-center justify-center rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] text-[7px] font-bold text-white">
-        S
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="max-w-[78%] self-start rounded-2xl rounded-bl-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-2 shadow-sm"
+    >
+      <p className="text-[12px] leading-relaxed text-[var(--ink-900)]">{text}</p>
+      <div className="mt-0.5 text-right font-mono text-[9px] text-[var(--ink-soft)]">
+        {time}
       </div>
-      Santiago
-    </span>
+    </motion.div>
   );
 }
 
-function WhatsAppBubble({
-  role,
-  text,
-  time,
-}: {
-  role: "in" | "out";
-  text: string;
-  time: string;
-}) {
-  const isOut = role === "out";
+function OutBubble({ text, time }: { text: string; time: string }) {
   return (
-    <div
-      className={cn(
-        "max-w-[78%] rounded-2xl px-3 py-1.5 shadow-sm",
-        isOut
-          ? "self-end rounded-br-sm bg-green-100"
-          : "self-start rounded-bl-sm bg-white"
-      )}
+    <motion.div
+      key="sent"
+      initial={{ opacity: 0, y: 12, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="max-w-[80%] self-end rounded-2xl rounded-br-md bg-[var(--ink-900)] px-3 py-2 shadow-sm"
     >
-      <p className="whitespace-pre-wrap text-[11.5px] leading-relaxed text-gray-900">
+      <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-white">
         {text}
       </p>
-      <div
-        className={cn(
-          "mt-0.5 flex items-center gap-1 text-[9px] text-gray-500",
-          isOut ? "justify-end" : "justify-start"
+      <div className="mt-1 flex items-center justify-end gap-1 font-mono text-[9px] text-white/60">
+        {time}
+        <span className="text-sky-400">✓✓</span>
+      </div>
+    </motion.div>
+  );
+}
+
+function TypingBubble() {
+  return (
+    <motion.div
+      key="typing"
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -4 }}
+      className="flex items-center gap-1 self-start rounded-2xl rounded-bl-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-2 shadow-sm"
+    >
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          className="h-1.5 w-1.5 rounded-full bg-[var(--ink-400)]"
+          animate={{ opacity: [0.3, 1, 0.3], y: [0, -2, 0] }}
+          transition={{ duration: 0.9, repeat: Infinity, delay: i * 0.15 }}
+        />
+      ))}
+    </motion.div>
+  );
+}
+
+function Composer({ step, shown }: { step: Step; shown: string }) {
+  const drafting = step === 2 && shown.length > 0;
+  return (
+    <div className="border-t border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-2.5">
+      <AnimatePresence>
+        {step === 2 && (
+          <motion.div
+            key="ia"
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mb-1.5 inline-flex items-center gap-1 rounded-full bg-[var(--accent-hot-pink-soft)] px-2 py-0.5 font-mono text-[9px] font-medium uppercase tracking-[0.04em] text-[var(--accent-hot-pink)]"
+          >
+            <Sparkles className="h-2.5 w-2.5" />
+            Brouillon IA · Copilot
+          </motion.div>
         )}
-      >
-        <span>{time}</span>
-        {isOut && <CheckCheck className="h-3 w-3 text-blue-500" />}
+      </AnimatePresence>
+      <div className="flex items-center gap-2 rounded-full border border-[var(--ink-200)] bg-[var(--paper-warm)] px-3 py-1.5">
+        <Smile className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+        <Paperclip className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+        <div className="min-w-0 flex-1 truncate text-[11.5px]">
+          {drafting ? (
+            <span className="text-[var(--ink-900)]">
+              {shown}
+              <span className="ml-0.5 inline-block h-3 w-0.5 animate-pulse bg-[var(--accent)] align-middle" />
+            </span>
+          ) : step === 3 ? (
+            <span className="italic text-[var(--ink-400)]">Envoi en cours…</span>
+          ) : (
+            <span className="text-[var(--ink-400)]">Écrire un message…</span>
+          )}
+        </div>
+        <motion.button
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white shadow-sm"
+          animate={step === 3 ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+          transition={{ duration: 0.4 }}
+        >
+          {step === 0 ? <Mic className="h-3 w-3" /> : <Send className="h-3 w-3" />}
+        </motion.button>
       </div>
     </div>
   );
@@ -564,57 +553,53 @@ function WhatsAppBubble({
 
 function IconBtn({ children }: { children: React.ReactNode }) {
   return (
-    <button className="flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-gray-100">
+    <button className="flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink-500)] transition-colors hover:bg-[var(--paper-warm)]">
       {children}
     </button>
   );
 }
 
 // ============================================
-// CUSTOMER PANEL (right — matches ContactInfo.tsx)
+// Right — customer panel (mirrors ContactInfo)
 // ============================================
 
 function CustomerPanel() {
   return (
-    <aside className="hidden flex-col overflow-hidden border-l border-gray-200 bg-white lg:flex">
-      {/* Header */}
-      <div className="border-b border-gray-100 px-3 py-3">
-        <div className="flex flex-col items-center gap-1.5">
-          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] text-sm font-semibold text-white shadow-sm">
-            AD
-          </div>
-          <p className="text-[12px] font-semibold text-gray-900">Aïssatou Diop</p>
-          <p className="text-[9px] text-gray-500">+221 77 834 12 48</p>
-        </div>
+    <aside className="hidden flex-col overflow-hidden border-l border-[var(--ink-200)] bg-[var(--paper-white)] lg:flex lg:h-[520px]">
+      <div className="flex flex-col items-center gap-1.5 border-b border-[var(--ink-100)] px-3 py-4">
+        <Avatar initials="AD" color="violet" size="xl" />
+        <p className="text-[12px] font-semibold text-[var(--ink-900)]">
+          Aïssatou Diop
+        </p>
+        <p className="font-mono text-[10px] text-[var(--ink-soft)]">
+          +221 77 834 12 48
+        </p>
       </div>
 
-      {/* Details */}
-      <div className="border-b border-gray-100 px-3 py-2">
-        <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+      <div className="border-b border-[var(--ink-100)] px-3 py-3">
+        <p className="mb-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
           Détails
         </p>
         <InfoRow icon={Mail} label="Email" value="aissatou@gmail.com" />
         <InfoRow icon={Building2} label="Société" value="Aïssa Mode" />
       </div>
 
-      {/* Tags */}
-      <div className="border-b border-gray-100 px-3 py-2">
+      <div className="border-b border-[var(--ink-100)] px-3 py-3">
         <div className="mb-1.5 flex items-center gap-1">
-          <TagIcon className="h-2.5 w-2.5 text-gray-400" />
-          <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+          <TagIcon className="h-2.5 w-2.5 text-[var(--ink-400)]" />
+          <p className="font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
             Tags
           </p>
         </div>
         <div className="flex flex-wrap gap-1">
-          <TagPill color="bg-rose-100 text-rose-700">VIP</TagPill>
-          <TagPill color="bg-green-100 text-green-700">Fidèle</TagPill>
-          <TagPill color="bg-amber-100 text-amber-700">B2C</TagPill>
+          <Chip tone="accent">VIP</Chip>
+          <Chip tone="good">Fidèle</Chip>
+          <Chip tone="warn">B2C</Chip>
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="flex-1 px-3 py-2">
-        <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+      <div className="flex-1 px-3 py-3">
+        <p className="mb-1.5 font-mono text-[9px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
           Activité
         </p>
         <div className="space-y-1.5">
@@ -624,11 +609,10 @@ function CustomerPanel() {
         </div>
       </div>
 
-      {/* Footer action */}
-      <div className="border-t border-gray-100 bg-gray-50/50 px-3 py-2">
-        <button className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-medium text-gray-700 transition-colors hover:bg-white">
-          <span>Voir historique</span>
-          <ChevronDown className="h-3 w-3 -rotate-90" />
+      <div className="border-t border-[var(--ink-100)] bg-[var(--paper-warm)] px-3 py-2.5">
+        <button className="flex w-full items-center justify-between rounded-md px-2 py-1 text-[10px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-white)]">
+          Voir l&apos;historique
+          <ChevronRight className="h-3 w-3" />
         </button>
       </div>
     </aside>
@@ -646,12 +630,16 @@ function InfoRow({
 }) {
   return (
     <div className="flex items-start gap-2 py-1">
-      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100">
-        <Icon className="h-3 w-3 text-gray-500" />
+      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-[var(--ink-100)] bg-[var(--paper-warm)]">
+        <Icon className="h-3 w-3 text-[var(--ink-500)]" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[8px] text-gray-400">{label}</p>
-        <p className="truncate text-[10px] font-medium text-gray-900">{value}</p>
+        <p className="font-mono text-[8px] uppercase tracking-wide text-[var(--ink-400)]">
+          {label}
+        </p>
+        <p className="truncate text-[10px] font-medium text-[var(--ink-900)]">
+          {value}
+        </p>
       </div>
     </div>
   );
@@ -660,33 +648,16 @@ function InfoRow({
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[9px] text-gray-500">{label}</span>
-      <span className="text-[10px] font-semibold text-gray-900">{value}</span>
+      <span className="text-[10px] text-[var(--ink-soft)]">{label}</span>
+      <span className="font-mono text-[10px] font-semibold text-[var(--ink-900)]">
+        {value}
+      </span>
     </div>
   );
 }
 
-function TagPill({
-  children,
-  color,
-}: {
-  children: React.ReactNode;
-  color: string;
-}) {
-  return (
-    <span
-      className={cn(
-        "rounded-full px-1.5 py-0.5 text-[8px] font-semibold",
-        color
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
 // ============================================
-// FLOATING TOASTS (real notifications)
+// Floating toasts — real notifications, on-brand
 // ============================================
 
 function FloatingAssignToast({ show }: { show: boolean }) {
@@ -699,16 +670,16 @@ function FloatingAssignToast({ show }: { show: boolean }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -8, scale: 0.95 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
-          className="absolute -left-4 top-24 hidden items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 shadow-xl md:flex"
+          className="absolute -left-4 top-28 hidden items-center gap-2 rounded-xl border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-2 shadow-[0_16px_40px_-12px_rgba(20,20,26,0.25)] md:flex"
         >
-          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] text-[9px] font-bold text-white">
+          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] font-mono text-[9px] font-bold text-white">
             S
           </div>
           <div>
-            <p className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+            <p className="font-mono text-[8px] font-medium uppercase tracking-[0.1em] text-[var(--ink-soft)]">
               Assignée à
             </p>
-            <p className="text-[11px] font-semibold text-gray-900">
+            <p className="text-[11px] font-semibold text-[var(--ink-900)]">
               Santiago · Support
             </p>
           </div>
@@ -728,12 +699,12 @@ function FloatingSentToast({ show }: { show: boolean }) {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.4 }}
-          className="absolute -right-4 bottom-16 hidden items-center gap-2 rounded-full border border-green-200 bg-white px-3 py-1.5 shadow-xl md:flex"
+          className="absolute -right-4 bottom-20 hidden items-center gap-2 rounded-full border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 shadow-[0_16px_40px_-12px_rgba(20,20,26,0.25)] md:flex"
         >
-          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500">
+          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--status-good)]">
             <Check className="h-2.5 w-2.5 text-white" strokeWidth={3} />
           </div>
-          <span className="text-[10px] font-semibold text-gray-900">
+          <span className="text-[10px] font-semibold text-[var(--ink-900)]">
             Répondu en 8s
           </span>
         </motion.div>
