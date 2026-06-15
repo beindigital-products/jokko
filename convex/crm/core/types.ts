@@ -114,6 +114,14 @@ export interface AdapterCallCtx {
         instanceUrl?: string;
     };
     scalingMode: "standard" | "large";
+    /** Per-connection field mapping (remote property names). Adapters honor it on pull. */
+    fieldMapping?: {
+        firstName?: string;
+        lastName?: string;
+        email?: string;
+        phone?: string;
+        tags?: string;
+    };
 }
 
 export interface CRMAdapter {

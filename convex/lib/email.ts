@@ -14,8 +14,8 @@
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { render } from "@react-email/render";
 import { InvitationEmail } from "../emails/invitation";
-import { VerificationEmail } from "../emails/verification";
 import { PasswordResetEmail } from "../emails/password_reset";
+import { MentionEmail } from "../emails/mention";
 import { DOMParser } from "@xmldom/xmldom";
 
 // Polyfill DOMParser for AWS SDK in Convex runtime
@@ -79,24 +79,43 @@ export async function sendInvitationEmail(params: {
     });
 }
 
-export async function sendVerificationEmail(params: {
-    to: string;
-    verifyUrl: string;
-}) {
-    return sendEmail({
-        to: params.to,
-        subject: "Vérifiez votre email - Jokko",
-        react: VerificationEmail({ verifyUrl: params.verifyUrl }),
-    });
-}
-
 export async function sendPasswordResetEmail(params: {
     to: string;
     resetUrl: string;
+}): Promise<void> {
+    // No email infra configured (test / local dev) → skip silently.
+    if (!process.env.AWS_SES_FROM_EMAIL) {
+        console.log("[auth] AWS_SES_FROM_EMAIL absent, email reset non envoyé.");
+        return;
+    }
+    try {
+        await sendEmail({
+            to: params.to,
+            subject: "Réinitialisez votre mot de passe - Jokko",
+            react: PasswordResetEmail({ resetUrl: params.resetUrl }),
+        });
+    } catch (e) {
+        // Log the failure but do not crash the auth flow — @convex-dev/auth's
+        // sendVerificationRequest must return cleanly regardless.
+        console.error("[auth] échec d'envoi email reset:", e);
+    }
+}
+
+export async function sendMentionEmail(params: {
+    to: string;
+    authorName: string;
+    where: string;
+    excerpt: string;
+    url: string;
 }) {
     return sendEmail({
         to: params.to,
-        subject: "Réinitialisez votre mot de passe - Jokko",
-        react: PasswordResetEmail({ resetUrl: params.resetUrl }),
+        subject: `${params.authorName} vous a mentionné sur Jokko`,
+        react: MentionEmail({
+            authorName: params.authorName,
+            where: params.where,
+            excerpt: params.excerpt,
+            url: params.url,
+        }),
     });
 }

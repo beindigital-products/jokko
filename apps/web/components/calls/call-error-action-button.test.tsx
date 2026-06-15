@@ -29,6 +29,11 @@ vi.mock('./mic-permission-button', () => ({
     MicPermissionButton: () => <button>Autoriser le microphone</button>,
 }));
 
+// Mock the permission hook so the recharge branch is role-controllable without
+// a Convex provider (useCan → useCurrentOrg would otherwise need one).
+const { mockUseCan } = vi.hoisted(() => ({ mockUseCan: vi.fn(() => ({ isAdmin: true })) }));
+vi.mock('@/hooks/use-permission', () => ({ useCan: () => mockUseCan() }));
+
 import { CallErrorActionButton } from './call-error-action-button';
 import { useCallStore } from '@/lib/stores/call-store';
 import { mapCallError } from './call-error-messages';
@@ -53,6 +58,7 @@ beforeEach(() => {
         errorAction: null,
         micStream: null,
     });
+    mockUseCan.mockReturnValue({ isAdmin: true });
 });
 
 describe('CallErrorActionButton — contextual fix-it buttons', () => {
@@ -151,5 +157,33 @@ describe('CallErrorActionButton — contextual fix-it buttons', () => {
         const link = screen.getByRole('link', { name: /Envoyer un modele/i });
         expect(link.getAttribute('href')).toContain('kconv_test_id');
         expect(link.getAttribute('href')).toContain('openTemplates=1');
+    });
+
+    it('renders a "Recharger le compte" link to billing for an admin/owner (recharge action)', () => {
+        mockUseCan.mockReturnValue({ isAdmin: true });
+        useCallStore.setState({
+            callState: 'error',
+            errorMessage: 'Credit insuffisant pour passer un appel.',
+            errorAction: { type: 'recharge' },
+        });
+
+        render(<CallErrorActionButton />);
+
+        const link = screen.getByRole('link', { name: /Recharger le compte/i });
+        expect(link).toHaveAttribute('href', '/dashboard/billing');
+    });
+
+    it('tells an agent to ask an administrator (recharge action, non-admin)', () => {
+        mockUseCan.mockReturnValue({ isAdmin: false });
+        useCallStore.setState({
+            callState: 'error',
+            errorMessage: 'Credit insuffisant pour passer un appel.',
+            errorAction: { type: 'recharge' },
+        });
+
+        render(<CallErrorActionButton />);
+
+        expect(screen.queryByRole('link', { name: /Recharger/i })).toBeNull();
+        expect(screen.getByText(/Demandez a un administrateur/i)).toBeInTheDocument();
     });
 });

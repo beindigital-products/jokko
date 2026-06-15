@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { query, internalMutation } from "./_generated/server";
+import { getAuthUserId } from "@convex-dev/auth/server";
 
 const UNLIMITED = -1;
 
@@ -32,6 +33,18 @@ export const getByKey = query({
 export const getLimitsForOrg = query({
     args: { organizationId: v.id("organizations") },
     handler: async (ctx, args) => {
+        // SECURITY: caller must belong to the org (don't leak which paid tier
+        // an arbitrary org is on). Graceful null keeps the client UI quiet.
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return null;
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", args.organizationId),
+            )
+            .first();
+        if (!membership) return null;
+
         const org = await ctx.db.get(args.organizationId);
         if (!org) return null;
 
@@ -176,13 +189,10 @@ export const seedPlans = internalMutation({
                 .first();
 
             if (existing) {
-                console.log(`[SEED] Plan "${planData.key}" already exists, updating...`);
                 await ctx.db.patch(existing._id, planData);
             } else {
-                console.log(`[SEED] Creating plan "${planData.key}"...`);
                 await ctx.db.insert("plans", planData);
             }
         }
-        console.log("[SEED] Plans seeded successfully.");
     },
 });

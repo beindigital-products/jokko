@@ -15,9 +15,8 @@
 
 'use client'
 
-import { User, UserX } from 'lucide-react'
+import { UserX } from 'lucide-react'
 
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import {
     Tooltip,
@@ -53,7 +52,6 @@ interface AssignmentBadgeProps {
 export function AssignmentBadge({
     assignedTo,
     assignedAt,
-    showAvatar = true,
     size = 'md',
     className,
 }: AssignmentBadgeProps) {
@@ -74,7 +72,6 @@ export function AssignmentBadge({
     }
 
     const displayName = assignedTo.name || assignedTo.email.split('@')[0]
-    const initials = getInitials(displayName)
 
     return (
         <TooltipProvider>
@@ -102,19 +99,6 @@ export function AssignmentBadge({
             </Tooltip>
         </TooltipProvider>
     )
-}
-
-// ============================================
-// HELPERS
-// ============================================
-
-function getInitials(name: string): string {
-    return name
-        .split(' ')
-        .map((n) => n[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2)
 }
 
 function formatRelativeDate(date: Date | string): string {

@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { query } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requirePlanFeature } from "./lib/planFeatures";
 
 // Helper to get Org ID (simplified)
 async function getOrganizationId(ctx: any, userId: string) {
@@ -32,6 +33,9 @@ export const getDashboardStats = query({
         const organizationId = await getOrganizationId(ctx, userId);
         if (!organizationId) throw new Error("No organization found");
 
+        // Analytics avancées (BUSINESS+) — gating serveur (le front gate déjà via FeatureGate).
+        await requirePlanFeature(ctx, organizationId, "analytics_advanced");
+
         const start = args.startDate || 0;
         const end = args.endDate || Date.now();
 
@@ -58,9 +62,15 @@ export const getDashboardStats = query({
         }
 
         // 2. Aggregate Messages & Calculate Response Times
+        // Bound the scan to the requested window via the (org, createdAt) index
+        // instead of collecting the org's ENTIRE message history into memory
+        // (which hits Convex's read limit on a large tenant). The analytics page
+        // always passes a date range (default: last 30 days).
         const messages = await ctx.db
             .query("messages")
-            .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+            .withIndex("by_org_created", (q) =>
+                q.eq("organizationId", organizationId).gte("createdAt", start).lte("createdAt", end),
+            )
             .collect();
 
         // Group by conversation for response time calc
@@ -149,12 +159,16 @@ export const getDashboardStats = query({
             }
         }
 
-        // 3. Aggregate Current Assignments
-        // For "Conversations handled", we can use the messages we processed (if agent sent a message, they handled it).
-        // OR we can use current assignments from `conversations` table.
-        // Let's use Current Assignments for the "Assignations" column as users expect "What is currently on their plate".
-        // But "conversations qu'ils ont eu à gérer" (handled) -> Messages logic is better?
-        // Let's add "Handled" (Active via messages) AND "Assigned" (Currently assigned).
+        // 3. Aggregate Conversations scoped to the requested period.
+        // We use createdAt to count conversations *opened* during the period,
+        // which is consistent with messages being scoped by createdAt. This gives
+        // a coherent "activity during the period" picture (vs lastMessageAt which
+        // would measure conversations *active* during the period — a different, less
+        // comparable metric).
+        //
+        // conversations has no compound (org, createdAt) index; we collect the org
+        // slice then filter in memory. This is the same pattern used for agent
+        // assignment counts and is acceptable given paged analytics queries.
 
         let totalConversations = 0;
         let openConversations = 0;
@@ -163,12 +177,15 @@ export const getDashboardStats = query({
         const conversations = await ctx.db
             .query("conversations")
             .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
-            .collect();
+            .take(5000);
 
         for (const conv of conversations) {
-            totalConversations++;
-            if (conv.status === 'OPEN') openConversations++;
-            else closedConversations++;
+            // Scope KPIs to the selected period (createdAt).
+            if (conv.createdAt >= start && conv.createdAt <= end) {
+                totalConversations++;
+                if (conv.status === 'OPEN') openConversations++;
+                else closedConversations++;
+            }
 
             if (conv.assignedTo && agentsMap.has(conv.assignedTo)) {
                 const agent = agentsMap.get(conv.assignedTo);
@@ -266,15 +283,21 @@ export const getDashboardStats = query({
         }
 
         // ── Trends (compare with previous period of same duration) ──
+        // `messages` is fetched with gte(start), so it contains ONLY the current
+        // period. To compute the previous period we issue a separate bounded query
+        // on [prevStart, start) rather than trying to filter the current slice
+        // (which would always yield 0 matches and produce a spurious +100% trend).
         const periodDuration = end - start;
         const prevStart = start - periodDuration;
 
-        let prevTotalMessages = 0;
-        for (const msg of messages) {
-            if (msg.createdAt >= prevStart && msg.createdAt < start) {
-                prevTotalMessages++;
-            }
-        }
+        const prevMessages = await ctx.db
+            .query("messages")
+            .withIndex("by_org_created", (q) =>
+                q.eq("organizationId", organizationId).gte("createdAt", prevStart).lt("createdAt", start),
+            )
+            .collect();
+
+        const prevTotalMessages = prevMessages.length;
 
         let currentNewConvs = 0;
         let prevNewConvs = 0;
@@ -297,6 +320,45 @@ export const getDashboardStats = query({
             ? Math.min(100, Math.round((conversationOutbound / conversationInbound) * 100))
             : 0;
 
+        // ── Peak hours heatmap (business hours, weekday × 2h bucket) ──
+        // Computed from real message timestamps. Off-hours (before 8h / after
+        // 22h) are excluded — this is a business-hours staffing view. Hours use
+        // the server clock (no per-org timezone yet), so treat them as ~UTC.
+        const HEAT_HOURS = [8, 10, 12, 14, 16, 18, 20];
+        const HEAT_DAY_LABELS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
+        const HEAT_DAY_NAMES = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+        const heatCounts: number[][] = HEAT_DAY_LABELS.map(() => HEAT_HOURS.map(() => 0));
+        for (const msg of messages) {
+            if (msg.createdAt < start || msg.createdAt > end) continue;
+            const dt = new Date(msg.createdAt);
+            const bucket = Math.floor((dt.getHours() - 8) / 2);
+            if (bucket < 0 || bucket > 6) continue;
+            const dayIdx = (dt.getDay() + 6) % 7; // Monday-first
+            heatCounts[dayIdx][bucket]++;
+        }
+        let heatMax = 0;
+        let peakDay = 0;
+        let peakBucket = 0;
+        for (let d = 0; d < 7; d++) {
+            for (let h = 0; h < 7; h++) {
+                if (heatCounts[d][h] > heatMax) {
+                    heatMax = heatCounts[d][h];
+                    peakDay = d;
+                    peakBucket = h;
+                }
+            }
+        }
+        const peakStartHour = HEAT_HOURS[peakBucket];
+        const heatmap = {
+            rows: heatCounts.map((row) => row.map((c) => (heatMax > 0 ? c / heatMax : 0))),
+            hours: HEAT_HOURS.map((h) => `${h}h`),
+            days: HEAT_DAY_LABELS,
+            peakLabel:
+                heatMax > 0
+                    ? `${HEAT_DAY_NAMES[peakDay]} ${peakStartHour}h–${peakStartHour + 2}h`
+                    : '—',
+        };
+
         return {
             global: {
                 totalMessages,
@@ -317,6 +379,7 @@ export const getDashboardStats = query({
                 messages: formatTrend(totalMessages, prevTotalMessages),
                 conversations: formatTrend(currentNewConvs, prevNewConvs),
             },
+            heatmap,
         };
     }
 });

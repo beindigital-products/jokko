@@ -5,7 +5,11 @@ export default defineConfig({
         environment: 'node',
         globals: true,
         setupFiles: './vitest.setup.ts',
-        include: ['convex/**/*.test.ts'],
-        exclude: ['node_modules/**', 'apps/**', 'packages/**', 'e2e/**'],
+        include: [
+            'convex/**/*.test.ts',
+            'apps/mobile/src/lib/**/*.test.ts',
+            'packages/*/src/**/*.test.ts',
+        ],
+        exclude: ['node_modules/**', 'apps/web/**', 'e2e/**'],
     },
 })

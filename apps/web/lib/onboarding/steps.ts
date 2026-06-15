@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LucideIcon, Building2, MessageCircle, CheckCircle, UtensilsCrossed, Store, ShoppingCart, Heart, GraduationCap, Home, Plane, Landmark, Laptop, Briefcase, MoreHorizontal } from 'lucide-react';
+import { UtensilsCrossed, Store, ShoppingCart, Heart, GraduationCap, Home, Plane, Landmark, Laptop, Briefcase, MoreHorizontal } from 'lucide-react';
 
 // ============================================
 // TYPES

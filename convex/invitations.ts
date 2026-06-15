@@ -132,21 +132,27 @@ export const create = action({
         const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/invite/${token}`;
         const inviterName = identity.name || identity.email || "Someone";
 
-        try {
-            await sendInvitationEmail({
-                to: args.email,
-                orgName: orgName,
-                inviterName: inviterName,
-                role: roleEnum,
-                inviteUrl: inviteUrl,
-            });
-        } catch (error) {
-            console.error("Failed to send email:", error);
-            // We don't throw here to avoid failing the whole action if email fails? 
-            // Better to log it. The invitation is created anyway.
+        let emailSent = false;
+        if (!process.env.AWS_SES_FROM_EMAIL) {
+            // No email infra configured (test / local dev) — skip silently.
+            console.log("[invitation] AWS_SES_FROM_EMAIL absent, email non envoyé (invitation créée).");
+        } else {
+            try {
+                await sendInvitationEmail({
+                    to: args.email,
+                    orgName: orgName,
+                    inviterName: inviterName,
+                    role: roleEnum,
+                    inviteUrl: inviteUrl,
+                });
+                emailSent = true;
+            } catch (error) {
+                console.error("[invitation] échec d'envoi email:", error);
+                // L'invitation est créée — on ne fait pas échouer l'action.
+            }
         }
 
-        return { success: true, token };
+        return { success: true, token, emailSent };
     },
 });
 
@@ -162,22 +168,11 @@ export const createRecord = internalMutation({
         invitedBySubject: v.string() // We pass the sub from identity to resolve user
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx); // Use this if called from client
-        // But if called from action, we might have lost context? 
-        // No, getAuthUserId relies on headers. 
-        // If called via `ctx.runMutation` from an action, the auth headers might not propagate unless configured.
-        // Actually, best practice is to trust the Action if it's internal.
-
-        // Let's rely on finding the user by their subject if possible, OR just trust `getAuthUserId` if it works.
-        // If `ctx.runMutation` is authenticated as the user who triggered the action, it works.
-
-        let inviterId = await getAuthUserId(ctx);
-        if (!inviterId) {
-            // Fallback: This gets tricky. For now let's hope auth propagates or we query user by subject if we stored it.
-            // Since we don't have a "by_subject" index on users shown in schema (only email), skipping complex resolution.
-            // We'll throw if direct auth fails.
-            throw new Error("Could not resolve inviter");
-        }
+        // SECURITY: only a member with members:invite (OWNER/ADMIN) may invite.
+        // create() is a public action that previously only checked authentication,
+        // so any authenticated AGENT could invite by calling it directly. The auth
+        // context propagates through ctx.runMutation, so this enforces it server-side.
+        const { userId: inviterId } = await requirePermission(ctx, args.organizationId, "members:invite");
 
         // Plan limit: block new invitations if the agent quota is already saturated.
         await assertWithinLimit(ctx, args.organizationId, "agents");
@@ -251,6 +246,11 @@ export const resend = action({
         // If it was expired, we would need to refresh it.
         // Let's assume for now it's PENDING and not checked here for expiry (expiration is usually checked on consume).
 
+        if (!process.env.AWS_SES_FROM_EMAIL) {
+            console.log("[invitation] AWS_SES_FROM_EMAIL absent, email de renvoi non envoyé.");
+            return { success: true, emailSent: false };
+        }
+
         await sendInvitationEmail({
             to: invitation.email,
             orgName: orgName,
@@ -259,7 +259,7 @@ export const resend = action({
             inviteUrl: inviteUrl,
         });
 
-        return { success: true };
+        return { success: true, emailSent: true };
     }
 });
 
@@ -298,52 +298,6 @@ export const getByToken = query({
                 inviterName: inviter?.name || inviter?.email || "Un membre",
             }
         };
-    }
-});
-
-// ACCEPT INVITATION & CREATE USER
-// This should probably be an action if we need to do complex auth stuff,
-// but usually creating a user is a mutation.
-// With Convex Auth, creating a user is handled by the auth adapter usually,
-// but we want to create a user AND link the invitation.
-export const accept = action({
-    args: {
-        token: v.string(),
-        password: v.string(),
-        name: v.string(),
-    },
-    handler: async (ctx, args) => {
-        // 1. Validate Invitation
-        const data = await ctx.runQuery(api.invitations.getByToken, { token: args.token });
-        if (!data || data.status !== "VALID" || !data.invitation) {
-            throw new Error("Invitation invalide ou expirée");
-        }
-
-        const { email } = data.invitation;
-
-        // 2. We explicitly use the Convex Auth "password" provider to sign up.
-        // But `signIn` from `convex/auth` is server-side only? No, it's usually client-side.
-        // Wait, we are in an Action here. We can't easily sign in the user into the browser session from here.
-        // The pattern for Convex Auth is usually: Client calls `signIn("password", { email, password, flow: "signUp" })`.
-        // BUT we need to also mark the invitation as accepted and link the user.
-
-        // Strategy:
-        // 1. Client calls `signIn("password", { email, password, flow: "signUp", name: args.name })`.
-        // 2. This creates the user in `users` table via the `Password` provider.
-        // 3. AFTER successful sign-in, the client calls a mutation `acceptInvitation` passing the token.
-        //    The mutation verifies the currently logged-in user matches the invitation email.
-        //    Then it accepts the invitation and creates the membership.
-
-        // However, the user wants "automatic" connection. The `signIn` function on client DOES that.
-        // So the flow on `app/invite/[token]/page.tsx` should be:
-        // 1. Fetch invitation details using `getByToken`.
-        // 2. Show form (Name, Password). Address is pre-filled from invitation.
-        // 3. On Submit:
-        //    await signIn("password", { email: invitation.email, password, name, flow: "signUp" })
-        // 4. If successful, call `api.invitations.acceptLink` (new mutation).
-        // 5. Redirect to dashboard.
-
-        return { success: true }; // Placeholder if we don't use this action directly for sign up
     }
 });
 

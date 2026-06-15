@@ -47,8 +47,13 @@ export const connectWithApiKey = action({
         if (info.authMode !== "apiKey") {
             throw new Error(`Le fournisseur ${provided} n'utilise pas une clé API`);
         }
+        // Garde "Bientôt" : connecteur non encore activé → non connectable
+        // (défense côté serveur en plus de la carte inerte dans le catalogue).
+        if (info.availability === "coming_soon") {
+            throw new Error(`Connecteur bientôt disponible : ${provided}`);
+        }
 
-        const { organizationId, role, plan } = await ctx.runQuery(
+        const { organizationId, role, plan, trialEndsAt, hasSelectedPlan, createdAt, stripeStatus } = await ctx.runQuery(
             internal.crm.oauth._sessionContext,
             { userId },
         );
@@ -56,8 +61,8 @@ export const connectWithApiKey = action({
         if (!hasPermission(role, "integrations:manage")) {
             throw new Error("Permission refusée : integrations:manage");
         }
-        // Feature gate plan : intégrations CRM réservées au plan PRO+
-        await requirePlanFeatureInAction(plan, "integrations_crm");
+        // Feature gate plan : intégrations CRM réservées au plan PRO+ (honore le trial)
+        await requirePlanFeatureInAction({ plan, trialEndsAt, hasSelectedPlan, createdAt, stripeStatus }, "integrations_crm");
 
         const trimmedKey = args.apiKey.trim();
         if (!trimmedKey) throw new Error("Clé API requise");

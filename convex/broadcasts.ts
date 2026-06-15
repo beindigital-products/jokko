@@ -3,8 +3,85 @@ import { mutation, query, internalAction, internalMutation, internalQuery } from
 import { internal, api } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { hasPermission, type Role } from "./lib/permissions";
+import { requirePermission } from "./lib/auth";
 import { requirePlanFeature } from "./lib/planFeatures";
 import { getMessageCostFCFA, calculateBroadcastCost } from "@jokko/core/whatsapp-pricing";
+
+// Per-template variable mapping ({{N}} → contact field or fixed value). Shared
+// validator for `create` / `update` and the table schema. `src` is a contact
+// field ("first" | "last" | "company" | "city") or "fixed".
+const templateVariablesValidator = v.array(
+    v.object({
+        token: v.string(),
+        src: v.string(),
+        fixed: v.optional(v.string()),
+    }),
+);
+
+type TemplateVariable = { token: string; src: string; fixed?: string };
+
+/**
+ * Resolve a saved variable mapping into WhatsApp template `components` for one
+ * contact. Tokens are sorted by their {{N}} index so the body parameters land in
+ * order. `src` reads a contact field (with sensible fallbacks); "fixed" uses the
+ * stored literal. Returns `[]` when there are no variables (Meta then sends the
+ * template as-is). Header variables aren't collected by the wizard yet, so only
+ * a "body" component is produced.
+ */
+function buildTemplateComponents(
+    vars: TemplateVariable[] | undefined,
+    contact: { name?: string; firstName?: string; lastName?: string; company?: string; city?: string },
+): Array<Record<string, unknown>> {
+    if (!vars || vars.length === 0) return [];
+
+    const firstNameOf = () => {
+        if (contact.firstName && contact.firstName.trim()) return contact.firstName.trim();
+        if (contact.name && contact.name.trim()) return contact.name.trim().split(/\s+/)[0];
+        return "";
+    };
+    const lastNameOf = () => {
+        if (contact.lastName && contact.lastName.trim()) return contact.lastName.trim();
+        if (contact.name && contact.name.trim()) {
+            const parts = contact.name.trim().split(/\s+/);
+            return parts.length > 1 ? parts.slice(1).join(" ") : "";
+        }
+        return "";
+    };
+
+    const resolve = (vr: TemplateVariable): string => {
+        switch (vr.src) {
+            case "fixed":
+                return vr.fixed ?? "";
+            case "first":
+                return firstNameOf();
+            case "last":
+                return lastNameOf();
+            case "company":
+                return contact.company?.trim() ?? "";
+            case "city":
+                return contact.city?.trim() ?? "";
+            default:
+                // Unknown source → fall back to the literal if present, else the
+                // contact's first name (best-effort, never undefined).
+                return (vr.fixed && vr.fixed.trim()) || firstNameOf();
+        }
+    };
+
+    // Keep the WhatsApp body parameters in {{1}},{{2}}… order regardless of the
+    // order the mapping was stored in.
+    const tokenIndex = (token: string): number => {
+        const m = /\{\{(\d+)\}\}/.exec(token);
+        return m ? Number(m[1]) : Number.MAX_SAFE_INTEGER;
+    };
+    const ordered = [...vars].sort((a, b) => tokenIndex(a.token) - tokenIndex(b.token));
+
+    return [
+        {
+            type: "body",
+            parameters: ordered.map((vr) => ({ type: "text", text: resolve(vr) })),
+        },
+    ];
+}
 
 // List broadcasts for the current organization
 export const list = query({
@@ -38,9 +115,25 @@ export const list = query({
             .order("desc")
             .collect();
 
-        // Enrich with template name ?
-        // Doing it client side or here? Let's do it here to accept fewer roundtrips if possible,
-        // but `Promise.all` is cheap here.
+        // Fetch the org's contacts once, then compute each broadcast's eligible
+        // audience against it (same logic as `get`'s totalAudience) — cheaper than
+        // re-scanning per row.
+        const contacts = await ctx.db
+            .query("contacts")
+            .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+            .collect();
+        const audienceFor = (config: (typeof broadcasts)[number]["audienceConfig"]): number => {
+            if (config.type === "TAGS" && config.tags && config.tags.length > 0) {
+                return contacts.filter((c) => c.tags && c.tags.some((t) => config.tags!.includes(t))).length;
+            }
+            if (config.type === "COUNTRIES" && config.countries && config.countries.length > 0) {
+                return contacts.filter((c) => config.countries!.some((p) => c.phone.startsWith(p))).length;
+            }
+            return contacts.length;
+        };
+
+        // Enrich with template name + category (for cost estimate), channel name
+        // and eligible-audience count. `Promise.all` keeps the template lookups cheap.
         const enrichedBroadcasts = await Promise.all(
             broadcasts.map(async (b) => {
                 const template = await ctx.db.get(b.templateId);
@@ -52,7 +145,9 @@ export const list = query({
                 return {
                     ...b,
                     templateName: template?.name || "Unknown Template",
+                    templateCategory: template?.category ?? null,
                     channelName,
+                    audienceCount: audienceFor(b.audienceConfig),
                 };
             })
         );
@@ -136,6 +231,7 @@ export const create = mutation({
             tags: v.optional(v.array(v.id("tags"))),
             countries: v.optional(v.array(v.string())),
         }),
+        templateVariables: v.optional(templateVariablesValidator),
     },
     handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
@@ -191,6 +287,7 @@ export const create = mutation({
             name: args.name,
             templateId: args.templateId,
             audienceConfig: args.audienceConfig,
+            templateVariables: args.templateVariables,
             whatsappChannelId: args.whatsappChannelId,
             status: args.scheduledAt ? "SCHEDULED" : "DRAFT",
             scheduledAt: args.scheduledAt,
@@ -236,6 +333,8 @@ export const update = mutation({
             tags: v.optional(v.array(v.id("tags"))),
             countries: v.optional(v.array(v.string())),
         })),
+        templateVariables: v.optional(templateVariablesValidator),
+        whatsappChannelId: v.optional(v.id("whatsappChannels")),
     },
     handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
@@ -276,6 +375,8 @@ export const update = mutation({
         if (args.scheduledAt !== undefined) updates.scheduledAt = args.scheduledAt;
         if (args.status !== undefined) updates.status = args.status;
         if (args.audienceConfig !== undefined) updates.audienceConfig = args.audienceConfig;
+        if (args.templateVariables !== undefined) updates.templateVariables = args.templateVariables;
+        if (args.whatsappChannelId !== undefined) updates.whatsappChannelId = args.whatsappChannelId;
 
         const statusChanged = args.status && args.status !== broadcast.status;
 
@@ -435,51 +536,74 @@ export const sendBroadcast = internalAction({
         organizationId: v.id("organizations"),
     },
     handler: async (ctx, args) => {
+        // Chunked + resumable sender. Each invocation sends one CHUNK of the
+        // audience then self-schedules the next, re-reading status between
+        // chunks. A pause flips status → PAUSED so the next chunk stops here,
+        // preserving the cursor (sentCount) for resume. Also keeps each action
+        // invocation well within Convex's time budget on large audiences.
+        const CHUNK = 50;
+
         // 1. Fetch Broadcast & Template
         const broadcast = await ctx.runQuery(internal.broadcasts.getBroadcastInternal, { id: args.broadcastId });
         if (!broadcast || !broadcast.template) return;
 
-        // 2. Fetch Contacts
-        const contacts = await ctx.runQuery(internal.contacts.listAllForOrg, { organizationId: args.organizationId });
+        // Pause / cancel guard — only proceed while actively SENDING.
+        if (broadcast.status !== "SENDING") return;
 
-        // 3. Filter Audience
+        // 2. Fetch + filter audience, deterministically ordered so sentCount is
+        //    a valid resume cursor across chunks.
+        const contacts = await ctx.runQuery(internal.contacts.listAllForOrg, { organizationId: args.organizationId });
         const config = broadcast.audienceConfig;
         let targetContacts = contacts;
-
         if (config.type === 'TAGS' && config.tags && config.tags.length > 0) {
-            targetContacts = contacts.filter(c =>
-                c.tags && c.tags.some(t => config.tags!.includes(t))
+            targetContacts = contacts.filter((c: any) =>
+                c.tags && c.tags.some((t: any) => config.tags!.includes(t))
             );
         } else if (config.type === 'COUNTRIES' && config.countries && config.countries.length > 0) {
-            targetContacts = contacts.filter(c =>
-                config.countries!.some(prefix => c.phone.startsWith(prefix))
+            targetContacts = contacts.filter((c: any) =>
+                config.countries!.some((prefix: string) => c.phone.startsWith(prefix))
             );
         }
+        targetContacts = [...targetContacts].sort((a: any, b: any) =>
+            a._id < b._id ? -1 : a._id > b._id ? 1 : 0,
+        );
 
-        // 4. Validate & deduct credits before sending (real pricing per country)
-        const { totalCostFCFA } = calculateBroadcastCost(targetContacts.map(c => c.phone));
-        if (totalCostFCFA > 0) {
-            try {
-                await ctx.runMutation(internal.credits.internalDeductCredits, {
-                    organizationId: args.organizationId,
-                    amount: totalCostFCFA,
-                    description: `Campagne "${broadcast.name}" — ${targetContacts.length} messages, ${totalCostFCFA.toLocaleString()} FCFA`,
-                    referenceId: args.broadcastId,
-                });
-            } catch (e: any) {
-                // Insufficient credits — mark broadcast as FAILED
-                await ctx.runMutation(internal.broadcasts.markFailed, {
-                    id: args.broadcastId,
-                    reason: "Crédits insuffisants pour envoyer cette campagne",
-                });
-                return;
+        const cursor = broadcast.sentCount ?? 0;
+
+        // 3. First chunk only: deduct credits for the full audience + lock total.
+        if (cursor === 0) {
+            const { totalCostFCFA } = calculateBroadcastCost(targetContacts.map((c: any) => c.phone));
+            if (totalCostFCFA > 0) {
+                try {
+                    await ctx.runMutation(internal.credits.internalDeductCredits, {
+                        organizationId: args.organizationId,
+                        amount: totalCostFCFA,
+                        description: `Campagne "${broadcast.name}" — ${targetContacts.length} messages, ${totalCostFCFA.toLocaleString()} FCFA`,
+                        referenceId: args.broadcastId,
+                    });
+                } catch (e: any) {
+                    await ctx.runMutation(internal.broadcasts.markFailed, {
+                        id: args.broadcastId,
+                        reason: "Crédits insuffisants pour envoyer cette campagne",
+                    });
+                    return;
+                }
             }
+            await ctx.runMutation(internal.broadcasts.setAudienceTotal, {
+                id: args.broadcastId,
+                total: targetContacts.length,
+            });
         }
 
-        console.log(`[BROADCAST] Sending ${broadcast.name} to ${targetContacts.length} contacts (${totalCostFCFA} FCFA).`);
+        const total = broadcast.audienceTotal ?? targetContacts.length;
 
-        // 5. Send Loop
-        for (const contact of targetContacts) {
+        // 4. Send this chunk (capped at the locked audience total). Resolve the
+        //    saved variable mapping into per-recipient WhatsApp components so
+        //    templates with {{N}} placeholders carry real values.
+        const chunk = targetContacts.slice(cursor, Math.min(cursor + CHUNK, total));
+        const vars = broadcast.templateVariables as TemplateVariable[] | undefined;
+        for (const contact of chunk) {
+            const components = buildTemplateComponents(vars, contact);
             await ctx.runMutation(internal.broadcasts.sendSingleToContact, {
                 broadcastId: args.broadcastId,
                 organizationId: args.organizationId,
@@ -487,14 +611,69 @@ export const sendBroadcast = internalAction({
                 phone: contact.phone,
                 templateName: broadcast.template.name,
                 languageCode: broadcast.template.language,
-                components: [],
+                components,
                 whatsappChannelId: broadcast.whatsappChannelId,
             });
         }
 
-        // 6. Mark Completed
-        await ctx.runMutation(internal.broadcasts.markCompleted, { id: args.broadcastId });
+        // 5. Continue, complete, or stop (paused / cancelled mid-flight).
+        const fresh = await ctx.runQuery(internal.broadcasts.getBroadcastInternal, { id: args.broadcastId });
+        if (!fresh) return;
+        if ((fresh.sentCount ?? 0) >= total) {
+            await ctx.runMutation(internal.broadcasts.markCompleted, { id: args.broadcastId });
+        } else if (fresh.status === "SENDING") {
+            await ctx.scheduler.runAfter(0, internal.broadcasts.sendBroadcast, {
+                broadcastId: args.broadcastId,
+                organizationId: args.organizationId,
+            });
+        }
+        // else PAUSED / CANCELLED → stop; sentCount cursor preserved for resume.
     }
+});
+
+/** Lock the audience size at send-start (cursor 0) for the chunked sender. */
+export const setAudienceTotal = internalMutation({
+    args: { id: v.id("broadcasts"), total: v.number() },
+    handler: async (ctx, args) => {
+        await ctx.db.patch(args.id, { audienceTotal: args.total, updatedAt: Date.now() });
+    },
+});
+
+/**
+ * Pause an in-flight send. The currently-running chunk finishes; the next
+ * scheduled chunk sees PAUSED and stops, preserving the sentCount cursor.
+ */
+export const pauseBroadcast = mutation({
+    args: { id: v.id("broadcasts") },
+    handler: async (ctx, args) => {
+        const broadcast = await ctx.db.get(args.id);
+        if (!broadcast) throw new Error("Broadcast not found");
+        await requirePermission(ctx, broadcast.organizationId, "broadcasts:send");
+        if (broadcast.status !== "SENDING") {
+            throw new Error("Seule une campagne en cours d'envoi peut être mise en pause");
+        }
+        await ctx.db.patch(args.id, { status: "PAUSED", updatedAt: Date.now() });
+        return { ok: true };
+    },
+});
+
+/** Resume a paused send — continues from the sentCount cursor. */
+export const resumeBroadcast = mutation({
+    args: { id: v.id("broadcasts") },
+    handler: async (ctx, args) => {
+        const broadcast = await ctx.db.get(args.id);
+        if (!broadcast) throw new Error("Broadcast not found");
+        await requirePermission(ctx, broadcast.organizationId, "broadcasts:send");
+        if (broadcast.status !== "PAUSED") {
+            throw new Error("Seule une campagne en pause peut être reprise");
+        }
+        await ctx.db.patch(args.id, { status: "SENDING", updatedAt: Date.now() });
+        await ctx.scheduler.runAfter(0, internal.broadcasts.sendBroadcast, {
+            broadcastId: args.id,
+            organizationId: broadcast.organizationId,
+        });
+        return { ok: true };
+    },
 });
 
 export const markFailed = internalMutation({
@@ -685,6 +864,44 @@ export const duplicate = mutation({
 // ===================================
 // AUDIENCE ESTIMATION
 // ===================================
+
+/**
+ * Audience options for the campaign wizard: the "Tous les contacts" (ALL) bucket
+ * plus one bucket per tag, each with its eligible-contact count. One contacts
+ * fetch, reused — feeds the wizard's audience step (mapped to audienceConfig).
+ */
+export const audienceOptions = query({
+    args: {},
+    handler: async (ctx) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return { all: 0, tags: [] };
+
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+        if (!session?.currentOrganizationId) return { all: 0, tags: [] };
+        const organizationId = session.currentOrganizationId;
+
+        const contacts = await ctx.db
+            .query("contacts")
+            .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+            .collect();
+        const tags = await ctx.db
+            .query("tags")
+            .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+            .collect();
+
+        return {
+            all: contacts.length,
+            tags: tags.map((t) => ({
+                id: t._id,
+                name: t.name,
+                count: contacts.filter((c) => c.tags && c.tags.includes(t._id)).length,
+            })),
+        };
+    },
+});
 
 export const estimateAudience = query({
     args: {

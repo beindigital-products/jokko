@@ -3,6 +3,7 @@ import { api } from "@/convex/_generated/api";
 import { useState, useMemo } from "react";
 import { useCurrentOrg } from "./use-current-org";
 import { Id } from "@/convex/_generated/dataModel";
+import { toast } from "sonner";
 
 export type ConversationFilter = 'all' | 'unread' | 'unassigned' | 'archived' | 'mine';
 
@@ -42,7 +43,7 @@ export function useConversations() {
     const conversationsData = useQuery(api.conversations.list,
         currentOrg ? {
             organizationId: currentOrg._id as Id<"organizations">,
-            filter: filter as any, // Cast to match backend union if needed or ensure backend supports all
+            filter,
             search: search || undefined
         } : "skip"
     );
@@ -50,7 +51,7 @@ export function useConversations() {
     const conversations: ConversationSummary[] = useMemo(() => {
         if (!conversationsData) return [];
 
-        return conversationsData.map((c: any) => ({
+        return conversationsData.map((c) => ({
             id: c._id,
             contact: {
                 id: c.contact?._id || "unknown",
@@ -59,14 +60,14 @@ export function useConversations() {
                 avatarUrl: c.contact?.profilePicture || null,
                 isBlocked: c.contact?.isBlocked,
             },
-            lastMessageText: c.preview,
+            lastMessageText: c.preview ?? null,
             lastMessageAt: c.lastMessageAt,
             lastMessageType: "TEXT",
             unreadCount: c.unreadCount,
             assignedTo: c.assignedTo ? {
                 id: c.assignedTo._id,
-                name: c.assignedTo.user.name,
-                email: c.assignedTo.user.email,
+                name: c.assignedTo.user.name ?? null,
+                email: c.assignedTo.user.email ?? "",
                 avatar: c.assignedTo.user.image || null
             } : undefined,
             tags: c.tags || [],
@@ -81,7 +82,7 @@ export function useConversations() {
 
     const unreadCount = useMemo(() => {
         if (!conversationsData) return 0;
-        return conversationsData.reduce((acc: number, c: any) => acc + (c.unreadCount || 0), 0);
+        return conversationsData.reduce((acc, c) => acc + (c.unreadCount || 0), 0);
     }, [conversationsData]);
 
     const resolveMutation = useMutation(api.conversations.resolve);
@@ -123,15 +124,30 @@ export function useConversations() {
     };
 
     const assignToMe = async (id: string) => {
-        await assignToMeMutation({ id: id as Id<"conversations"> });
+        try {
+            await assignToMeMutation({ id: id as Id<"conversations"> });
+        } catch (error) {
+            console.error("assignToMe failed:", error);
+            toast.error(error instanceof Error ? error.message : "Impossible de s'auto-assigner");
+        }
     };
 
     const togglePin = async (id: string) => {
-        await togglePinMutation({ id: id as Id<"conversations"> });
+        try {
+            await togglePinMutation({ id: id as Id<"conversations"> });
+        } catch (error) {
+            console.error("togglePin failed:", error);
+            toast.error(error instanceof Error ? error.message : "Impossible d'épingler la conversation");
+        }
     };
 
     const blockContact = async (contactId: string) => {
-        await toggleBlockMutation({ id: contactId as Id<"contacts"> });
+        try {
+            await toggleBlockMutation({ id: contactId as Id<"contacts"> });
+        } catch (error) {
+            console.error("blockContact failed:", error);
+            toast.error(error instanceof Error ? error.message : "Impossible de bloquer/débloquer le contact");
+        }
     }
 
     const markAsRead = async (id: string) => {

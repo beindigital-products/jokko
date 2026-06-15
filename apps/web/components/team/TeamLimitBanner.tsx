@@ -30,7 +30,6 @@ export function TeamLimitBanner({
     if (percentage < 80) return null
 
     const isAtLimit = percentage >= 100
-    const isNearLimit = percentage >= 80 && percentage < 100
 
     return (
         <div

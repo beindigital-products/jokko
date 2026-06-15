@@ -39,6 +39,7 @@ import {
     EmptyDescription,
     EmptyMedia
 } from '@/components/ui/empty';
+import { EmptyState } from '@/components/dashboard/primitives/EmptyState';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -545,6 +546,26 @@ export const BroadcastList: React.FC = () => {
                                         <TableCell colSpan={8} className="h-48">
                                             {(() => {
                                                 const emptyState = getEmptyState();
+                                                if (emptyState.showCta) {
+                                                    return (
+                                                        <EmptyState
+                                                            dense
+                                                            illustration="megaphone"
+                                                            title="Pas encore de campagne."
+                                                            body="Une campagne combine un modèle, une audience, et une plage horaire. Le statut Meta est suivi en temps réel."
+                                                            primary={
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() => router.push('/dashboard/campagnes/new')}
+                                                                    className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
+                                                                >
+                                                                    <Plus className="h-3.5 w-3.5" />
+                                                                    Nouvelle Campagne
+                                                                </Button>
+                                                            }
+                                                        />
+                                                    );
+                                                }
                                                 return (
                                                     <Empty>
                                                         <EmptyMedia variant="icon">
@@ -558,18 +579,6 @@ export const BroadcastList: React.FC = () => {
                                                                 {emptyState.description}
                                                             </EmptyDescription>
                                                         </EmptyHeader>
-                                                        {emptyState.showCta && (
-                                                            <div className="mt-4">
-                                                                <Button
-                                                                    size="sm"
-                                                                    onClick={() => router.push('/dashboard/campagnes/new')}
-                                                                    className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
-                                                                >
-                                                                    <Plus className="h-3.5 w-3.5" />
-                                                                    Nouvelle Campagne
-                                                                </Button>
-                                                            </div>
-                                                        )}
                                                     </Empty>
                                                 );
                                             })()}

@@ -27,13 +27,13 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import { ContactList } from './ContactList'
-import { ConversationView } from './ConversationView'
-import { ContactInfo } from './ContactInfo'
+import { InboxList } from './v3/InboxList'
+import { InboxThread } from './v3/InboxThread'
+import { InboxCopilot } from './v3/InboxCopilot'
 import { EmptyState } from './EmptyState'
 import { useRealtime } from '@/hooks/useRealtime'
 import { useConversations } from '@/hooks/useConversations'
@@ -65,12 +65,7 @@ export function ConversationLayout({
     const [showList, setShowList] = useState(true)
     const [showInfo, setShowInfo] = useState(false)
 
-    // Sur mobile, gerer la vue
-    useEffect(() => {
-        if (isMobile && conversationId) {
-            setShowList(false)
-        }
-    }, [isMobile, conversationId])
+    const shouldShowList = isMobile && conversationId ? false : showList
 
     // Subscribe aux events temps reel
     useRealtime(organizationId)
@@ -181,21 +176,23 @@ export function ConversationLayout({
     }
 
     return (
-        <div className="flex h-full overflow-hidden bg-gray-50/30">
+        <div className="flex h-full overflow-hidden bg-[var(--paper-white)]">
             {/* Contact List */}
             <AnimatePresence mode="wait">
-                {(!isMobile || showList) && (
+                {(!isMobile || shouldShowList) && (
                     <motion.aside
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.2 }}
                         className={cn(
-                            'flex flex-col border-r border-gray-100 bg-white relative z-0 overflow-hidden',
-                            isMobile ? 'w-full' : 'w-80 md:w-96 lg:w-[420px] shrink-0'
+                            'flex flex-col bg-[var(--paper-white)] relative z-0 overflow-hidden',
+                            // Match ConversationList's own width (340px) so its right
+                            // border sits flush against the thread — no empty gap.
+                            isMobile ? 'w-full' : 'w-80 md:w-96 lg:w-[340px] shrink-0'
                         )}
                     >
-                        <ContactList
+                        <InboxList
                             selectedId={conversationId}
                             onSelect={handleSelectConversation}
                         />
@@ -205,7 +202,7 @@ export function ConversationLayout({
 
             {/* Conversation View */}
             <AnimatePresence mode="wait">
-                {(!isMobile || !showList) && (
+                {(!isMobile || !shouldShowList) && (
                     <motion.main
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -217,7 +214,8 @@ export function ConversationLayout({
                         )}
                     >
                         {conversationId ? (
-                            <ConversationView
+                            <InboxThread
+                                key={conversationId}
                                 conversationId={conversationId}
                                 onBack={isMobile ? handleBack : undefined}
                                 onToggleInfo={toggleInfo}
@@ -238,9 +236,9 @@ export function ConversationLayout({
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: 20 }}
                         transition={{ duration: 0.2 }}
-                        className="w-80 shrink-0 border-l border-gray-100 bg-white overflow-hidden h-full flex flex-col"
+                        className="w-80 shrink-0 bg-[var(--paper-white)] overflow-hidden h-full flex flex-col"
                     >
-                        <ContactInfo
+                        <InboxCopilot
                             conversationId={conversationId}
                             onClose={() => setShowInfo(false)}
                         />

@@ -20,6 +20,7 @@ import type {
     UnifiedContact,
     UnifiedDeal,
 } from "../../core/types";
+import { mappedIdentity, type FieldMapping } from "../../core/mapping";
 
 const PIPEDRIVE_AUTH = "https://oauth.pipedrive.com/oauth/authorize";
 const PIPEDRIVE_TOKEN = "https://oauth.pipedrive.com/oauth/token";
@@ -165,17 +166,23 @@ interface PipedrivePerson {
     update_time?: string;
 }
 
-function toUnifiedContact(raw: PipedrivePerson): UnifiedContact {
+function toUnifiedContact(raw: PipedrivePerson, mapping?: FieldMapping): UnifiedContact {
     const ownerId = typeof raw.owner_id === "object" ? raw.owner_id?.id : raw.owner_id;
-    return {
-        externalId: String(raw.id),
+    const id = mappedIdentity(raw, mapping, {
         firstName: raw.first_name,
         lastName: raw.last_name,
         emails: (raw.email ?? []).map((e) => e.value).filter(Boolean),
-        phones: (raw.phone ?? []).map((p) => ({
-            raw: p.value,
-            type: p.label,
-        })).filter((p) => p.raw),
+        phones: (raw.phone ?? [])
+            .map((p) => ({ raw: p.value, type: p.label }))
+            .filter((p) => p.raw),
+    });
+    return {
+        externalId: String(raw.id),
+        firstName: id.firstName,
+        lastName: id.lastName,
+        emails: id.emails,
+        phones: id.phones,
+        externalTags: id.tags,
         company: raw.org_name ?? undefined,
         externalOwnerId: ownerId ? String(ownerId) : undefined,
         externalUpdatedAtMs: raw.update_time ? Date.parse(raw.update_time) : undefined,
@@ -208,7 +215,7 @@ export async function pullContactsPage(p: {
         };
     };
 
-    const items = (json.data ?? []).map(toUnifiedContact);
+    const items = (json.data ?? []).map((r) => toUnifiedContact(r, p.ctx.fieldMapping));
     const nextStart = json.additional_data?.pagination?.next_start;
     const hasMore = Boolean(json.additional_data?.pagination?.more_items_in_collection);
     return {

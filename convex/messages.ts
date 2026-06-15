@@ -2,6 +2,8 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { requireMembership, requirePermission } from "./lib/auth";
+import { createNotification } from "./notifications";
+import { formatConversationPreview } from "./lib/messagePreview";
 import { paginationOptsValidator } from "convex/server";
 
 // ============================================
@@ -45,15 +47,123 @@ export const list = query({
                     if (url) mediaUrl = url;
                 }
 
+                const reactions = await ctx.db
+                    .query("messageReactions")
+                    .withIndex("by_message", (q) => q.eq("messageId", msg._id))
+                    .collect();
+
+                // Internal notes show their author to the team — resolve the name.
+                let senderName: string | undefined;
+                if (msg.isInternal && msg.senderId) {
+                    const sender = await ctx.db.get(msg.senderId);
+                    senderName = sender?.name || sender?.email || undefined;
+                }
+
                 return {
                     ...msg,
                     id: msg._id,
                     timestamp: msg._creationTime, // Use creation time as timestamp
                     mediaUrl,
-                    // Ensure other fields match UI type
+                    senderName,
+                    reactions: reactions.map((r) => ({
+                        userId: r.userId,
+                        emoji: r.emoji,
+                        createdAt: r.createdAt,
+                    })),
                 };
             }))
         };
+    },
+});
+
+// ============================================
+// Reactions (V1.5+)
+// ============================================
+
+/**
+ * Toggle a reaction on a message. Same emoji from the same user removes it.
+ * A different emoji replaces it. No WhatsApp Cloud sync yet — reactions
+ * are an internal team annotation on the conversation timeline.
+ */
+export const react = mutation({
+    args: {
+        messageId: v.id("messages"),
+        emoji: v.string(),
+    },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+
+        const { userId } = await requirePermission(
+            ctx,
+            conversation.organizationId,
+            "messages:send",
+        );
+
+        if (!args.emoji || args.emoji.trim().length === 0) {
+            throw new Error("Emoji is required");
+        }
+        if (args.emoji.length > 8) {
+            throw new Error("Reaction emoji is too long");
+        }
+
+        const existing = await ctx.db
+            .query("messageReactions")
+            .withIndex("by_message_user", (q) =>
+                q.eq("messageId", args.messageId).eq("userId", userId),
+            )
+            .first();
+
+        if (existing) {
+            if (existing.emoji === args.emoji) {
+                await ctx.db.delete(existing._id);
+                return { action: "removed" as const };
+            }
+            await ctx.db.patch(existing._id, { emoji: args.emoji });
+            return { action: "replaced" as const };
+        }
+
+        await ctx.db.insert("messageReactions", {
+            organizationId: conversation.organizationId,
+            messageId: args.messageId,
+            userId,
+            emoji: args.emoji,
+            createdAt: Date.now(),
+        });
+        return { action: "added" as const };
+    },
+});
+
+/**
+ * Explicit unreact — useful if UI wants a discrete "remove" affordance
+ * beyond the toggle behaviour of react().
+ */
+export const unreact = mutation({
+    args: { messageId: v.id("messages") },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+
+        const { userId } = await requirePermission(
+            ctx,
+            conversation.organizationId,
+            "messages:send",
+        );
+
+        const existing = await ctx.db
+            .query("messageReactions")
+            .withIndex("by_message_user", (q) =>
+                q.eq("messageId", args.messageId).eq("userId", userId),
+            )
+            .first();
+
+        if (existing) await ctx.db.delete(existing._id);
     },
 });
 
@@ -133,9 +243,19 @@ export const send = mutation({
         await ctx.db.patch(args.conversationId, {
             lastMessageAt: Date.now(),
             lastMessageDirection: "OUTBOUND",
-            preview: args.content || (args.type === "TEXT" ? args.content : `[${args.type}]`),
+            preview: formatConversationPreview({ type: args.type, content: args.content }),
             updatedAt: Date.now(),
         });
+
+        const org = await ctx.db.get(conversation.organizationId);
+        if (org?.demo?.outboundMode === "local_only") {
+            await ctx.db.patch(messageId, {
+                status: "SENT",
+                externalId: `demo:local:${messageId}`,
+                updatedAt: Date.now(),
+            });
+            return messageId;
+        }
 
         // Trigger WhatsApp Send
         let replyToWhatsAppId: string | undefined;
@@ -164,11 +284,10 @@ export const send = mutation({
                 let mediaUrl: string | null | undefined = args.mediaUrl;
                 if (!mediaUrl && args.mediaStorageId) {
                     mediaUrl = await ctx.storage.getUrl(args.mediaStorageId);
-                    console.log(`[DEBUG] Resolved media URL for storageId ${args.mediaStorageId}: ${mediaUrl}`);
                 }
 
                 if (mediaUrl) {
-                    console.log(`[DEBUG] Scheduling WhatsApp message for type ${args.type} with mimeType ${args.mediaType}`);
+                    // PII: do not log the resolved media URL / payload.
                     await ctx.scheduler.runAfter(0, internal.whatsapp_actions.sendMessage, {
                         messageId,
                         organizationId: conversation.organizationId,
@@ -180,6 +299,117 @@ export const send = mutation({
                         mimeType: args.mediaType,
                         fileName: args.fileName,
                         replyToWhatsAppId
+                    });
+                }
+            }
+        }
+
+        return messageId;
+    },
+});
+
+/**
+ * addInternalNote — creates a team-only internal note on a conversation.
+ *
+ * Unlike `send`, this NEVER schedules a WhatsApp delivery and never
+ * overwrites the customer-facing conversation preview/lastMessage — it is
+ * a private note visible only to the team (Front/Intercom pattern). It
+ * carries optional @mentions of teammates.
+ *
+ * Notification in-app (MENTION) + email mention envoyés via
+ * internal.mention_emails.send (scheduler.runAfter) dans la boucle ci-dessous.
+ */
+export const addInternalNote = mutation({
+    args: {
+        conversationId: v.id("conversations"),
+        content: v.string(),
+        mentions: v.optional(
+            v.array(
+                v.object({
+                    userId: v.id("users"),
+                    name: v.string(),
+                })
+            )
+        ),
+    },
+    handler: async (ctx, args) => {
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+
+        // Any team member can leave an internal note.
+        const { userId } = await requireMembership(ctx, conversation.organizationId);
+
+        const content = args.content.trim();
+        if (!content) throw new Error("Note vide");
+
+        const messageId = await ctx.db.insert("messages", {
+            organizationId: conversation.organizationId,
+            conversationId: args.conversationId,
+            senderId: userId,
+            // No contactId — a note is not addressed to the contact.
+            type: "TEXT",
+            content,
+            // Internal notes never leave Jokko.
+            direction: "OUTBOUND",
+            status: "SENT",
+            isInternal: true,
+            mentions: args.mentions,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+        });
+
+        // NOTE: we intentionally do NOT patch conversation.preview /
+        // lastMessageDirection here — an internal note must not masquerade
+        // as the last customer message in the inbox list.
+
+        // Notifie chaque coéquipier mentionné (hors auteur) : notification in-app
+        // MENTION + email via internal.mention_emails.send (scheduler.runAfter).
+        if (args.mentions && args.mentions.length > 0) {
+            const author = await ctx.db.get(userId);
+            const authorName = author?.name || author?.email || "Un coéquipier";
+            const contact = conversation.contactId
+                ? await ctx.db.get(conversation.contactId)
+                : null;
+            const where = contact?.name || contact?.phone || "une conversation";
+            const seen = new Set<string>();
+            for (const m of args.mentions) {
+                if (m.userId === userId) continue; // don't notify yourself
+                if (seen.has(m.userId)) continue;
+                seen.add(m.userId);
+                // SECURITY: only notify users who are actually members of this
+                // org. The mentions array is client-supplied; without this a
+                // caller could push a MENTION (leaking the contact name + a
+                // 140-char note excerpt + deep link) to an arbitrary userId.
+                const mentionIsMember = await ctx.db
+                    .query("memberships")
+                    .withIndex("by_user_org", (q) =>
+                        q.eq("userId", m.userId).eq("organizationId", conversation.organizationId),
+                    )
+                    .first();
+                if (!mentionIsMember) continue;
+                await createNotification(ctx, {
+                    organizationId: conversation.organizationId,
+                    userId: m.userId,
+                    type: "MENTION",
+                    title: `${authorName} vous a mentionné`,
+                    message: `Sur ${where} : ${content.slice(0, 140)}`,
+                    link: `/dashboard/conversations/${args.conversationId}`,
+                    metadata: {
+                        conversationId: String(args.conversationId),
+                        messageId: String(messageId),
+                    },
+                });
+                // Proactive email (best-effort, scheduled) to the mentioned
+                // member. A failed send is logged inside the action, never blocks
+                // the note — the in-app MENTION notification already landed.
+                const mentionedUser = await ctx.db.get(m.userId);
+                if (mentionedUser?.email) {
+                    await ctx.scheduler.runAfter(0, internal.mention_emails.send, {
+                        to: mentionedUser.email,
+                        authorName,
+                        where,
+                        excerpt: content.slice(0, 140),
+                        conversationId: String(args.conversationId),
                     });
                 }
             }
@@ -204,6 +434,16 @@ export const retry = mutation({
 
         // Reset status
         await ctx.db.patch(args.messageId, { status: "PENDING", updatedAt: Date.now() });
+
+        const org = await ctx.db.get(conversation.organizationId);
+        if (org?.demo?.outboundMode === "local_only") {
+            await ctx.db.patch(args.messageId, {
+                status: "SENT",
+                externalId: message.externalId || `demo:local:${args.messageId}`,
+                updatedAt: Date.now(),
+            });
+            return;
+        }
 
         // Trigger WhatsApp
         const contact = await ctx.db.get(conversation.contactId!);
@@ -288,4 +528,46 @@ export const getConversationMedia = query({
 
         return enriched;
     }
+});
+
+// Supprimer un message (menu d'actions / message échoué).
+export const remove = mutation({
+    args: { messageId: v.id("messages") },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+        await requirePermission(ctx, conversation.organizationId, "messages:send");
+
+        await ctx.db.delete(args.messageId);
+
+        // If we just removed the conversation's last message, refresh its preview.
+        if (conversation.lastMessageAt === message.createdAt) {
+            const last = await ctx.db
+                .query("messages")
+                .withIndex("by_conversation", (q) => q.eq("conversationId", message.conversationId))
+                .order("desc")
+                .first();
+            await ctx.db.patch(conversation._id, {
+                preview: last ? formatConversationPreview({ type: last.type, content: last.content }) : "",
+                lastMessageAt: last?.createdAt ?? conversation.createdAt,
+                lastMessageDirection: last?.direction ?? conversation.lastMessageDirection,
+                updatedAt: Date.now(),
+            });
+        }
+    },
+});
+
+// "Marquer" un message (étoile).
+export const toggleStar = mutation({
+    args: { messageId: v.id("messages") },
+    handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
+        if (!message) throw new Error("Message not found");
+        const conversation = await ctx.db.get(message.conversationId);
+        if (!conversation) throw new Error("Conversation not found");
+        await requirePermission(ctx, conversation.organizationId, "messages:send");
+        await ctx.db.patch(args.messageId, { isStarred: !message.isStarred, updatedAt: Date.now() });
+    },
 });

@@ -10,14 +10,6 @@
 
 import { ConversationsLayoutClient } from './_components/conversations-layout-client'
 
-export default function ConversationsLayout({
-    children,
-}: {
-    children: React.ReactNode
-}) {
-    return (
-        <ConversationsLayoutClient>
-            {children}
-        </ConversationsLayoutClient>
-    )
+export default function ConversationsLayout() {
+    return <ConversationsLayoutClient />
 }

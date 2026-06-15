@@ -2,7 +2,7 @@ import { usePresence } from './use-presence';
 import { useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useCurrentOrg } from './use-current-org';
 
 // Use this for overall presence

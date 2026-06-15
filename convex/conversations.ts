@@ -1,12 +1,22 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 import { requireMembership, requirePermission } from "./lib/auth";
 import { canSeeAllConversations } from "./lib/permissions";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { enqueueConversationEvent } from "./crm/enqueue";
+import { formatConversationPreview } from "./lib/messagePreview";
 
 // ============================================
 // Queries
 // ============================================
+
+// Safety ceiling for the inbox list scan. The query reads the most-recent
+// conversations (ordered by lastMessageAt) and enriches each (contact +
+// assignee), so an unbounded `.collect()` would hit Convex's read limit on a
+// very large tenant. 1000 is well above any realistic active inbox, so it's a
+// no-op for normal use and a guard against a pathological scan. Proper
+// server-side pagination + a search index is the follow-up for huge tenants.
+const CONVERSATION_LIST_LIMIT = 1000;
 
 export const list = query({
     args: {
@@ -16,6 +26,7 @@ export const list = query({
             v.literal("unread"),
             v.literal("unassigned"),
             v.literal("archived"),
+            v.literal("resolved"),
             v.literal("mine"),
             v.literal("star")
         ),
@@ -27,17 +38,17 @@ export const list = query({
         let conversations;
 
         // Apply basic status filtering
-        if (args.filter === "archived") {
+        if (args.filter === "archived" || args.filter === "resolved") {
+            // Both are "closed" states stored on the conversation; surface each on
+            // its own tab so a resolved/archived thread stays reachable (to reopen).
+            const status = args.filter === "archived" ? "ARCHIVED" : "RESOLVED";
             conversations = await ctx.db
                 .query("conversations")
                 .withIndex("by_org_status", (q) =>
-                    q.eq("organizationId", args.organizationId).eq("status", "ARCHIVED")
+                    q.eq("organizationId", args.organizationId).eq("status", status)
                 )
-                .order("desc") // Most recent first (based on status change?) or created? Schema has by_org_last_message too.
-                // Schema: .index("by_org_last_message", ["organizationId", "lastMessageAt"])
-                // Use by_org_last_message for optimal sorting, then filter in memory?
-                // Or use filtering.
-                .collect();
+                .order("desc") // Most recent first
+                .take(CONVERSATION_LIST_LIMIT);
         } else {
             // Active conversations (OPEN, SNOOZED, etc.)
             // We probably want to exclude ARCHIVED unless explicitly requested.
@@ -48,7 +59,7 @@ export const list = query({
                     q.eq("organizationId", args.organizationId)
                 )
                 .order("desc")
-                .collect();
+                .take(CONVERSATION_LIST_LIMIT);
 
             // Filter out ARCHIVED/RESOLVED since we are not in 'archived' mode
             conversations = conversations.filter(c => c.status !== "ARCHIVED" && c.status !== "RESOLVED");
@@ -56,18 +67,8 @@ export const list = query({
 
         // Advanced filtering in memory
         // (Convex doesn't support complex multi-field filtering efficiently yet without specific indexes)
-
-        // 1. Search (if provided)
-        if (args.search) {
-            const searchLower = args.search.toLowerCase();
-            // We need contact info to search by name/phone
-            // Optimization: fetch contacts for filtered conversations concurrently
-            // For now, simpler implementation:
-
-            // Fetch contacts for all candidates to filter by name? Expensive.
-            // Better: Search contacts first, then find conversations?
-            // Let's rely on basic search for now.
-        }
+        // NB : search is applied AFTER enrichment below, since it matches on the
+        // contact name/phone which we only resolve during enrichment.
 
         // 2. Filter tabs
         let filtered = conversations;
@@ -119,10 +120,31 @@ export const list = query({
             })
         );
 
-        // Sort by lastMessageAt desc
-        enriched.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+        // Search — match on contact name, phone (raw + digits), tags, preview.
+        let result = enriched;
+        if (args.search) {
+            const q = args.search.toLowerCase().trim();
+            const qDigits = q.replace(/\D/g, "");
+            result = result.filter((c) => {
+                const name = (c.contact?.name ?? "").toLowerCase();
+                const phone = (c.contact?.phoneNumber ?? "").toLowerCase();
+                const phoneDigits = phone.replace(/\D/g, "");
+                const tags = (c.tags ?? []).join(" ").toLowerCase();
+                const preview = (c.preview ?? "").toLowerCase();
+                return (
+                    name.includes(q) ||
+                    phone.includes(q) ||
+                    (qDigits.length > 0 && phoneDigits.includes(qDigits)) ||
+                    tags.includes(q) ||
+                    preview.includes(q)
+                );
+            });
+        }
 
-        return enriched;
+        // Sort by lastMessageAt desc
+        result.sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+
+        return result;
     },
 });
 
@@ -144,9 +166,12 @@ export const getById = query({
 
         const contact = conversation.contactId ? await ctx.db.get(conversation.contactId) : null;
         const assignee = conversation.assignedTo ? await ctx.db.get(conversation.assignedTo) : null;
+        // Which WhatsApp number this conversation is on (multi-number orgs).
+        const channel = conversation.whatsappChannelId ? await ctx.db.get(conversation.whatsappChannelId) : null;
 
         return {
             ...conversation,
+            channelLabel: channel ? channel.label || channel.displayPhoneNumber || undefined : undefined,
             contact: contact ? {
                 _id: contact._id,
                 name: contact.name,
@@ -237,6 +262,18 @@ export const resolve = mutation({
             status: "RESOLVED",
             updatedAt: Date.now()
         });
+
+        // Push vers les CRM connectés en mode "out"/"two" (no-op si aucune
+        // connexion active poussante — la garde vit dans enqueueConversationEvent).
+        if (conversation.contactId) {
+            await enqueueConversationEvent(ctx, {
+                organizationId: conversation.organizationId,
+                eventType: "conversation_resolved",
+                contactId: conversation.contactId,
+                conversationId: args.id,
+                occurredAtMs: Date.now(),
+            });
+        }
     },
 });
 
@@ -347,6 +384,18 @@ export const assignToMe = mutation({
         await ctx.db.patch(membership._id, {
             activeConversations: (membership.activeConversations || 0) + 1,
         });
+
+        // Push "conversation_assigned" vers les CRM poussants (no-op sinon).
+        if (conversation.contactId) {
+            await enqueueConversationEvent(ctx, {
+                organizationId: conversation.organizationId,
+                eventType: "conversation_assigned",
+                contactId: conversation.contactId,
+                conversationId: args.id,
+                occurredAtMs: Date.now(),
+                metadata: { assignedTo: userId },
+            });
+        }
     },
 });
 
@@ -521,6 +570,47 @@ export const getOrCreate = mutation({
             updatedAt: Date.now(),
         });
 
+        // Nouvelle conversation → push "conversation_opened" vers les CRM
+        // connectés en mode poussant (no-op sinon, garde dans enqueue).
+        await enqueueConversationEvent(ctx, {
+            organizationId: contact.organizationId,
+            eventType: "conversation_opened",
+            contactId: args.contactId,
+            conversationId,
+            occurredAtMs: Date.now(),
+        });
+
         return conversationId;
+    },
+});
+
+/**
+ * Maintenance: re-derive every conversation's `preview` from its last message
+ * using the current `formatConversationPreview` rules. Useful after changing the
+ * preview format (e.g. audio → "Message vocal (m:ss)") so existing rows update
+ * without waiting for a new message. Internal-only; run via the dashboard/CLI.
+ */
+export const refreshPreviews = internalMutation({
+    args: { organizationId: v.id("organizations") },
+    handler: async (ctx, args) => {
+        const conversations = await ctx.db
+            .query("conversations")
+            .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))
+            .collect();
+        let updated = 0;
+        for (const conversation of conversations) {
+            const lastMessage = await ctx.db
+                .query("messages")
+                .withIndex("by_conversation", (q) => q.eq("conversationId", conversation._id))
+                .order("desc")
+                .first();
+            if (!lastMessage) continue;
+            const preview = formatConversationPreview({ type: lastMessage.type, content: lastMessage.content });
+            if (preview !== conversation.preview) {
+                await ctx.db.patch(conversation._id, { preview });
+                updated += 1;
+            }
+        }
+        return { updated, total: conversations.length };
     },
 });

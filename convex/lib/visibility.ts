@@ -11,11 +11,6 @@ import { Id } from '../_generated/dataModel'
  *   → Voient TOUTES les conversations de l'organisation
  *   → Peuvent assigner/réassigner n'importe quelle conversation
  *
- * MANAGER:
- *   → Voient les conversations de LEURS départements
- *   → Voient les conversations non assignées (file d'attente)
- *   → Peuvent assigner aux agents de leurs départements
- *
  * AGENT:
  *   → Voient UNIQUEMENT les conversations qui leur sont assignées
  *   → Voient les conversations en file d'attente de leurs départements (si autorisé)
@@ -27,7 +22,7 @@ export type VisibilityLevel = 'ALL' | 'DEPARTMENT' | 'ASSIGNED_ONLY' | 'NONE'
 export interface VisibilityContext {
     memberId: Id<'users'> // Adapted to 'users'
     organizationId: Id<'organizations'>
-    role: 'OWNER' | 'ADMIN' | 'MANAGER' | 'AGENT'
+    role: 'OWNER' | 'ADMIN' | 'AGENT'
     agentId?: Id<'agents'>
     departmentIds?: string[]
 }
@@ -37,8 +32,6 @@ export function getVisibilityLevel(role: string): VisibilityLevel {
         case 'OWNER':
         case 'ADMIN':
             return 'ALL'
-        case 'MANAGER':
-            return 'DEPARTMENT'
         case 'AGENT':
             return 'ASSIGNED_ONLY'
         default:

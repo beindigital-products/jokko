@@ -2,13 +2,14 @@
 
 import { useQuery, useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Loader2, Bell, Check, Trash2, Mail } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { EmptyState } from '@/components/dashboard/primitives/EmptyState';
 
 export default function NotificationsPage() {
     const router = useRouter();
@@ -62,15 +63,12 @@ export default function NotificationsPage() {
                             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
                         </div>
                     ) : notifications.length === 0 ? (
-                        <div className="text-center p-12 text-gray-500">
-                            <div className="flex justify-center mb-4">
-                                <div className="p-3 bg-gray-100 rounded-full">
-                                    <Bell className="h-6 w-6 text-gray-400" />
-                                </div>
-                            </div>
-                            <h3 className="text-lg font-medium text-gray-900">Aucune notification</h3>
-                            <p className="mt-1">Vous êtes à jour !</p>
-                        </div>
+                        <EmptyState
+                            illustration="bell"
+                            dense
+                            title="Boîte calme."
+                            body="On vous préviendra ici dès qu'on a quelque chose à dire — mention dans une conversation, assignation, modèle approuvé."
+                        />
                     ) : (
                         <div className="divide-y divide-gray-100">
                             {notifications.map((notification) => (

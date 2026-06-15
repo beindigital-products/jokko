@@ -7,15 +7,13 @@ interface SquigglyUnderlineProps {
     strokeWidth?: number
     duration?: number
     className?: string
-    width?: number
 }
 
 export const SquigglyUnderline = ({
     color = "#16a34a",
     strokeWidth = 1,
     duration = 0.8,
-    className = "",
-    width: _width = 37
+    className = ""
 }: SquigglyUnderlineProps) => (
     <motion.div className={`absolute -bottom-[6px] left-0 right-0 h-[10px] ${className}`}>
         <svg className="w-full h-full" viewBox="0 0 37 8" fill="none" preserveAspectRatio="none">

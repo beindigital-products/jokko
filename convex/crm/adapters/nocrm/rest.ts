@@ -20,6 +20,7 @@ import type {
     UnifiedContact,
     UnifiedDeal,
 } from "../../core/types";
+import { mappedIdentity, type FieldMapping } from "../../core/mapping";
 
 const NOCRM_API_ENV = "NOCRM_SUBDOMAIN";
 
@@ -115,16 +116,23 @@ interface NoCRMLead {
     updated_at?: string;
 }
 
-function toUnifiedContact(raw: NoCRMLead): UnifiedContact {
+function toUnifiedContact(raw: NoCRMLead, mapping?: FieldMapping): UnifiedContact {
     const phones: Array<{ raw: string; type?: string }> = [];
     if (raw.phone) phones.push({ raw: raw.phone, type: "primary" });
     if (raw.mobile) phones.push({ raw: raw.mobile, type: "mobile" });
-    return {
-        externalId: String(raw.id),
+    const id = mappedIdentity(raw, mapping, {
         firstName: raw.first_name,
         lastName: raw.last_name,
         emails: raw.email ? [raw.email] : [],
         phones,
+    });
+    return {
+        externalId: String(raw.id),
+        firstName: id.firstName,
+        lastName: id.lastName,
+        emails: id.emails,
+        phones: id.phones,
+        externalTags: id.tags,
         company: raw.company,
         externalOwnerId: raw.user_id ? String(raw.user_id) : undefined,
         externalUpdatedAtMs: raw.updated_at ? Date.parse(raw.updated_at) : undefined,
@@ -150,7 +158,7 @@ export async function pullContactsPage(p: {
         baseUrl,
         method: "GET",
     })) as NoCRMLead[];
-    const items = (json ?? []).map(toUnifiedContact);
+    const items = (json ?? []).map((r) => toUnifiedContact(r, p.ctx.fieldMapping));
     const hasMore = items.length === perPage;
     return {
         items,

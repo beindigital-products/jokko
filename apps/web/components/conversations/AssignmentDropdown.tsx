@@ -104,7 +104,7 @@ export function AssignmentDropdown({
                 ) : (
                     <UserPlus className="h-4 w-4" />
                 )}
-                <span className="hidden sm:inline">M'assigner</span>
+                <span className="hidden sm:inline">M&apos;assigner</span>
             </Button>
         )
     }
@@ -135,7 +135,7 @@ export function AssignmentDropdown({
                     {!isAssignedToMe && (
                         <DropdownMenuItem onClick={handleAssignToMe}>
                             <User className="mr-2 h-4 w-4" />
-                            M'assigner
+                            M&apos;assigner
                         </DropdownMenuItem>
                     )}
 

@@ -1,8 +1,10 @@
 import { action, internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { v } from "convex/values";
+import { generateRegistrationPin } from "./lib/registration";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { encrypt, decrypt } from "./lib/encryption";
+import { hasPermission } from "./lib/permissions";
 
 /**
  * Helper to get active organization ID for current user
@@ -31,6 +33,61 @@ export const getAuthUserIdQuery = internalQuery({
         const userId = await getAuthUserId(ctx);
         return userId;
     }
+});
+
+/**
+ * SECURITY: assert the current user is a member of `organizationId` with the
+ * `settings:whatsapp` permission (OWNER/ADMIN). Used by WhatsApp config actions
+ * that previously trusted a client-supplied org / channel id without any
+ * membership or role check (IDOR + missing role control).
+ */
+export const assertWhatsAppManager = internalQuery({
+    args: { organizationId: v.id("organizations") },
+    handler: async (ctx, args) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) throw new Error("Non authentifié");
+
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", args.organizationId),
+            )
+            .first();
+        if (!membership) throw new Error("Non membre de cette organisation");
+        if (!hasPermission(membership.role, "settings:whatsapp")) {
+            throw new Error("Permission refusée: settings:whatsapp");
+        }
+        return { userId, organizationId: args.organizationId };
+    },
+});
+
+/**
+ * SECURITY: resolve a channel's organizationId AND assert the current user has
+ * `settings:whatsapp` on that org. Used by channel-scoped actions
+ * (sendTestMessageByChannel, getChannelStatus) to close a cross-tenant IDOR —
+ * the channelId is client-supplied and could belong to any organization.
+ */
+export const assertChannelManager = internalQuery({
+    args: { channelId: v.id("whatsappChannels") },
+    handler: async (ctx, args) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) throw new Error("Non authentifié");
+
+        const channel = await ctx.db.get(args.channelId);
+        if (!channel) throw new Error("Canal introuvable");
+
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", channel.organizationId),
+            )
+            .first();
+        if (!membership) throw new Error("Non membre de cette organisation");
+        if (!hasPermission(membership.role, "settings:whatsapp")) {
+            throw new Error("Permission refusée: settings:whatsapp");
+        }
+        return { organizationId: channel.organizationId };
+    },
 });
 
 /**
@@ -97,6 +154,10 @@ export const getPhoneNumberStatus = action({
 export const getChannelStatus = action({
     args: { channelId: v.id("whatsappChannels") },
     handler: async (ctx, args): Promise<Record<string, string> | null> => {
+        // SECURITY: enforce org membership + role before reading channel status
+        // from Meta (was a cross-tenant IDOR in read).
+        await ctx.runQuery(internal.whatsapp.assertChannelManager, { channelId: args.channelId });
+
         const channel: any = await ctx.runQuery(internal.channels.getChannelWithWaba, { channelId: args.channelId });
 
         const rawToken: string = channel.waba?.accessTokenRef || channel.orgWhatsapp?.accessToken || "";
@@ -128,6 +189,10 @@ export const sendTestMessageByChannel = action({
         to: v.string(),
     },
     handler: async (ctx, args): Promise<{ success: boolean; messageId: string | undefined }> => {
+        // SECURITY: enforce org membership + role before sending a WhatsApp via
+        // this channel's credentials (was a cross-tenant IDOR send).
+        await ctx.runQuery(internal.whatsapp.assertChannelManager, { channelId: args.channelId });
+
         const channel: any = await ctx.runQuery(internal.channels.getChannelWithWaba, { channelId: args.channelId });
 
         const rawToken: string = channel.waba?.accessTokenRef || channel.orgWhatsapp?.accessToken || "";
@@ -293,6 +358,10 @@ export const finalizeWhatsAppRegistration = action({
             throw new Error("No active organization found");
         }
 
+        // SECURITY: writing WhatsApp config requires the settings:whatsapp role
+        // (OWNER/ADMIN) — an AGENT must not be able to (re)register a number.
+        await ctx.runQuery(internal.whatsapp.assertWhatsAppManager, { organizationId: orgId });
+
         // 1. Subscribe app to WABA webhooks (so incoming messages trigger our webhook)
         console.log(`[REGISTER] Subscribing app to WABA ${args.wabaId} webhooks...`);
         const subscribeRes = await fetch(
@@ -324,7 +393,7 @@ export const finalizeWhatsAppRegistration = action({
                 },
                 body: JSON.stringify({
                     messaging_product: "whatsapp",
-                    pin: crypto.randomUUID().replace(/-/g, "").substring(0, 6),
+                    pin: generateRegistrationPin(),
                 }),
             }
         );
@@ -360,6 +429,11 @@ export const subscribeWebhook = action({
             orgId = await ctx.runQuery(internal.whatsapp.getActiveOrgId);
         }
         if (!orgId) throw new Error("No active organization found");
+
+        // SECURITY: the organizationId is client-supplied — verify the caller is
+        // a manager (settings:whatsapp) of THAT org before subscribing its WABA
+        // webhook (was an unauthenticated/cross-tenant write).
+        await ctx.runQuery(internal.whatsapp.assertWhatsAppManager, { organizationId: orgId });
 
         const org: any = await ctx.runQuery(internal.utils.getOrganization, { id: orgId });
         if (!org?.whatsapp?.businessAccountId || !org?.whatsapp?.accessToken) {
@@ -580,6 +654,10 @@ export const addChannel = action({
         const userId: string | null = await ctx.runQuery(internal.whatsapp.getAuthUserIdQuery);
         if (!userId) throw new Error("Not authenticated");
 
+        // SECURITY: adding/connecting a channel writes WhatsApp credentials — gate
+        // it behind the settings:whatsapp role (OWNER/ADMIN), not just any member.
+        await ctx.runQuery(internal.whatsapp.assertWhatsAppManager, { organizationId: orgId as any });
+
         // 2. Exchange short-lived token for long-lived token (~60 days)
         let longLivedToken = args.accessToken;
         const appId = process.env.FACEBOOK_APP_ID;
@@ -638,7 +716,7 @@ export const addChannel = action({
                 },
                 body: JSON.stringify({
                     messaging_product: "whatsapp",
-                    pin: crypto.randomUUID().replace(/-/g, "").substring(0, 6),
+                    pin: generateRegistrationPin(),
                 }),
             }
         );

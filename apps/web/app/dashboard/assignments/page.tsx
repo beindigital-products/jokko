@@ -1,11 +1,17 @@
 import { Metadata } from 'next'
-import AssignmentsClient from './_components/assignments-client'
+import AssignmentsV3Client from './_components/AssignmentsV3Client'
 
 export const metadata: Metadata = {
-    title: 'Assignments | Jokko',
-    description: 'View and manage assignments',
+    title: 'Assignations | Jokko',
+    description: 'Routage automatique et file d’attribution des conversations',
 }
 
 export default function AssignmentsPage() {
-    return <AssignmentsClient />
+    // Full-bleed route: rendered straight into #main-content by the dashboard
+    // layout, so `h-full` fills the box exactly (banner-independent).
+    return (
+        <div className="h-full">
+            <AssignmentsV3Client />
+        </div>
+    )
 }

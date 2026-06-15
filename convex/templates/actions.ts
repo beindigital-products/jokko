@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { action } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { buildMetaTemplatePayload } from "../lib/templateBuilder";
+import { decrypt } from "../lib/encryption";
 import { api } from "../_generated/api";
 
 export const submitToMeta = action({
@@ -25,15 +26,15 @@ export const submitToMeta = action({
             organizationId: template.organizationId,
         });
 
-        const accessToken = creds.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+        const rawToken = creds.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
         const businessAccountId = creds.businessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 
-        if (!accessToken || !businessAccountId) {
+        if (!rawToken || !businessAccountId) {
             console.error("Missing WhatsApp credentials for org", template.organizationId);
             throw new Error("Configuration error: Missing WhatsApp credentials");
         }
-
-        console.log("Sending payload to Meta:", JSON.stringify(payload, null, 2));
+        // Tokens are encrypted at-rest; decrypt before use (plaintext env tokens pass through).
+        const accessToken = await decrypt(rawToken);
 
         // 4. Send to Meta Graph API
         const response = await fetch(`https://graph.facebook.com/v21.0/${businessAccountId}/message_templates`, {
@@ -52,10 +53,8 @@ export const submitToMeta = action({
             throw new Error(`Meta API Error: ${data.error?.message || 'Unknown error'}`);
         }
 
-        console.log("Meta API Success:", data);
-
         // Update status to PENDING and save Meta ID
-        await ctx.runMutation(api.templates.mutations.updateStatus, {
+        await ctx.runMutation(internal.templates.mutations.updateStatus, {
             id: args.templateId,
             status: "PENDING",
             metaTemplateId: data.id
@@ -68,8 +67,6 @@ export const submitToMeta = action({
 export const syncFromMeta = action({
     args: {},
     handler: async (ctx) => {
-        console.log("Starting Template Sync from Meta...");
-
         // 1. Resolve org from auth context
         const localTemplates = await ctx.runQuery(api.templates.queries.listForSync);
         if (localTemplates.length === 0) {
@@ -84,12 +81,13 @@ export const syncFromMeta = action({
             organizationId,
         });
 
-        const accessToken = creds.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
+        const rawToken = creds.accessToken || process.env.WHATSAPP_ACCESS_TOKEN;
         const businessAccountId = creds.businessAccountId || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
 
-        if (!accessToken || !businessAccountId) {
+        if (!rawToken || !businessAccountId) {
             throw new Error("Missing WhatsApp credentials");
         }
+        const accessToken = await decrypt(rawToken);
 
         // 3. Fetch all templates from Meta
         const response = await fetch(
@@ -108,8 +106,6 @@ export const syncFromMeta = action({
         const data = await response.json();
         const metaTemplates = data.data as Array<{ name: string, status: string, id: string }>;
 
-        console.log(`Fetched ${metaTemplates?.length || 0} templates from Meta`);
-
         if (!metaTemplates || metaTemplates.length === 0) {
             return { message: "No templates found on Meta", updated: 0 };
         }
@@ -123,8 +119,7 @@ export const syncFromMeta = action({
                 const newStatus = remote.status.toUpperCase();
 
                 if (local.status !== newStatus || local.metaTemplateId !== remote.id) {
-                    console.log(`Updating ${local.name}: ${local.status} -> ${newStatus}`);
-                    await ctx.runMutation(api.templates.mutations.updateStatus, {
+                    await ctx.runMutation(internal.templates.mutations.updateStatus, {
                         id: local._id,
                         status: newStatus,
                         metaTemplateId: remote.id

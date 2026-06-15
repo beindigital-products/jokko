@@ -1,12 +1,18 @@
 import { useState, useMemo } from 'react';
 import { useMutation, useAction } from 'convex/react';
+import { toast } from 'sonner';
 import { api } from '@/convex/_generated/api';
 import { TemplateType, TemplateTypeConfig } from '@/convex/lib/templateTypes';
 import { validateTemplate } from '@/convex/lib/templateValidation';
+import type {
+    ExistingTemplateData,
+    TemplateCarouselEditorCard,
+    TemplateFormData,
+} from '@/components/templates/types';
 
 interface UseTemplateBuilderProps {
     type: TemplateType;
-    initialData?: any;
+    initialData?: ExistingTemplateData | null;
     onSuccess: () => void;
     config: TemplateTypeConfig;
 }
@@ -20,10 +26,12 @@ export const useTemplateBuilder = ({
     const createMutation = useMutation(api.templates.mutations.create);
     const updateMutation = useMutation(api.templates.mutations.update);
     const submitToMetaAction = useAction(api.templates.actions.submitToMeta);
+    type CreateTemplateArgs = Parameters<typeof createMutation>[0];
+    type UpdateTemplateArgs = Parameters<typeof updateMutation>[0];
 
     const [loading, setLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<TemplateFormData>({
         name: initialData?.name || '',
         language: initialData?.language || 'fr',
         category: initialData?.category || 'MARKETING',
@@ -31,8 +39,15 @@ export const useTemplateBuilder = ({
         header: initialData?.header || (config.features.headerTypes.length > 0 ? { type: config.features.headerTypes[0] } : undefined),
         footer: initialData?.footer || '',
         buttons: initialData?.buttons || [],
-        sections: initialData?.listConfig?.sections || [], // For LIST
-        cards: initialData?.carouselCards?.map((c: any) => ({
+        sections: initialData?.listConfig?.sections?.map((section) => ({
+            title: section.title || '',
+            rows: section.rows.map((row) => ({
+                id: row.id,
+                title: row.title,
+                description: row.description || '',
+            })),
+        })) || [], // For LIST
+        cards: initialData?.carouselCards?.map((c) => ({
             title: c.title,
             headerUrl: c.header?.mediaUrl,
             body: c.body,
@@ -43,7 +58,7 @@ export const useTemplateBuilder = ({
     const validationResult = useMemo(() => {
         // Construct the hypothetical payload for validation
         // We reuse the logic from submit() roughly
-        const payload: any = {
+        const payload: CreateTemplateArgs = {
             name: formData.name,
             language: formData.language,
             category: formData.category,
@@ -55,13 +70,19 @@ export const useTemplateBuilder = ({
         };
         // Add specific fields if needed for validation (LIST...)
         if (type === 'LIST') {
-            payload.listConfig = { sections: formData.sections };
+            payload.listConfig = {
+                buttonText: formData.buttons?.[0]?.text || 'Menu',
+                sections: formData.sections,
+            };
         }
 
         return validateTemplate(payload);
     }, [formData, type]);
 
-    const handleChange = (field: string, value: any) => {
+    const handleChange = <Field extends keyof TemplateFormData>(
+        field: Field,
+        value: TemplateFormData[Field],
+    ) => {
         setFormData(prev => ({ ...prev, [field]: value }));
     };
 
@@ -69,7 +90,7 @@ export const useTemplateBuilder = ({
         setLoading(true);
         try {
             // Transform data to match Schema
-            const payload: any = {
+            const payload: CreateTemplateArgs = {
                 name: formData.name,
                 language: formData.language,
                 category: formData.category,
@@ -110,8 +131,7 @@ export const useTemplateBuilder = ({
                 delete payload.buttons;
                 delete payload.footer; // Usually carousel doesn't have a main footer? check limits.
 
-                payload.carouselCards = formData.cards.map((card: any) => ({
-                    title: card.title, // Add title if schema supports it or it passes through as any
+                payload.carouselCards = formData.cards.map((card: TemplateCarouselEditorCard) => ({
                     header: {
                         type: 'IMAGE', // Assuming image for now
                         mediaUrl: card.headerUrl
@@ -125,14 +145,15 @@ export const useTemplateBuilder = ({
                 await updateMutation({
                     id: initialData._id,
                     ...payload,
-                });
+                } satisfies UpdateTemplateArgs);
             } else {
                 await createMutation(payload);
             }
             onSuccess();
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert("Erreur lors de l'enregistrement: " + error.message);
+            const message = error instanceof Error ? error.message : String(error);
+            toast.error("Erreur lors de l'enregistrement: " + message);
         } finally {
             setLoading(false);
         }
@@ -143,22 +164,23 @@ export const useTemplateBuilder = ({
 
         // Final Validation Check before publish
         if (!validationResult.valid) {
-            alert("Veuillez corriger les erreurs avant d'envoyer à WhatsApp.");
+            toast.error("Veuillez corriger les erreurs avant d'envoyer à WhatsApp.");
             return;
         }
 
         if (validationResult.warnings.length > 0) {
-            const confirm = window.confirm("Ce template contient des avertissements. Voulez-vous vraiment l'envoyer ? Il risque d'être rejeté.");
-            if (!confirm) return;
+            toast.error("Ce template contient des avertissements. Veuillez les corriger avant l'envoi pour éviter un rejet.");
+            return;
         }
 
         setIsPublishing(true);
         try {
             await submitToMetaAction({ templateId: initialData._id });
-            alert("Template envoyé pour validation à WhatsApp !");
-        } catch (error: any) {
+            toast.success("Template envoyé pour validation à WhatsApp !");
+        } catch (error) {
             console.error(error);
-            alert("Erreur lors de l'envoi à WhatsApp: " + error.message);
+            const message = error instanceof Error ? error.message : String(error);
+            toast.error("Erreur lors de l'envoi à WhatsApp: " + message);
         } finally {
             setIsPublishing(false);
         }

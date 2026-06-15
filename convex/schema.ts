@@ -62,6 +62,10 @@ export default defineSchema({
         locale: v.optional(v.string()),
         timezone: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
+        // RGPD : timestamp (ms epoch) auquel l'utilisateur a accepté les CGU
+        // et la politique de confidentialité au moment du sign-up.
+        // Persistance gérée par le callback Password.profile() dans convex/auth.ts.
+        acceptedTermsAt: v.optional(v.number()),
         createdAt: v.optional(v.number()),
         updatedAt: v.optional(v.number()),
     }).index("email", ["email"]),
@@ -137,6 +141,22 @@ export default defineSchema({
         // FREE est un sentinel "pas de plan choisi". Après expiration du trial et
         // sans plan sélectionné, toutes les features sont verrouillées.
         hasSelectedPlan: v.optional(v.boolean()),
+
+        // Demo/review workspaces are seeded for App Store and Meta review.
+        // `local_only` lets reviewers send messages without hitting WhatsApp APIs.
+        demo: v.optional(v.object({
+            kind: v.union(
+                v.literal("APP_REVIEW"),
+                v.literal("META_WABA_REVIEW")
+            ),
+            seedVersion: v.string(),
+            seededAt: v.number(),
+            outboundMode: v.union(
+                v.literal("local_only"),
+                v.literal("whatsapp_api")
+            ),
+            notes: v.optional(v.string()),
+        })),
 
         // Stripe Subscription
         stripe: v.optional(v.object({
@@ -387,6 +407,9 @@ export default defineSchema({
         // Professional
         company: v.optional(v.string()),
         jobTitle: v.optional(v.string()),
+
+        // Profile picture (uploaded avatar; falls back to initials when absent)
+        profilePictureStorageId: v.optional(v.id("_storage")),
 
         // Metadata
         notes: v.optional(v.union(
@@ -753,6 +776,7 @@ export default defineSchema({
             v.literal("DRAFT"),
             v.literal("SCHEDULED"),
             v.literal("SENDING"),
+            v.literal("PAUSED"),
             v.literal("COMPLETED"),
             v.literal("FAILED"),
             v.literal("CANCELLED")
@@ -760,6 +784,26 @@ export default defineSchema({
 
         scheduledAt: v.optional(v.number()),
         completedAt: v.optional(v.number()),
+
+        // Total audience size locked at send-start — lets the chunked sender
+        // detect completion + cap at the paid count (resume uses sentCount as
+        // the cursor).
+        audienceTotal: v.optional(v.number()),
+
+        // Per-template variable mapping ({{N}} → contact field or fixed value),
+        // resolved per-recipient at send-time into WhatsApp template components.
+        // `token` is the placeholder ("{{1}}"), `src` a contact field
+        // ("first" | "last" | "company" | "city") or "fixed", and `fixed` the
+        // literal value when `src === "fixed"`. Ordered to match {{1}},{{2}}…
+        templateVariables: v.optional(
+            v.array(
+                v.object({
+                    token: v.string(),
+                    src: v.string(),
+                    fixed: v.optional(v.string()),
+                }),
+            ),
+        ),
 
         // Multi-channel WhatsApp
         whatsappChannelId: v.optional(v.id("whatsappChannels")),
@@ -1034,6 +1078,22 @@ export default defineSchema({
         // Reply/Forward
         replyToId: v.optional(v.id("messages")),
         isForwarded: v.optional(v.boolean()),
+        isStarred: v.optional(v.boolean()), // "Marquer" depuis le menu d'actions
+
+        // Internal note (team-only, NOT sent to WhatsApp). When true the
+        // message is a private note visible only to the team.
+        isInternal: v.optional(v.boolean()),
+        // @mentions inside an internal note. Each entry points at a member
+        // user; `name` is denormalized for cheap rendering. The proactive
+        // notification + email to the mentioned user is wired separately.
+        mentions: v.optional(
+            v.array(
+                v.object({
+                    userId: v.id("users"),
+                    name: v.string(),
+                })
+            )
+        ),
 
         // External ID (WhatsApp Message ID)
         externalId: v.optional(v.string()),
@@ -1046,7 +1106,9 @@ export default defineSchema({
     })
         .index("by_conversation", ["conversationId"])
         .index("by_organization", ["organizationId"])
-        .index("by_external_id", ["externalId"]),
+        .index("by_external_id", ["externalId"])
+        // Date-bounded org scans (analytics windows) without reading all history.
+        .index("by_org_created", ["organizationId", "createdAt"]),
 
     // ============================================
     // TYPING INDICATORS
@@ -1559,6 +1621,75 @@ export default defineSchema({
         .index("by_user", ["userId"])
         .index("by_user_read", ["userId", "isRead"])
         .index("by_org", ["organizationId"]),
+
+    devices: defineTable({
+        userId: v.id("users"),
+        organizationId: v.optional(v.id("organizations")),
+        expoPushToken: v.string(),
+        deviceId: v.string(),
+        platform: v.union(
+            v.literal("ios"),
+            v.literal("android"),
+            v.literal("web"),
+            v.literal("unknown")
+        ),
+        appVersion: v.optional(v.string()),
+        nativeBuildVersion: v.optional(v.string()),
+        permissionStatus: v.string(),
+        notificationsEnabled: v.boolean(),
+        lastActiveAt: v.number(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_user", ["userId"])
+        .index("by_user_device", ["userId", "deviceId"])
+        .index("by_token", ["expoPushToken"])
+        .index("by_organization_enabled", ["organizationId", "notificationsEnabled"]),
+
+    pushDeliveryAttempts: defineTable({
+        notificationId: v.id("notifications"),
+        userId: v.id("users"),
+        organizationId: v.id("organizations"),
+        deviceRecordId: v.id("devices"),
+        status: v.union(v.literal("sent"), v.literal("failed")),
+        ticketId: v.optional(v.string()),
+        error: v.optional(v.string()),
+        createdAt: v.number(),
+    })
+        .index("by_notification", ["notificationId"])
+        .index("by_user", ["userId"])
+        .index("by_device", ["deviceRecordId"]),
+
+    messageReactions: defineTable({
+        organizationId: v.id("organizations"),
+        messageId: v.id("messages"),
+        userId: v.id("users"),
+        emoji: v.string(),
+        createdAt: v.number(),
+    })
+        .index("by_message", ["messageId"])
+        .index("by_message_user", ["messageId", "userId"])
+        .index("by_organization", ["organizationId"]),
+
+    notificationPreferences: defineTable({
+        userId: v.id("users"),
+        organizationId: v.optional(v.id("organizations")),
+        newMessages: v.boolean(),
+        assignments: v.boolean(),
+        mentions: v.boolean(),
+        systemAlerts: v.boolean(),
+        mutedConversationIds: v.array(v.id("conversations")),
+        mutedWhatsappChannelIds: v.array(v.id("whatsappChannels")),
+        dndEnabled: v.boolean(),
+        dndStartHour: v.number(),
+        dndEndHour: v.number(),
+        dndWeekendsOnly: v.boolean(),
+        dndTimezone: v.string(),
+        createdAt: v.number(),
+        updatedAt: v.number(),
+    })
+        .index("by_user", ["userId"])
+        .index("by_user_org", ["userId", "organizationId"]),
     // ============================================
     // Waiting List
     // ============================================
@@ -1626,6 +1757,22 @@ export default defineSchema({
         remoteAccountId: v.string(),
         remoteAccountLabel: v.optional(v.string()),
         scalingMode: v.union(v.literal("standard"), v.literal("large")),
+        // Sync preferences (set from the connector detail modal). Direction gates
+        // pull (poller) vs push (enqueue); frequency sets the poll cadence.
+        // Absent = legacy default ("two" / "rt").
+        syncDirection: v.optional(v.union(v.literal("out"), v.literal("in"), v.literal("two"))),
+        syncFrequency: v.optional(v.union(v.literal("rt"), v.literal("hourly"), v.literal("daily"))),
+        // Per-connection field mapping: which remote CRM property feeds each Jokko
+        // identity field. Absent / empty = adapter default. Honored at import.
+        fieldMapping: v.optional(
+            v.object({
+                firstName: v.optional(v.string()),
+                lastName: v.optional(v.string()),
+                email: v.optional(v.string()),
+                phone: v.optional(v.string()),
+                tags: v.optional(v.string()),
+            }),
+        ),
         debugMode: v.optional(v.boolean()),
         debugModeExpiresAt: v.optional(v.number()),
         refreshInFlight: v.optional(v.boolean()),
@@ -1938,4 +2085,3 @@ export default defineSchema({
         .index("by_agent", ["agentId"])
         .index("by_channel_status", ["whatsappChannelId", "status"]),
 });
-

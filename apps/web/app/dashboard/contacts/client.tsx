@@ -5,9 +5,11 @@ import { useRouter } from 'next/navigation';
 import { usePaginatedQuery, useMutation, useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { Id } from '@/convex/_generated/dataModel';
-import { ContactList, Tag } from '@/components/contacts/ContactList';
+import type { Tag } from '@/components/contacts/ContactList';
+import { ContactsView } from './_components/ContactsView';
 import { Contact, ContactTag, getInitials } from '@/components/contacts/ContactCard';
 import { ContactFormDialog } from '@/components/contacts/ContactFormDialog';
+import type { ContactFormSubmitData } from '@/components/contacts/ContactForm';
 import { ImportDialog } from '@/components/contacts/ImportDialog';
 import { DuplicatesDialog } from '@/components/contacts/DuplicatesDialog';
 import { usePermission } from '@/hooks/use-permission';
@@ -18,10 +20,10 @@ import {
     SheetTitle,
     SheetDescription,
 } from '@/components/ui/sheet';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
+import { Avatar as V3Avatar } from '@/components/dashboard/primitives/Avatar';
+import { Chip } from '@/components/dashboard/primitives/Chip';
+import { avatarColorFromString } from '@/lib/dashboard/avatar-color';
+import { cn } from '@/lib/utils';
 import {
     Phone,
     Mail,
@@ -34,6 +36,14 @@ import {
     ArrowUpRight,
     Clock,
     ExternalLink,
+    Merge,
+    Download,
+    Upload,
+    Plus,
+    Ban,
+    CheckCircle2,
+    Check,
+    X as XIcon,
 } from 'lucide-react';
 import { useCrmLink } from '@/hooks/use-crm-link';
 import {
@@ -47,6 +57,55 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { formatPhoneDisplay } from '@/lib/contacts/validation';
+import { PageHeader, HeaderButton } from '@/components/dashboard/shell';
+import { toast } from 'sonner';
+
+type RawContactTag = string | {
+    id?: string;
+    _id?: string;
+    name?: string;
+    color?: string;
+} | null | undefined;
+
+interface ContactNote {
+    content: string;
+    authorName?: string;
+    createdAt: number;
+}
+
+interface ContactMutationError extends Error {
+    data?: {
+        code?: string;
+        message?: string;
+    };
+}
+
+function normalizeTag(tag: RawContactTag): ContactTag {
+    if (typeof tag === 'string') {
+        return { id: tag, name: tag, color: '#808080' };
+    }
+    if (!tag) {
+        return { id: 'tag', name: 'Tag', color: '#808080' };
+    }
+
+    return {
+        id: tag.id || tag._id || tag.name || 'tag',
+        name: tag.name || tag.id || tag._id || 'Tag',
+        color: tag.color || '#808080',
+    };
+}
+
+function isContactNote(note: unknown): note is ContactNote {
+    return typeof note === 'object' && note !== null && 'content' in note && 'createdAt' in note;
+}
+
+function getErrorMessage(error: unknown, fallback = 'Erreur inconnue'): string {
+    return error instanceof Error ? error.message : fallback;
+}
+
+function isContactMutationError(error: unknown): error is ContactMutationError {
+    return error instanceof Error && 'data' in error;
+}
 
 // ============================================
 // RELATIVE TIME HELPER
@@ -87,17 +146,20 @@ function ContactDetailDrawer({
     const contactData = useQuery(api.contacts.get, { id: contactId as Id<"contacts"> });
     const timeline = useQuery(api.contacts.getContactTimeline, { contactId: contactId as Id<"contacts"> });
     const crmLink = useCrmLink(contactId);
+    const toggleBlock = useMutation(api.contacts.toggleBlock);
+    const removeNote = useMutation(api.contacts.removeNote);
 
     if (!contactData) {
         return (
-            <div className="flex items-center justify-center h-full">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600" />
+            <div className="flex h-full items-center justify-center bg-[var(--paper-white)]">
+                <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--ink-200)] border-t-[var(--accent)]" />
             </div>
         );
     }
 
     const displayName = contactData.name || [contactData.firstName, contactData.lastName].filter(Boolean).join(' ') || 'Sans nom';
     const initials = getInitials(contactData.name ?? null, contactData.firstName, contactData.lastName);
+    const avatarColor = avatarColorFromString(displayName);
     const formattedPhone = formatPhoneDisplay(contactData.phone, 'international');
 
     // Build a Contact object for callbacks
@@ -115,11 +177,7 @@ function ContactDetailDrawer({
         city: contactData.city || null,
         country: contactData.country || null,
         notes: null,
-        tags: (contactData.tags || []).map((t: any) => ({
-            id: typeof t === 'string' ? t : t.id,
-            name: typeof t === 'string' ? t : t.name,
-            color: typeof t === 'string' ? '#808080' : t.color || '#808080',
-        })),
+        tags: (contactData.tags || []).map(normalizeTag),
         isWhatsApp: contactData.isWhatsApp || null,
         isBlocked: contactData.isBlocked || null,
         createdAt: contactData.createdAt,
@@ -127,234 +185,234 @@ function ContactDetailDrawer({
 
     const tags: ContactTag[] = contactForCallbacks.tags;
 
+    const hasNoExtraInfo =
+        !contactData.email && !contactData.company && !contactData.address && !contactData.city && !contactData.country;
+
     return (
-        <div className="flex flex-col h-full overflow-hidden">
-            {/* Header with avatar */}
-            <div className="flex flex-col items-center pt-2 pb-4">
-                <div className="relative">
-                    <Avatar className="h-16 w-16">
-                        <AvatarImage src={undefined} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-[#14532d] to-[#059669] text-white text-xl font-semibold">
-                            {initials}
-                        </AvatarFallback>
-                    </Avatar>
-                    {contactData.isBlocked && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-red-500 border-2 border-white" title="Bloqué" />
-                    )}
-                    {!contactData.isBlocked && contactData.isWhatsApp && (
-                        <span className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-green-500 border-2 border-white" title="WhatsApp" />
-                    )}
+        <div className="flex h-full flex-col overflow-hidden bg-[var(--paper-white)]">
+            {/* Header */}
+            <div className="border-b border-[var(--ink-200)] px-5 pb-4 pt-6">
+                <div className="flex flex-col items-center text-center">
+                    <V3Avatar
+                        initials={initials}
+                        color={avatarColor}
+                        size="xl"
+                        status={!contactData.isBlocked && contactData.isWhatsApp ? 'online' : undefined}
+                    />
+                    <h2 className="mt-3 text-[16px] font-semibold tracking-[-0.01em] text-[var(--ink-900)]">
+                        {displayName}
+                    </h2>
+                    <p className="font-mono text-[11px] text-[var(--ink-soft)]">{formattedPhone}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center justify-center gap-1.5">
+                        {contactData.isBlocked ? <Chip tone="danger">Bloqué</Chip> : null}
+                        {!contactData.isBlocked && contactData.isWhatsApp ? (
+                            <Chip tone="good">WhatsApp</Chip>
+                        ) : null}
+                        {crmLink ? <Chip tone="warn">Sync · {crmLink.providerLabel}</Chip> : null}
+                    </div>
                 </div>
-                <h2 className="text-lg font-semibold text-gray-900 mt-3">{displayName}</h2>
-                <p className="text-sm text-gray-500 font-mono">{formattedPhone}</p>
-                {contactData.isBlocked && (
-                    <Badge variant="destructive" className="mt-1 text-[10px]">Bloqué</Badge>
-                )}
-            </div>
 
-            {/* CRM sync badge */}
-            {crmLink && (
-                <div className="px-6 pb-3 flex justify-center">
-                    <Badge
-                        variant="outline"
-                        className="text-[11px] font-medium border-amber-200 bg-amber-50 text-amber-900 gap-1"
+                {/* Actions */}
+                <div className="mt-4 flex items-center justify-center gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => { onMessage(contactForCallbacks); onClose(); }}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[12px] font-medium text-white transition-colors hover:bg-[var(--ink-700)]"
                     >
-                        Synchronisé avec {crmLink.providerLabel}
-                    </Badge>
-                </div>
-            )}
-
-            {/* Action buttons */}
-            <div className="flex items-center justify-center gap-2 pb-4 px-6">
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
-                    onClick={() => { onMessage(contactForCallbacks); onClose(); }}
-                >
-                    <MessageCircle className="h-3.5 w-3.5" />
-                    Envoyer un message
-                </Button>
-                {crmLink && crmLink.externalUrl ? (
-                    <Button
-                        asChild
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
-                    >
-                        <a href={crmLink.externalUrl} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        Message
+                    </button>
+                    {crmLink && crmLink.externalUrl ? (
+                        <a
+                            href={crmLink.externalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)]"
+                        >
                             <ExternalLink className="h-3.5 w-3.5" />
-                            Éditer dans {crmLink.providerLabel}
+                            {crmLink.providerLabel}
                         </a>
-                    </Button>
-                ) : (
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
-                        onClick={() => { onEdit(contactForCallbacks); onClose(); }}
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={() => { onEdit(contactForCallbacks); onClose(); }}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)]"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Éditer
+                        </button>
+                    )}
+                    <button
+                        type="button"
+                        onClick={() => { onDelete(contactForCallbacks); onClose(); }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] px-3 py-1.5 text-[12px] font-medium text-[var(--status-danger)] transition-colors hover:bg-[var(--status-danger-soft)]"
                     >
-                        <Pencil className="h-3.5 w-3.5" />
-                        Modifier
-                    </Button>
-                )}
-                <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 gap-1.5 text-xs rounded-full text-red-600 hover:text-red-700 hover:bg-red-50 cursor-pointer"
-                    onClick={() => { onDelete(contactForCallbacks); onClose(); }}
-                >
-                    <Trash2 className="h-3.5 w-3.5" />
-                    Supprimer
-                </Button>
+                        <Trash2 className="h-3.5 w-3.5" />
+                        Supprimer
+                    </button>
+                    <button
+                        type="button"
+                        onClick={async () => {
+                            try {
+                                const blocked = await toggleBlock({ id: contactData._id });
+                                toast.success(blocked ? 'Contact bloqué' : 'Contact débloqué');
+                            } catch (e) {
+                                toast.error(e instanceof Error ? e.message : 'Action impossible');
+                            }
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)]"
+                    >
+                        <Ban className="h-3.5 w-3.5" />
+                        {contactData.isBlocked ? 'Débloquer' : 'Bloquer'}
+                    </button>
+                </div>
             </div>
-
-            <Separator />
 
             {/* Scrollable content */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-5">
-                {/* Contact details */}
-                <div className="space-y-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Informations</h3>
-
-                    <div className="flex items-center gap-2.5 text-sm">
-                        <Phone className="h-4 w-4 text-gray-400 shrink-0" />
-                        <span className="text-gray-700 font-mono">{formattedPhone}</span>
+            <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+                {/* Informations */}
+                <section className="space-y-2.5">
+                    <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                        Informations
+                    </h3>
+                    <div className="flex items-center gap-2.5 text-[13px]">
+                        <Phone className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                        <span className="font-mono text-[var(--ink-700)]">{formattedPhone}</span>
                     </div>
-
-                    {contactData.email && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                            <Mail className="h-4 w-4 text-gray-400 shrink-0" />
-                            <span className="text-gray-700 truncate">{contactData.email}</span>
+                    {contactData.email ? (
+                        <div className="flex items-center gap-2.5 text-[13px]">
+                            <Mail className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                            <span className="truncate text-[var(--ink-700)]">{contactData.email}</span>
                         </div>
-                    )}
-
-                    {contactData.company && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                            <Building2 className="h-4 w-4 text-gray-400 shrink-0" />
-                            <span className="text-gray-700 truncate">
+                    ) : null}
+                    {contactData.company ? (
+                        <div className="flex items-center gap-2.5 text-[13px]">
+                            <Building2 className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                            <span className="truncate text-[var(--ink-700)]">
                                 {contactData.company}
-                                {contactData.jobTitle && ` - ${contactData.jobTitle}`}
+                                {contactData.jobTitle ? ` · ${contactData.jobTitle}` : ''}
                             </span>
                         </div>
-                    )}
-
-                    {(contactData.address || contactData.city || contactData.country) && (
-                        <div className="flex items-center gap-2.5 text-sm">
-                            <MapPin className="h-4 w-4 text-gray-400 shrink-0" />
-                            <span className="text-gray-700 truncate">
+                    ) : null}
+                    {contactData.address || contactData.city || contactData.country ? (
+                        <div className="flex items-center gap-2.5 text-[13px]">
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-[var(--ink-400)]" />
+                            <span className="truncate text-[var(--ink-700)]">
                                 {[contactData.address, contactData.city, contactData.country].filter(Boolean).join(', ')}
                             </span>
                         </div>
-                    )}
-
-                    {!contactData.email && !contactData.company && !contactData.address && !contactData.city && !contactData.country && (
-                        <p className="text-sm text-gray-400 italic">Aucune information supplémentaire</p>
-                    )}
-                </div>
+                    ) : null}
+                    {hasNoExtraInfo ? (
+                        <p className="text-[12.5px] italic text-[var(--ink-soft)]">Aucune information supplémentaire</p>
+                    ) : null}
+                </section>
 
                 {/* Tags */}
-                {tags.length > 0 && (
-                    <div className="space-y-2">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tags</h3>
+                {tags.length > 0 ? (
+                    <section className="space-y-2">
+                        <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                            Tags
+                        </h3>
                         <div className="flex flex-wrap gap-1.5">
                             {tags.map((tag) => (
-                                <Badge
-                                    key={tag.id}
-                                    variant="secondary"
-                                    className="text-xs font-medium px-2 py-0.5"
-                                    style={{
-                                        backgroundColor: `${tag.color}15`,
-                                        color: tag.color,
-                                        borderColor: `${tag.color}40`,
-                                    }}
-                                >
-                                    {tag.name}
-                                </Badge>
+                                <Chip key={tag.id} tone="neutral">{tag.name}</Chip>
                             ))}
                         </div>
-                    </div>
-                )}
+                    </section>
+                ) : null}
 
                 {/* Notes */}
-                {contactData.notes && Array.isArray(contactData.notes) && contactData.notes.length > 0 && (
-                    <div className="space-y-2">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</h3>
+                {contactData.notes && Array.isArray(contactData.notes) && contactData.notes.length > 0 ? (
+                    <section className="space-y-2">
+                        <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                            Notes
+                        </h3>
                         <div className="space-y-2">
-                            {contactData.notes.map((note: any, i: number) => (
-                                <div key={i} className="bg-gray-50 rounded-lg p-3">
-                                    <p className="text-sm text-gray-700">{note.content}</p>
-                                    <div className="flex items-center gap-2 mt-1.5">
-                                        {note.authorName && (
-                                            <span className="text-[11px] text-gray-400">{note.authorName}</span>
-                                        )}
-                                        {note.createdAt && (
-                                            <span className="text-[11px] text-gray-400">
-                                                {formatRelativeTime(note.createdAt)}
-                                            </span>
-                                        )}
+                            {contactData.notes.filter(isContactNote).map((note, i) => (
+                                <div key={i} className="rounded-lg border border-[var(--ink-200)] bg-[var(--paper-warm)] p-3">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <p className="text-[13px] text-[var(--ink-700)]">{note.content}</p>
+                                        {typeof note.createdAt === 'number' ? (
+                                            <button
+                                                type="button"
+                                                title="Supprimer la note"
+                                                onClick={async () => {
+                                                    try {
+                                                        await removeNote({ contactId: contactData._id, noteTimestamp: note.createdAt as number });
+                                                        toast.success('Note supprimée');
+                                                    } catch (e) {
+                                                        toast.error(e instanceof Error ? e.message : 'Suppression impossible');
+                                                    }
+                                                }}
+                                                className="shrink-0 rounded p-0.5 text-[var(--ink-soft)] transition-colors hover:text-[var(--status-danger)]"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                            </button>
+                                        ) : null}
+                                    </div>
+                                    <div className="mt-1.5 flex items-center gap-2 font-mono text-[10px] text-[var(--ink-soft)]">
+                                        {note.authorName ? <span>{note.authorName}</span> : null}
+                                        {note.createdAt ? <span>{formatRelativeTime(note.createdAt)}</span> : null}
                                     </div>
                                 </div>
                             ))}
                         </div>
-                    </div>
-                )}
-
-                <Separator />
+                    </section>
+                ) : null}
 
                 {/* Activity Timeline */}
-                <div className="space-y-3">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Activité</h3>
-
+                <section className="space-y-3">
+                    <h3 className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">
+                        Activité
+                    </h3>
                     {!timeline ? (
                         <div className="flex items-center justify-center py-4">
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600" />
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-[var(--ink-200)] border-t-[var(--accent)]" />
                         </div>
                     ) : timeline.length === 0 ? (
-                        <p className="text-sm text-gray-400 italic">Aucune activité récente</p>
+                        <p className="text-[12.5px] italic text-[var(--ink-soft)]">Aucune activité récente</p>
                     ) : (
                         <div className="relative">
-                            {/* Vertical line */}
-                            <div className="absolute left-[9px] top-2 bottom-2 w-px bg-gray-200" />
-
+                            <div className="absolute bottom-2 left-[9px] top-2 w-px bg-[var(--ink-200)]" />
                             <div className="space-y-3">
-                                {timeline.map((entry, i) => (
-                                    <div key={i} className="flex items-start gap-3 relative">
-                                        {/* Dot */}
-                                        <div className={`relative z-10 mt-1 h-[18px] w-[18px] rounded-full border-2 flex items-center justify-center shrink-0 ${
-                                            entry.type === 'message_received'
-                                                ? 'border-blue-400 bg-blue-50'
-                                                : 'border-green-400 bg-green-50'
-                                        }`}>
-                                            {entry.type === 'message_received' ? (
-                                                <ArrowDownLeft className="h-2.5 w-2.5 text-blue-500" />
-                                            ) : (
-                                                <ArrowUpRight className="h-2.5 w-2.5 text-green-600" />
-                                            )}
-                                        </div>
-
-                                        {/* Content */}
-                                        <div className="flex-1 min-w-0 pb-1">
-                                            <p className="text-sm text-gray-700">
-                                                <span className="font-medium">
-                                                    {entry.type === 'message_received' ? 'Message reçu' : 'Message envoyé'}
-                                                </span>
-                                                {': '}
-                                                <span className="text-gray-500">{entry.content}</span>
-                                            </p>
-                                            <div className="flex items-center gap-1 mt-0.5">
-                                                <Clock className="h-3 w-3 text-gray-300" />
-                                                <span className="text-[11px] text-gray-400">
-                                                    {formatRelativeTime(entry.timestamp)}
-                                                </span>
+                                {timeline.map((entry, i) => {
+                                    const received = entry.type === 'message_received';
+                                    return (
+                                        <div key={i} className="relative flex items-start gap-3">
+                                            <div
+                                                className={cn(
+                                                    'relative z-10 mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full border-2',
+                                                    received
+                                                        ? 'border-[var(--ink-300)] bg-[var(--paper-warm)]'
+                                                        : 'border-[var(--accent)] bg-[var(--accent-muted)]',
+                                                )}
+                                            >
+                                                {received ? (
+                                                    <ArrowDownLeft className="h-2.5 w-2.5 text-[var(--ink-500)]" />
+                                                ) : (
+                                                    <ArrowUpRight className="h-2.5 w-2.5 text-[var(--accent)]" />
+                                                )}
+                                            </div>
+                                            <div className="min-w-0 flex-1 pb-1">
+                                                <p className="text-[13px] text-[var(--ink-700)]">
+                                                    <span className="font-medium text-[var(--ink-900)]">
+                                                        {received ? 'Message reçu' : 'Message envoyé'}
+                                                    </span>
+                                                    {': '}
+                                                    <span className="text-[var(--ink-500)]">{entry.content}</span>
+                                                </p>
+                                                <div className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-[var(--ink-soft)]">
+                                                    <Clock className="h-3 w-3" />
+                                                    <span>{formatRelativeTime(entry.timestamp)}</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}
-                </div>
+                </section>
             </div>
         </div>
     );
@@ -387,7 +445,7 @@ export function ContactsPageClient() {
         id: t._id,
         name: t.name,
         color: t.color || '#808080',
-        contactCount: 0 // TODO: Implement count
+        contactCount: 0
     }));
 
     // Use paginated query for contacts
@@ -401,7 +459,7 @@ export function ContactsPageClient() {
     );
 
     // Transform results to match Contact interface
-    const contacts: Contact[] = (results || []).map((c: any) => ({
+    const contacts: Contact[] = (results || []).map((c) => ({
         id: c._id,
         phone: c.phone,
         name: c.name || null,
@@ -410,15 +468,11 @@ export function ContactsPageClient() {
         email: c.email || null,
         company: c.company || null,
         jobTitle: c.jobTitle || null,
-        notes: c.notes || null,
+        notes: Array.isArray(c.notes) ? null : c.notes || null,
         countryCode: c.countryCode || null,
         isWhatsApp: c.isWhatsApp || null,
         isBlocked: c.isBlocked || null,
-        tags: c.tags?.map((t: any) => ({
-            id: t._id,
-            name: t.name,
-            color: t.color || '#808080'
-        })) || [],
+        tags: c.tags?.map(normalizeTag) || [],
         createdAt: c.createdAt
     }));
 
@@ -431,22 +485,22 @@ export function ContactsPageClient() {
         loadMore(30);
     };
 
-    const handleCreateSubmit = async (data: any) => {
+    const handleCreateSubmit = async (data: ContactFormSubmitData) => {
         try {
             await createContact(data);
             setIsCreateDialogOpen(false);
             // Success
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            if (error.data?.code === 'DUPLICATE_CONTACT') {
-                alert(`Contact existant: ${error.data.message}`);
+            if (isContactMutationError(error) && error.data?.code === 'DUPLICATE_CONTACT') {
+                toast.error(`Contact existant: ${error.data.message}`);
             } else {
-                alert(`Erreur: ${error.message}`);
+                toast.error(`Erreur: ${getErrorMessage(error)}`);
             }
         }
     };
 
-    const handleEditSubmit = async (data: any) => {
+    const handleEditSubmit = async (data: ContactFormSubmitData) => {
         if (!editingContact) return;
         try {
             await updateContact({
@@ -455,9 +509,9 @@ export function ContactsPageClient() {
             });
             setEditingContact(null);
             // Success
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur: ${error.message}`);
+            toast.error(`Erreur: ${getErrorMessage(error)}`);
         }
     };
 
@@ -475,9 +529,9 @@ export function ContactsPageClient() {
             }
             setContactToDelete(null);
             // Success
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur: ${error.message}`);
+            toast.error(`Erreur: ${getErrorMessage(error)}`);
         }
     };
 
@@ -487,7 +541,7 @@ export function ContactsPageClient() {
             router.push(`/dashboard/conversations/${conversationId}`);
         } catch (error) {
             console.error("Failed to start conversation:", error);
-            alert("Impossible de démarrer la conversation.");
+            toast.error("Impossible de démarrer la conversation.");
         }
     };
 
@@ -544,9 +598,9 @@ export function ContactsPageClient() {
                 bulkDeleteIds.map(id => deleteContact({ id: id as Id<"contacts"> }))
             );
             setBulkDeleteIds(null);
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur lors de la suppression: ${error.message}`);
+            toast.error(`Erreur lors de la suppression: ${getErrorMessage(error)}`);
         }
     };
 
@@ -564,15 +618,43 @@ export function ContactsPageClient() {
                     });
                 })
             );
-        } catch (error: any) {
+        } catch (error) {
             console.error(error);
-            alert(`Erreur lors de l'ajout du tag: ${error.message}`);
+            toast.error(`Erreur lors de l'ajout du tag: ${getErrorMessage(error)}`);
         }
     };
 
     return (
         <div>
-            <ContactList
+            {/* Full-bleed header band: negate the layout padding (incl. top) so the
+                PageHeader sits flush at the top like the full-bleed pages. */}
+            <div className="-mx-3 -mt-3 mb-4 sm:-mx-4 sm:-mt-4 lg:-mx-6 lg:-mt-6">
+                <PageHeader
+                    eyebrow={`DONNÉES · ${contacts.length} CONTACT${contacts.length > 1 ? "S" : ""}`}
+                    title="Contacts"
+                    description="Annuaire unifié — synchro WhatsApp, attributs, segments. Import CSV, déduplication, export RGPD."
+                    actions={
+                        <>
+                            <HeaderButton icon={Merge} onClick={() => setIsDuplicatesDialogOpen(true)}>
+                                Doublons
+                            </HeaderButton>
+                            {canExport ? (
+                                <HeaderButton icon={Download} onClick={handleExport}>
+                                    Exporter
+                                </HeaderButton>
+                            ) : null}
+                            <HeaderButton icon={Upload} onClick={() => setIsImportDialogOpen(true)}>
+                                Importer
+                            </HeaderButton>
+                            <HeaderButton icon={Plus} variant="primary" onClick={() => setIsCreateDialogOpen(true)}>
+                                Nouveau
+                            </HeaderButton>
+                        </>
+                    }
+                />
+            </div>
+            <div className="-mx-3 sm:-mx-4 lg:-mx-6">
+            <ContactsView
                 contacts={contacts}
                 tags={tags}
                 total={contacts.length}
@@ -583,7 +665,6 @@ export function ContactsPageClient() {
                 onFilterByTag={setTagFilter}
                 onAddNew={() => setIsCreateDialogOpen(true)}
                 onImport={() => setIsImportDialogOpen(true)}
-                onExport={handleExport}
                 onEdit={(c) => setEditingContact(c)}
                 onDelete={handleDeleteClick}
                 onMessage={handleMessage}
@@ -593,8 +674,8 @@ export function ContactsPageClient() {
                 onBulkAddTag={handleBulkAddTag}
                 canDelete={canDelete}
                 canExport={canExport}
-                onDuplicates={() => setIsDuplicatesDialogOpen(true)}
             />
+            </div>
 
             {/* Contact Detail Drawer (Sheet) */}
             <Sheet open={!!selectedContactId} onOpenChange={(open) => !open && setSelectedContactId(null)}>
@@ -642,18 +723,35 @@ export function ContactsPageClient() {
             />
 
             <AlertDialog open={!!contactToDelete} onOpenChange={(open) => !open && setContactToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Êtes-vous sûr ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Cette action est irréversible. Cela supprimera définitivement le contact
-                            {contactToDelete?.name ? <strong> {contactToDelete.name} </strong> : " sélectionné "}
-                            et toutes les données associées.
+                <AlertDialogContent className="gap-0 overflow-hidden rounded-xl border-[var(--ink-200)] bg-[var(--paper-white)] p-0 sm:max-w-[420px]">
+                    <AlertDialogHeader className="space-y-0 px-6 pb-4 pt-6 text-left">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--status-danger-soft)]">
+                            <Trash2 className="h-5 w-5 text-[var(--status-danger)]" />
+                        </div>
+                        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                            Annuaire · suppression
+                        </p>
+                        <AlertDialogTitle className="mt-1 font-editorial text-[20px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                            Supprimer ce contact ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="mt-1.5 text-[13px] leading-snug text-[var(--ink-500)]">
+                            Cette action est irréversible. Le contact
+                            {contactToDelete?.name ? (
+                                <span className="font-medium text-[var(--ink-700)]"> {contactToDelete.name} </span>
+                            ) : (
+                                " sélectionné "
+                            )}
+                            et toutes ses données seront supprimés définitivement.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogFooter className="flex-row justify-end gap-2 border-t border-[var(--ink-200)] bg-[var(--paper-warm)]/40 px-6 py-3.5">
+                        <AlertDialogCancel className="mt-0 h-auto rounded-md border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-700)] hover:bg-[var(--paper-warm)]">
+                            Annuler
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmDelete}
+                            className="h-auto rounded-md bg-[var(--status-danger)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--status-danger)]/90"
+                        >
                             Supprimer
                         </AlertDialogAction>
                     </AlertDialogFooter>
@@ -662,17 +760,30 @@ export function ContactsPageClient() {
 
             {/* Bulk delete confirmation */}
             <AlertDialog open={!!bulkDeleteIds} onOpenChange={(open) => !open && setBulkDeleteIds(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''} ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            Cette action est irréversible. Cela supprimera définitivement les {bulkDeleteIds?.length} contacts
-                            sélectionnés et toutes les données associées.
+                <AlertDialogContent className="gap-0 overflow-hidden rounded-xl border-[var(--ink-200)] bg-[var(--paper-white)] p-0 sm:max-w-[420px]">
+                    <AlertDialogHeader className="space-y-0 px-6 pb-4 pt-6 text-left">
+                        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--status-danger-soft)]">
+                            <Trash2 className="h-5 w-5 text-[var(--status-danger)]" />
+                        </div>
+                        <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                            Annuaire · suppression
+                        </p>
+                        <AlertDialogTitle className="mt-1 font-editorial text-[20px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                            Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''} ?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription className="mt-1.5 text-[13px] leading-snug text-[var(--ink-500)]">
+                            Cette action est irréversible. Les {bulkDeleteIds?.length} contacts sélectionnés et
+                            toutes leurs données seront supprimés définitivement.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Annuler</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                    <AlertDialogFooter className="flex-row justify-end gap-2 border-t border-[var(--ink-200)] bg-[var(--paper-warm)]/40 px-6 py-3.5">
+                        <AlertDialogCancel className="mt-0 h-auto rounded-md border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-700)] hover:bg-[var(--paper-warm)]">
+                            Annuler
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                            onClick={confirmBulkDelete}
+                            className="h-auto rounded-md bg-[var(--status-danger)] px-3 py-1.5 text-[13px] font-medium text-white hover:bg-[var(--status-danger)]/90"
+                        >
                             Supprimer {bulkDeleteIds?.length} contact{(bulkDeleteIds?.length || 0) > 1 ? 's' : ''}
                         </AlertDialogAction>
                     </AlertDialogFooter>

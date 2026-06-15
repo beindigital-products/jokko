@@ -11,11 +11,48 @@
  * Convex acts as a signaling relay between Meta and the agent's browser (WebRTC peer).
  */
 
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { requireMembership, requirePermission } from "./lib/auth";
+import { callCostFcfa } from "./lib/callPricing";
+
+/**
+ * Debit the org's credit for a finished OUTBOUND call (inbound is free).
+ *
+ * Billed exactly once: both terminateCall and handleCallTerminate guard on a
+ * terminal status before reaching here, so whichever ends the call first bills
+ * it and the other early-returns. Never drives the balance negative; records a
+ * USAGE transaction so the spend shows up in the credit history.
+ */
+async function billOutboundCall(
+    ctx: MutationCtx,
+    call: { _id: string; direction: string; toPhone: string; organizationId: Id<"organizations">; [key: string]: unknown },
+    durationSeconds: number | undefined,
+) {
+    if (call.direction !== "OUTBOUND") return;
+    const cost = callCostFcfa(call.toPhone, durationSeconds);
+    if (cost <= 0) return;
+
+    const org = await ctx.db.get(call.organizationId);
+    const balance = org?.creditBalance ?? 0;
+    const debit = Math.min(cost, balance); // clamp: never go below zero
+    if (debit <= 0) return;
+
+    const newBalance = balance - debit;
+    await ctx.db.patch(call.organizationId, { creditBalance: newBalance });
+    await ctx.db.insert("creditTransactions", {
+        organizationId: call.organizationId,
+        amount: -debit,
+        type: "USAGE" as const,
+        description: `Appel sortant ${call.toPhone} (${Math.ceil((durationSeconds ?? 0) / 60)} min)`,
+        referenceId: String(call._id),
+        balanceAfter: newBalance,
+        createdAt: Date.now(),
+    });
+}
 
 // ============================================
 // WEBHOOK HANDLER (called from http.ts)
@@ -102,7 +139,7 @@ export const handleCallWebhook = internalMutation({
 });
 
 async function handleInboundCall(
-    ctx: any,
+    ctx: MutationCtx,
     args: {
         callId: string;
         from: string;
@@ -193,7 +230,7 @@ async function handleInboundCall(
     console.log(`[CALLS] Inbound call ${callId} from ${from} - RINGING`);
 }
 
-async function handleCallTerminate(ctx: any, args: { callId: string }) {
+async function handleCallTerminate(ctx: MutationCtx, args: { callId: string }) {
     const call = await ctx.db
         .query("calls")
         .withIndex("by_external_call_id", (q: any) => q.eq("externalCallId", args.callId))
@@ -220,6 +257,9 @@ async function handleCallTerminate(ctx: any, args: { callId: string }) {
         terminationReason: "remote_hangup",
         updatedAt: now,
     });
+
+    // Debit the org's credit for this outbound call.
+    await billOutboundCall(ctx, call, durationSeconds);
 
     // Insert system message into conversation
     if (call.conversationId) {
@@ -255,7 +295,7 @@ async function handleCallTerminate(ctx: any, args: { callId: string }) {
 }
 
 async function handleOutboundCallUpdate(
-    ctx: any,
+    ctx: MutationCtx,
     args: { callId: string; sdp?: string; sdpType?: string }
 ) {
     const call = await ctx.db
@@ -278,8 +318,8 @@ async function handleOutboundCallUpdate(
 }
 
 async function handlePermissionGranted(
-    ctx: any,
-    args: { from: string; to: string; phoneNumberId: string }
+    ctx: MutationCtx,
+    args: { callId?: string; from: string; to: string; phoneNumberId: string }
 ) {
     // Find the REQUESTING_PERMISSION call for this contact
     // The "from" is the user (contact), "to" is the business number
@@ -319,6 +359,19 @@ export const getActiveCall = query({
         organizationId: v.id("organizations"),
     },
     handler: async (ctx, args) => {
+        // SECURITY: only members of the org may read its active call (the result
+        // embeds contact PII). Return null for non-members so the reactive
+        // subscription stays quiet instead of erroring.
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return null;
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", args.organizationId),
+            )
+            .first();
+        if (!membership) return null;
+
         // Find any ringing call for this org
         const call = await ctx.db
             .query("calls")
@@ -419,6 +472,19 @@ export const getCallHistory = query({
         conversationId: v.id("conversations"),
     },
     handler: async (ctx, args) => {
+        // SECURITY: scope the history read to members of the conversation's org.
+        const conversation = await ctx.db.get(args.conversationId);
+        if (!conversation) return [];
+        const userId = await getAuthUserId(ctx);
+        if (!userId) return [];
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", conversation.organizationId),
+            )
+            .first();
+        if (!membership) return [];
+
         return await ctx.db
             .query("calls")
             .withIndex("by_conversation", (q) => q.eq("conversationId", args.conversationId))
@@ -444,6 +510,16 @@ export const getChannelsWithTokenError = query({
     handler: async (ctx, args) => {
         const userId = await getAuthUserId(ctx);
         if (!userId) return [];
+
+        // SECURITY: l'appelant doit être membre de l'org ciblée (sinon divulgation
+        // cross-tenant des erreurs de token Meta via un simple organizationId).
+        const membership = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) =>
+                q.eq("userId", userId).eq("organizationId", args.organizationId),
+            )
+            .first();
+        if (!membership) return [];
 
         const window = args.windowMs ?? 24 * 60 * 60 * 1000;
         const since = Date.now() - window;
@@ -503,16 +579,30 @@ export const requestOutboundCall = mutation({
         conversationId: v.id("conversations"),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const conversation = await ctx.db.get(args.conversationId);
         if (!conversation) throw new Error("Conversation not found");
+
+        // SECURITY: caller must be a member of the conversation's org with
+        // permission to place calls (prevents cross-tenant CPR sends).
+        const { userId } = await requirePermission(
+            ctx,
+            conversation.organizationId,
+            "calls:initiate",
+        );
 
         const contact = conversation.contactId
             ? await ctx.db.get(conversation.contactId)
             : null;
         if (!contact?.phone) throw new Error("Contact has no phone number");
+
+        // CREDIT GATE: outbound calls are billable per minute. Block the call when
+        // the org has no credit so an agent can't start a call that can't be paid
+        // for. The frontend maps INSUFFICIENT_CREDIT to a role-aware message
+        // (admin/owner → "Recharger le compte"; agent → "prévenez un administrateur").
+        const org = await ctx.db.get(conversation.organizationId);
+        if ((org?.creditBalance ?? 0) <= 0) {
+            throw new Error("INSUFFICIENT_CREDIT: solde insuffisant pour passer un appel");
+        }
 
         // Check for existing active calls
         const existingCalls = await ctx.db
@@ -602,11 +692,11 @@ export const startOutboundCall = mutation({
         sdpOffer: v.string(),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
+
+        // SECURITY: enforce org membership + calls:initiate on the call's org.
+        await requirePermission(ctx, call.organizationId, "calls:initiate");
 
         if (call.status !== "PERMISSION_GRANTED") {
             throw new Error(`Cannot start call: status is ${call.status}, expected PERMISSION_GRANTED`);
@@ -636,11 +726,11 @@ export const acceptCall = mutation({
         sdpAnswer: v.string(),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
+
+        // SECURITY: only a member of the call's org with calls:answer may pick it up.
+        const { userId } = await requirePermission(ctx, call.organizationId, "calls:answer");
 
         // Optimistic concurrency: only accept if still ringing
         if (call.status !== "RINGING") {
@@ -673,20 +763,42 @@ export const confirmConnected = mutation({
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
 
-        if (call.status !== "PRE_ACCEPTED") {
-            console.log(`[CALLS] confirmConnected: call ${args.callId} is ${call.status}, not PRE_ACCEPTED`);
+        // SECURITY: was fully unauthenticated — require org membership.
+        await requireMembership(ctx, call.organizationId);
+
+        const now = Date.now();
+
+        // Inbound: the agent pre-accepted and ICE is now connected → mark CONNECTED
+        // and send `accept` to Meta to finalize the incoming call.
+        if (call.status === "PRE_ACCEPTED") {
+            await ctx.db.patch(args.callId, {
+                status: "CONNECTED" as const,
+                answeredAt: call.answeredAt ?? now,
+                updatedAt: now,
+            });
+            await ctx.scheduler.runAfter(0, internal.call_actions.sendAccept, { callId: args.callId });
+            console.log(`[CALLS] confirmConnected: inbound call ${args.callId} -> CONNECTED`);
             return;
         }
 
-        await ctx.db.patch(args.callId, {
-            status: "CONNECTED" as const,
-            updatedAt: Date.now(),
-        });
+        // Outbound: the call was RINGING after we sent the SDP offer; ICE is now
+        // connected → mark CONNECTED. No `accept` action — the offer/answer
+        // handshake already established the call with Meta. Set answeredAt so the
+        // duration + "Appel audio" system message are correct (outbound calls had
+        // no answeredAt, so they always rendered as "Appel manqué"). Leaving the
+        // call stuck at RINGING also made getActiveCall treat the live call as an
+        // incoming one and routed hang-up to reject (Meta "method not allowed").
+        if (call.status === "RINGING" && call.direction === "OUTBOUND") {
+            await ctx.db.patch(args.callId, {
+                status: "CONNECTED" as const,
+                answeredAt: call.answeredAt ?? now,
+                updatedAt: now,
+            });
+            console.log(`[CALLS] confirmConnected: outbound call ${args.callId} -> CONNECTED`);
+            return;
+        }
 
-        // Send accept to Meta
-        await ctx.scheduler.runAfter(0, internal.call_actions.sendAccept, {
-            callId: args.callId,
-        });
+        console.log(`[CALLS] confirmConnected: call ${args.callId} is ${call.status}/${call.direction}, no transition`);
     },
 });
 
@@ -695,11 +807,11 @@ export const rejectCall = mutation({
         callId: v.id("calls"),
     },
     handler: async (ctx, args) => {
-        const userId = await getAuthUserId(ctx);
-        if (!userId) throw new Error("Not authenticated");
-
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
+
+        // SECURITY: only a member of the call's org with calls:answer may reject it.
+        await requirePermission(ctx, call.organizationId, "calls:answer");
 
         if (call.status !== "RINGING") {
             throw new Error(`Call is no longer ringing (status: ${call.status})`);
@@ -748,6 +860,9 @@ export const terminateCall = mutation({
         const call = await ctx.db.get(args.callId);
         if (!call) throw new Error("Call not found");
 
+        // SECURITY: was fully unauthenticated — require org membership.
+        await requireMembership(ctx, call.organizationId);
+
         if (call.status === "TERMINATED" || call.status === "REJECTED" || call.status === "MISSED") {
             return; // Already ended
         }
@@ -764,6 +879,9 @@ export const terminateCall = mutation({
             terminationReason: "agent_hangup",
             updatedAt: now,
         });
+
+        // Debit the org's credit for this outbound call.
+        await billOutboundCall(ctx, call, durationSeconds);
 
         // Send terminate to Meta
         await ctx.scheduler.runAfter(0, internal.call_actions.sendTerminate, {

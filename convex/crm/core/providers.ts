@@ -100,7 +100,10 @@ export const PROVIDER_INFO: Record<CRMProvider, ProviderInfo> = {
         key: "axonaut",
         displayName: "Axonaut",
         authMode: "apiKey",
-        availability: "available",
+        // "Bientôt" : connecteur non encore activé (décision produit — on ouvre
+        // d'abord les CRM les plus utilisés, les 4 providers OAuth). Le pull
+        // apiKey n'est pas finalisé. Le catalogue l'affiche en lecture seule.
+        availability: "coming_soon",
         docsUrl: "https://axonaut.com/api/v2/doc",
         capabilities: {
             authMode: "apiKey",
@@ -119,7 +122,8 @@ export const PROVIDER_INFO: Record<CRMProvider, ProviderInfo> = {
         key: "nocrm",
         displayName: "noCRM.io",
         authMode: "apiKey",
-        availability: "available",
+        // "Bientôt" : connecteur non encore activé (cf. axonaut ci-dessus).
+        availability: "coming_soon",
         docsUrl: "https://nocrm.io/help/api/",
         capabilities: {
             authMode: "apiKey",

@@ -28,6 +28,8 @@ export type CallErrorAction =
     | { type: "signin" }
     /** Re-engagement: prompt the user to send a template message in this conversation */
     | { type: "send-template" }
+    /** Top up the org's call credit (role-aware: admin/owner → billing, agent → ask an admin) */
+    | { type: "recharge" }
     /** External link (e.g. Meta Business Manager) */
     | { type: "external"; href: string; label: string };
 
@@ -94,6 +96,19 @@ export function mapCallError(reason: string | undefined | null): CallErrorMessag
     }
     if (r.includes("contact has no phone")) {
         return { message: "Ce contact n'a pas de numero de telephone valide." };
+    }
+
+    // --- No call credit (outbound calls are billed per minute) ---
+    if (
+        r.includes("insufficient_credit") ||
+        r.includes("solde insuffisant") ||
+        r.includes("credit insuffisant") ||
+        r.includes("crédit insuffisant")
+    ) {
+        return {
+            message: "Credit insuffisant pour passer un appel.",
+            action: { type: "recharge" },
+        };
     }
     if (r.includes("not authenticated")) {
         return {

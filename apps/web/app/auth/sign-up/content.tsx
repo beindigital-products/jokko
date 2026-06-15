@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
@@ -20,6 +21,7 @@ import {
     Bot,
 } from "lucide-react";
 import { SplitText } from "@/components/animations/split-text";
+import { evaluatePassword, PASSWORD_CRITERIA } from "@/lib/password-policy";
 
 export default function SignUpContent() {
     const router = useRouter();
@@ -43,6 +45,18 @@ export default function SignUpContent() {
             return;
         }
 
+        // Client-side validation against the real policy (mirrors convex/auth.ts).
+        const evaluation = evaluatePassword(password);
+        if (!evaluation.isValid) {
+            const failing = PASSWORD_CRITERIA
+                .filter((c) => evaluation.failed.includes(c.id))
+                .map((c) => c.label)
+                .join(", ");
+            setError(`Mot de passe invalide : ${failing}.`);
+            setLoading(false);
+            return;
+        }
+
         formData.delete("confirmPassword");
         formData.set("flow", "signUp");
 
@@ -52,10 +66,10 @@ export default function SignUpContent() {
         } catch (err) {
             console.error("Sign up error:", err);
             if (err instanceof Error) {
-                const message = err.message.includes(
-                    "Le mot de passe doit contenir",
-                )
-                    ? "Le mot de passe doit contenir au moins 8 caractères."
+                // Pass through backend policy errors verbatim; they already
+                // use the right criteria wording from convex/auth.ts.
+                const message = err.message.includes("Le mot de passe doit contenir")
+                    ? err.message
                     : "Une erreur est survenue lors de l'inscription.";
                 setError(message);
             } else {
@@ -151,7 +165,7 @@ export default function SignUpContent() {
                             name="password"
                             type={showPassword ? "text" : "password"}
                             label="Mot de passe"
-                            placeholder="8 caractères minimum"
+                            placeholder="10 car. min, majuscule, chiffre"
                             autoComplete="new-password"
                             required
                             suffix={
@@ -354,9 +368,13 @@ function AuthField({
 function MobileLogo() {
     return (
         <Link href="/" className="inline-flex items-center gap-2.5">
-            <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-sm font-bold text-white shadow-[0_8px_24px_-6px_var(--accent-glow)]">
-                J
-            </span>
+            <Image
+                src="/logo-mark.png"
+                alt=""
+                width={36}
+                height={36}
+                className="h-9 w-9 object-contain"
+            />
             <span className="font-display text-xl font-semibold tracking-tight">
                 Jokko
             </span>
@@ -426,9 +444,13 @@ function OnboardingPanel() {
                     href="/"
                     className="inline-flex items-center gap-2.5 self-end"
                 >
-                    <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-sm font-bold text-white shadow-[0_8px_24px_-6px_var(--accent-glow)]">
-                        J
-                    </span>
+                    <Image
+                        src="/logo-mark.png"
+                        alt=""
+                        width={36}
+                        height={36}
+                        className="h-9 w-9 object-contain brightness-0 invert"
+                    />
                     <span className="font-display text-xl font-semibold tracking-tight text-white">
                         Jokko
                     </span>

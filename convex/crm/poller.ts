@@ -58,12 +58,28 @@ export const _kickDeltaPoll = internalMutation({
         if (!conn || conn.status !== "active") return;
 
         const info = getProviderInfo(conn.provider as CRMProvider);
-        const intervalMs =
+        const baseIntervalMs =
             conn.scalingMode === "large"
                 ? info.capabilities.pollIntervalLargeMs
                 : info.capabilities.pollIntervalStandardMs;
+        // Sync frequency overrides the provider default cadence; "rt" keeps the
+        // provider default (webhooks handle real-time, polling is the fallback).
+        const intervalMs =
+            conn.syncFrequency === "hourly"
+                ? 60 * 60_000
+                : conn.syncFrequency === "daily"
+                  ? 24 * 60 * 60_000
+                  : baseIntervalMs;
 
         const now = Date.now();
+
+        // Direction "out" = push-only → never pull from the CRM. Bump nextPollAt
+        // so the connection isn't re-selected on every tick.
+        if ((conn.syncDirection ?? "two") === "out") {
+            await ctx.db.patch(connectionId, { nextPollAt: now + intervalMs, updatedAt: now });
+            return;
+        }
+
         const sinceMs = conn.lastPollAt ?? conn.lastSyncAt ?? now - intervalMs;
 
         const existingRunning = await ctx.db

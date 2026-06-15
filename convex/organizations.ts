@@ -89,6 +89,19 @@ export const get = query({
     }
 });
 
+/**
+ * Create OR update the user's current onboarding organization.
+ *
+ * Idempotent : if the user already has an active organization (via
+ * `userSessions.currentOrganizationId`) and owns it, this mutation patches
+ * the existing org instead of inserting a new one. Lets the BUSINESS_INFO
+ * onboarding step be re-submitted (back-navigation, retry) without
+ * orphaning organizations and memberships.
+ *
+ * Slug ownership : the pre-existing uniqueness check (slug belongs to one
+ * of MY orgs vs. someone else's) is preserved and reused — no separate
+ * `updateOrgDuringOnboarding` mutation needed.
+ */
 export const create = mutation({
     args: {
         name: v.string(),
@@ -105,8 +118,7 @@ export const create = mutation({
             throw new Error("Unauthorized");
         }
 
-        await rateLimiter.limit(ctx, "createOrganization", { key: userId, throws: true });
-
+        // Slug ownership check — applies to both create and update paths.
         if (args.slug) {
             const existing = await ctx.db
                 .query("organizations")
@@ -114,7 +126,6 @@ export const create = mutation({
                 .first();
 
             if (existing) {
-                // Vérifier si le slug appartient à une org de l'utilisateur
                 const membership = await ctx.db
                     .query("memberships")
                     .withIndex("by_user_org", (q) =>
@@ -128,6 +139,37 @@ export const create = mutation({
             }
         }
 
+        // ─── Upsert : if the user has a current org and owns it, patch it.
+        const session = await ctx.db
+            .query("userSessions")
+            .withIndex("by_user", (q) => q.eq("userId", userId))
+            .first();
+
+        if (session?.currentOrganizationId) {
+            const currentOrg = await ctx.db.get(session.currentOrganizationId);
+            if (currentOrg && currentOrg.ownerId === userId) {
+                // PATCH path — re-submit during onboarding.
+                await ctx.db.patch(currentOrg._id, {
+                    name: args.name,
+                    slug: args.slug ?? currentOrg.slug,
+                    businessSector: args.businessSector,
+                    website: args.website,
+                    phone: args.phone,
+                    timezone: args.timezone,
+                    locale: args.locale,
+                    updatedAt: Date.now(),
+                });
+                await ctx.db.patch(session._id, {
+                    lastActivityAt: Date.now(),
+                });
+                return currentOrg._id;
+            }
+        }
+
+        // ─── Insert path — only enforce the rate limit when actually creating
+        // a brand-new organization. Edits during onboarding are unbounded.
+        await rateLimiter.limit(ctx, "createOrganization", { key: userId, throws: true });
+
         const now = Date.now();
         const TRIAL_DURATION_MS = 14 * 24 * 60 * 60 * 1000; // 14 jours
 
@@ -139,7 +181,7 @@ export const create = mutation({
             phone: args.phone,
             timezone: args.timezone,
             locale: args.locale,
-            onboardingStep: "PLAN_SELECT", // Next step
+            onboardingStep: "PLAN_SELECT",
             ownerId: userId,
             plan: "FREE",
             hasSelectedPlan: false,
@@ -167,12 +209,7 @@ export const create = mutation({
             joinedAt: Date.now(),
         });
 
-        // Auto-switch to new org
-        const session = await ctx.db
-            .query("userSessions")
-            .withIndex("by_user", (q) => q.eq("userId", userId))
-            .first();
-
+        // Auto-switch to new org.
         if (session) {
             await ctx.db.patch(session._id, {
                 currentOrganizationId: orgId,

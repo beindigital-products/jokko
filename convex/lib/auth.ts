@@ -28,6 +28,28 @@ export async function requireAuth(ctx: QueryCtx | MutationCtx): Promise<Id<"user
     return userId;
 }
 
+/**
+ * Resolve the caller's active organization from their session.
+ * Returns `null` when the user is unauthenticated or has no current org.
+ *
+ * Single source of truth for the `userSessions.currentOrganizationId`
+ * lookup that was previously inlined across ~30 files — keeps the
+ * multi-tenant boundary in one place.
+ */
+export async function getCurrentOrgId(
+    ctx: QueryCtx | MutationCtx
+): Promise<Id<"organizations"> | null> {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) return null;
+
+    const session = await ctx.db
+        .query("userSessions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .first();
+
+    return session?.currentOrganizationId ?? null;
+}
+
 export async function requireMembership(
     ctx: QueryCtx | MutationCtx,
     organizationId: Id<"organizations">

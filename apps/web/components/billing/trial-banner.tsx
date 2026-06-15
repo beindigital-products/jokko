@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
-import { Clock, Lock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useTrialStatus } from "@/hooks/usePlans";
+import { useState } from "react";
+import { Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useTrialStatus } from "@/hooks/usePlans";
+import { Banner } from "@/components/dashboard/primitives/Banner";
+import { trialBannerContent } from "./trial-banner-content";
 
 type TrialBannerProps = {
     variant?: "sidebar" | "page";
@@ -12,86 +13,96 @@ type TrialBannerProps = {
 };
 
 /**
- * Bandeau récapitulatif du statut d'essai.
+ * TrialBanner — wires `useTrialStatus` to the shared Banner primitive (4 tons).
  *
- * - Essai actif : affiche le compte à rebours (jours restants) + rappel "toutes features déverrouillées"
- * - Essai expiré + plan non choisi : affiche un message bloquant + CTA vers /dashboard/billing
- * - Plan sélectionné : n'affiche rien
+ * Visibilité (Q3=b) : masqué dès qu'un plan payant est sélectionné. Le ton
+ * monte avec les jours restants : neutral (J≥10) → reminder (J3-9) →
+ * urgent (J≤2) → expired (post-J0). "Plus tard" masque pour la session.
  */
 export function TrialBanner({ variant = "page", className }: TrialBannerProps) {
-    const { isTrialing, trialDaysLeft, hasSelectedPlan, isLoading } = useTrialStatus();
+    const { isTrialing, trialDaysLeft, trialEndsAt, hasSelectedPlan, isLoading } = useTrialStatus();
+    const [dismissed, setDismissed] = useState(false);
 
-    if (isLoading) return null;
+    if (isLoading || hasSelectedPlan || dismissed) return null;
 
-    // Cas 1 : plan sélectionné → on n'affiche pas de bandeau (sauf si trial actif
-    // avec plan = on reste discret, déjà géré au niveau des badges features).
-    if (hasSelectedPlan) return null;
+    const onDismiss = () => setDismissed(true);
+    const billing = "/dashboard/billing";
 
-    // Cas 2 : essai actif sans plan choisi
-    if (isTrialing) {
+    // Fallback : org sans trialEndsAt → accueil neutre (jamais "expiré").
+    if (trialEndsAt == null && !isTrialing) {
         return (
-            <div
-                data-testid="trial-banner"
-                data-trial-state="active"
-                className={cn(
-                    "flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900 dark:border-amber-900 dark:bg-amber-950/60 dark:text-amber-200",
-                    variant === "sidebar" && "text-xs",
-                    className,
-                )}
-            >
-                <div className="flex-1">
-                    <div className="font-semibold">
-                        Essai actif · {trialDaysLeft} j restant{trialDaysLeft > 1 ? "s" : ""}
-                    </div>
-                    <p className={cn("opacity-80", variant === "sidebar" ? "text-[11px]" : "text-sm")}>
-                        Toutes les fonctionnalités sont déverrouillées. Choisissez un plan avant la fin
-                        de l'essai pour éviter le verrouillage.
-                    </p>
-                    <Button asChild size="sm" variant="outline" className="mt-2 h-7 border-amber-300 bg-white/60 text-amber-900 hover:bg-white dark:bg-amber-900/40 dark:text-amber-100">
-                        <Link href="/dashboard/billing">Choisir un plan</Link>
-                    </Button>
-                </div>
-            </div>
+            <Banner
+                variant={variant}
+                className={className}
+                data-state="neutre"
+                tone="neutral"
+                eyebrow="Essai · 14 jours"
+                progress={0}
+                title="Bienvenue dans Jokko"
+                body="Aucune limite pendant l'essai. Choisissez un plan quand vous serez prêt."
+                cta="Choisir un plan"
+                ctaTone="primary"
+                ctaHref={billing}
+                dismissible
+                onDismiss={onDismiss}
+            />
         );
     }
 
-    // Cas 3 : essai expiré et pas de plan choisi → lock global
+    // Branches expiré → urgent → rappel → neutre : contenu centralisé dans le
+    // helper partagé (même mapping que la bannière de l'Overview).
+    const content = trialBannerContent({ expired: !isTrialing, days: Math.max(0, trialDaysLeft) });
+
     return (
-        <div
-            data-testid="trial-banner"
-            data-trial-state="expired"
-            className={cn(
-                "flex items-start gap-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-rose-900 dark:border-rose-900 dark:bg-rose-950/60 dark:text-rose-200",
-                variant === "sidebar" && "text-xs",
-                className,
-            )}
-        >
-            <Lock className={cn("mt-0.5 shrink-0", variant === "sidebar" ? "h-4 w-4" : "h-5 w-5")} />
-            <div className="flex-1">
-                <div className="font-semibold">Période d'essai terminée</div>
-                <p className={cn("opacity-80", variant === "sidebar" ? "text-[11px]" : "text-sm")}>
-                    Toutes les fonctionnalités sont verrouillées tant qu'aucun plan n'est sélectionné.
-                </p>
-                <Button asChild size="sm" className="mt-2 h-7">
-                    <Link href="/dashboard/billing">Choisir un plan</Link>
-                </Button>
-            </div>
-        </div>
+        <Banner
+            variant={variant}
+            className={className}
+            data-state={content.dataState}
+            tone={content.tone}
+            eyebrow={content.eyebrow}
+            left={content.left}
+            progress={content.progress}
+            title={content.title}
+            body={content.body}
+            cta={content.cta}
+            ctaTone={content.ctaTone}
+            ctaHref={billing}
+            secondaryCta={content.secondaryCta}
+            secondaryHref={content.secondaryCta ? "/dashboard/team" : undefined}
+            dismissible={content.dismissible}
+            onDismiss={content.dismissible ? onDismiss : undefined}
+        />
     );
 }
 
 /**
- * Variante inline qui affiche simplement un texte "N j restants".
- * Utile dans la sidebar à côté du plan actuel.
+ * Inline pill showing "N j restants" — used in the sidebar header next to
+ * the plan label. Stays subtle even at urgent ton.
  */
 export function TrialCountdownPill({ className }: { className?: string }) {
     const { isTrialing, trialDaysLeft, isLoading } = useTrialStatus();
     if (isLoading || !isTrialing) return null;
+
+    const tone =
+        trialDaysLeft <= 2
+            ? "urgent"
+            : trialDaysLeft <= 9
+                ? "rappel"
+                : "neutre";
+
+    const toneClasses: Record<"neutre" | "rappel" | "urgent", string> = {
+        neutre: "border-[var(--ink-200)] bg-[var(--paper-warm)] text-[var(--ink-600)]",
+        rappel: "border-[var(--status-warn)]/30 bg-[var(--status-warn-soft)] text-[var(--status-warn)]",
+        urgent: "border-[var(--status-danger)]/40 bg-[var(--status-danger-soft)] text-[var(--status-danger)]",
+    };
+
     return (
         <span
             data-testid="trial-countdown"
+            data-trial-state={tone}
             className={cn(
-                "inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700",
+                "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-mono text-[10px] font-medium uppercase tracking-wide",
+                toneClasses[tone],
                 className,
             )}
         >

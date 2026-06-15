@@ -38,12 +38,9 @@ import {
     Forward,
     Copy,
     RotateCcw,
-    MapPin,
     Loader2,
     Bot,
-    Unlock,
 } from 'lucide-react'
-import Image from 'next/image'
 
 import { cn } from '@/lib/utils'
 import type { Message } from '@/hooks/useMessages'
@@ -239,7 +236,7 @@ export function MessageBubble({
                         {/* Actions - Buttons */}
                         {action?.buttons && (
                             <div className="flex flex-wrap gap-2 mt-2">
-                                {action.buttons.map((btn: any, i: number) => (
+                                {action.buttons.map((btn, i) => (
                                     <div key={i} className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm text-indigo-600 font-medium shadow-xs">
                                         {btn.reply?.title || 'Button'}
                                     </div>
@@ -251,15 +248,15 @@ export function MessageBubble({
                         {action?.sections && (
                             <div className="mt-2 text-sm text-gray-900 border border-gray-100 rounded-lg overflow-hidden bg-white/50">
                                 <div className="px-3 py-2 bg-gray-50 border-b border-gray-100 font-medium text-gray-500 text-xs flex items-center justify-between">
-                                    <span>LISTE D'OPTIONS</span>
+                                    <span>LISTE D&apos;OPTIONS</span>
                                     {action.button && <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{action.button}</span>}
                                 </div>
                                 <div className="p-2 space-y-3">
-                                    {action.sections.map((section: any, i: number) => (
+                                    {action.sections.map((section, i) => (
                                         <div key={i}>
                                             {section.title && <p className="text-xs font-semibold text-gray-500 mb-1 uppercase">{section.title}</p>}
                                             <ul className="space-y-1">
-                                                {section.rows?.map((row: any, j: number) => (
+                                                {section.rows?.map((row, j) => (
                                                     <li key={j} className="flex flex-col px-2 py-1 bg-white rounded border border-gray-100">
                                                         <span className="font-medium">{row.title}</span>
                                                         {row.description && <span className="text-xs text-gray-500">{row.description}</span>}
@@ -354,8 +351,8 @@ export function MessageBubble({
     // Check if we have any actions available
     const hasActions = onReply || onForward || message.content
 
-    // Menu button component
-    const MenuButton = () => (
+    // Menu button
+    const menuButton = (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
                 <button
@@ -486,7 +483,7 @@ export function MessageBubble({
                 </div>
 
                 {/* Context Menu Button - positioned beside the bubble */}
-                {hasActions && <MenuButton />}
+                {hasActions && menuButton}
             </div>
         </motion.div>
     )

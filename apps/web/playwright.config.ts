@@ -8,7 +8,9 @@ export default defineConfig({
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
     retries: process.env.CI ? 2 : 0,
-    workers: process.env.CI ? 1 : undefined,
+    // Cap local workers: the suite shares one dev server + Convex backend, so the
+    // default (~cpu/2) can saturate it and cause cascading timeouts. CI uses 1.
+    workers: process.env.CI ? 1 : 4,
     reporter: 'html',
     use: {
         baseURL: 'https://localhost:1000',
@@ -25,6 +27,15 @@ export default defineConfig({
             use: {
                 ...devices['Desktop Chrome'],
                 storageState: AUTH_FILE,
+                // Fake mic so the voice-message flow (getUserMedia → record →
+                // send) can run headless; auto-accept the permission prompt.
+                permissions: ['microphone'],
+                launchOptions: {
+                    args: [
+                        '--use-fake-ui-for-media-stream',
+                        '--use-fake-device-for-media-stream',
+                    ],
+                },
             },
             dependencies: ['setup'],
         },

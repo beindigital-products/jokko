@@ -1,74 +1,25 @@
-/**
- * ╔═══════════════════════════════════════════════════════════════╗
- * ║            components/team/InviteMemberModal.tsx              ║
- * ╠═══════════════════════════════════════════════════════════════╣
- * ║                                                               ║
- * ║     Modal d'invitation avec verification de limite            ║
- * ║                                                               ║
- * ║     Design coherent avec l'application:                       ║
- * ║     - Input avec style h-12, rounded-xl                       ║
- * ║     - Couleurs vertes (green-500, green-600)                  ║
- * ║     - Selection de role avec cartes visuelles                 ║
- * ║                                                               ║
- * ╚═══════════════════════════════════════════════════════════════╝
- */
-
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useForm, useWatch } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
-import {
-    Loader2,
-    UserPlus,
-    AlertTriangle,
-    Shield,
-    MessageSquare,
-    Building2,
-} from 'lucide-react'
-import { useAction, useQuery } from "convex/react"
-import { api } from "@/convex/_generated/api"
+import { useState } from 'react'
+import { Loader2, Lock, Send, Users } from 'lucide-react'
+import { useAction, useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import type { Id } from '@/convex/_generated/dataModel'
 
 import {
     Dialog,
     DialogContent,
     DialogDescription,
-    DialogFooter,
-    DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
 import {
-    Form,
-    FormControl,
-    FormField,
-    FormItem,
-    FormLabel,
-    FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-import { ButtonGroup } from '@/components/ui/button-group'
-import { Progress } from '@/components/ui/progress'
-
-import { type Role, ROLE_DEFINITIONS, getAssignableRoles } from '@/lib/team/roles'
-
-// ============================================
-// SCHEMA
-// ============================================
-
-const inviteSchema = z.object({
-    name: z.string().min(2, 'Le nom doit contenir au moins 2 caracteres'), // Note: We only send email via backend, name is just for UI or unused
-    email: z.string().email('Email invalide'),
-    role: z.enum(['admin', 'agent']),
-    poleId: z.string().optional(),
-})
-
-type InviteFormValues = z.infer<typeof inviteSchema>
-
-// ============================================
-// TYPES
-// ============================================
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select'
+import { type Role, getAssignableRoles } from '@/lib/team/roles'
 
 interface InviteMemberModalProps {
     open: boolean
@@ -78,25 +29,16 @@ interface InviteMemberModalProps {
     teamUsage?: { current: number; limit: number }
 }
 
-// ============================================
-// ROLE ICON
-// ============================================
+type InviteRole = 'agent' | 'admin'
 
-function RoleIcon({ role, className }: { role: string; className?: string }) {
-    switch (role) {
-        case 'admin':
-            return <Shield className={className} />
-        case 'agent':
-            return <MessageSquare className={className} />
-        default:
-            return <Shield className={className} />
-    }
-}
+const ROLE_CARDS: { value: InviteRole; label: string; sub: string }[] = [
+    { value: 'agent', label: 'Agent', sub: 'Voit ses conversations' },
+    { value: 'admin', label: 'Admin', sub: 'Cockpit complet' },
+]
 
-// ============================================
-// COMPONENT
-// ============================================
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/** v3 Inviter un coéquipier — recreates the `dialogs.jsx` InviteMemberDialog. */
 export function InviteMemberModal({
     open,
     onOpenChange,
@@ -104,332 +46,205 @@ export function InviteMemberModal({
     currentUserRole,
     teamUsage,
 }: InviteMemberModalProps) {
-    const [error, setError] = useState<string | null>(null)
-
-    // Convex
     const sendInvitation = useAction(api.invitations.create)
     const polesData = useQuery(api.poles.list, {})
-    const poles = polesData?.poles || []
-    const polesLoading = polesData === undefined
+    const poles = polesData?.poles ?? []
 
-    const form = useForm<InviteFormValues>({
-        resolver: zodResolver(inviteSchema),
-        defaultValues: {
-            name: '',
-            email: '',
-            role: 'agent',
-            poleId: undefined,
-        },
-    })
+    const [email, setEmail] = useState('')
+    const [role, setRole] = useState<InviteRole>('agent')
+    const [poleId, setPoleId] = useState<string>('none')
+    const [error, setError] = useState<string | null>(null)
+    const [submitting, setSubmitting] = useState(false)
 
-    // Watch role to conditionally show pole selection
-    const selectedRole = useWatch({ control: form.control, name: 'role' })
+    const canSetAdmin = getAssignableRoles(currentUserRole).includes('admin')
+    const isLimitReached = teamUsage ? teamUsage.current >= teamUsage.limit : false
+    const seatsLabel = teamUsage ? `Équipe · ${teamUsage.current} / ${teamUsage.limit} sièges` : 'Équipe'
 
-    // Clear poleId when role changes to admin
-    useEffect(() => {
-        if (selectedRole === 'admin') {
-            form.setValue('poleId', undefined)
-        }
-    }, [selectedRole, form])
-
-    // Roles that current user can assign
-    const assignableRoles = getAssignableRoles(currentUserRole)
-
-    // Check if limit reached
-    const isLimitReached = teamUsage
-        ? teamUsage.current >= teamUsage.limit
-        : false
-
-    const handleOpenChange = (newOpen: boolean) => {
-        if (!newOpen) {
-            form.reset({
-                name: '',
-                email: '',
-                role: 'agent',
-                poleId: undefined,
-            })
-            setError(null)
-        }
-        onOpenChange(newOpen)
+    const reset = () => {
+        setEmail('')
+        setRole('agent')
+        setPoleId('none')
+        setError(null)
+        setSubmitting(false)
     }
 
-    const onSubmit = async (values: InviteFormValues) => {
+    const handleOpenChange = (next: boolean) => {
+        if (!next) reset()
+        onOpenChange(next)
+    }
+
+    const handleSubmit = async () => {
         if (isLimitReached) {
-            setError('Limite de membres atteinte. Passez a un plan superieur.')
+            setError('Limite de sièges atteinte. Passez à un plan supérieur.')
             return
         }
-
+        if (!EMAIL_RE.test(email.trim())) {
+            setError('Adresse email invalide.')
+            return
+        }
+        setSubmitting(true)
         setError(null)
-
         try {
             const result = await sendInvitation({
-                email: values.email,
-                name: values.name, // Send the name to backend
-                role: values.role.toUpperCase(),
-                poleId: values.poleId as any, // Cast ID
-                // OrganizationId is inferred on backend or we could pass it if needed
+                email: email.trim(),
+                role: role.toUpperCase(),
+                poleId: role === 'agent' && poleId !== 'none' ? (poleId as Id<'poles'>) : undefined,
             })
-
-            const token = result?.token as string | undefined
-            onSuccess(token ? { token, email: values.email } : undefined)
+            const token = (result?.token as string | undefined) ?? undefined
+            onSuccess(token ? { token, email: email.trim() } : undefined)
             handleOpenChange(false)
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+            setSubmitting(false)
         }
     }
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogContent className="sm:max-w-[500px] overflow-y-auto max-h-[90vh]">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <UserPlus className="h-5 w-5 text-green-600" />
-                        Inviter un membre
+            <DialogContent
+                showCloseButton
+                className="max-h-[90vh] gap-0 overflow-hidden p-0 sm:max-w-[560px]"
+            >
+                {/* Head */}
+                <div className="border-b border-[var(--ink-200)] px-6 pb-4 pt-5">
+                    <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                        {seatsLabel}
+                    </p>
+                    <DialogTitle className="mt-1 font-editorial text-[24px] font-normal italic tracking-tight text-[var(--ink-900)]">
+                        Inviter un coéquipier
                     </DialogTitle>
-                    <DialogDescription>
-                        Envoyez une invitation par email pour rejoindre votre organisation.
+                    <DialogDescription className="mt-1.5 text-[13px] text-[var(--ink-500)]">
+                        Une invitation par email avec un lien de connexion valable 14 jours.
                     </DialogDescription>
-                </DialogHeader>
+                </div>
 
-                {isLimitReached && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
-                        <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
-                        <div>
-                            <p className="font-medium text-amber-800 text-sm">Limite atteinte</p>
-                            <p className="text-amber-700 text-xs mt-0.5">
-                                Vous avez atteint la limite de votre plan. Supprimez des membres ou passez au plan superieur.
-                            </p>
+                {/* Body */}
+                <div className="flex flex-col gap-[18px] overflow-y-auto px-6 py-5">
+                    {isLimitReached && (
+                        <div className="rounded-lg border border-[var(--status-warn)]/30 bg-[var(--status-warn-soft)] px-3.5 py-2.5 text-[12.5px] text-[var(--ink-700)]">
+                            Vous avez atteint la limite de sièges de votre plan. Retirez un membre ou passez au plan supérieur.
                         </div>
-                    </div>
-                )}
+                    )}
 
-                <Form {...form}>
-                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                        {/* Name - Optional for backend but kept for UI */}
-                        <FormField
-                            control={form.control}
-                            name="name"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-gray-700">Nom complet</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            placeholder="Ex: Jean Dupont"
-                                            className="h-11 rounded-xl"
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
+                    <Field label="Email">
+                        <input
+                            type="email"
+                            autoFocus
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            placeholder="jeanne.lemoine@exemple.fr"
+                            className="h-11 w-full rounded-lg border border-[var(--ink-200)] bg-[var(--paper-white)] px-3.5 text-[14px] text-[var(--ink-900)] outline-none placeholder:text-[var(--ink-400)] focus:border-[var(--accent)]"
                         />
+                    </Field>
 
-                        {/* Email */}
-                        <FormField
-                            control={form.control}
-                            name="email"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-gray-700">Adresse email</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="email"
-                                            placeholder="jean@example.com"
-                                            className="h-11 rounded-xl"
-                                            {...field}
-                                        />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-
-                        {/* Role Selection */}
-                        <FormField
-                            control={form.control}
-                            name="role"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel className="text-gray-700">Role</FormLabel>
-                                    <FormControl>
-                                        <div className="space-y-2">
-                                            {assignableRoles.map((role) => {
-                                                const roleConfig = ROLE_DEFINITIONS[role]
-                                                const isSelected = field.value === role
-
-                                                if (!roleConfig) return null
-
-                                                return (
-                                                    <button
-                                                        key={role}
-                                                        type="button"
-                                                        onClick={() => field.onChange(role)}
-                                                        className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${isSelected
-                                                            ? 'border-green-500 bg-green-50'
-                                                            : 'border-gray-200 hover:border-gray-300 bg-white'
-                                                            }`}
-                                                    >
-                                                        <div className={`p-2 rounded-lg ${roleConfig.bgColor}`}>
-                                                            <RoleIcon role={role} className={`h-5 w-5 ${roleConfig.color}`} />
-                                                        </div>
-                                                        <div className="flex-1 text-left">
-                                                            <p className={`font-medium ${isSelected ? 'text-green-700' : 'text-gray-900'}`}>
-                                                                {roleConfig.label}
-                                                            </p>
-                                                            <p className="text-sm text-gray-500">
-                                                                {roleConfig.description}
-                                                            </p>
-                                                        </div>
-                                                        {isSelected && (
-                                                            <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
-                                                                <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                                </svg>
-                                                            </div>
-                                                        )}
-                                                    </button>
-                                                )
-                                            })}
+                    <Field
+                        label="Rôle"
+                        hint={!canSetAdmin ? 'Seul le propriétaire peut nommer un Admin.' : undefined}
+                    >
+                        <div className="flex gap-2">
+                            {ROLE_CARDS.map((r) => {
+                                const locked = r.value === 'admin' && !canSetAdmin
+                                const selected = role === r.value
+                                return (
+                                    <button
+                                        key={r.value}
+                                        type="button"
+                                        disabled={locked}
+                                        onClick={() => setRole(r.value)}
+                                        className={`relative flex-1 rounded-[10px] border px-3.5 py-3 text-left transition-colors ${
+                                            selected
+                                                ? 'border-[var(--accent)] bg-[var(--accent-muted)]'
+                                                : locked
+                                                  ? 'cursor-not-allowed border-[var(--ink-200)] bg-[var(--paper-warm)] opacity-55'
+                                                  : 'border-[var(--ink-200)] bg-[var(--paper-white)] hover:border-[var(--ink-300)]'
+                                        }`}
+                                    >
+                                        <div className="text-[13.5px] font-semibold tracking-tight text-[var(--ink-900)]">
+                                            {r.label}
                                         </div>
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
+                                        <div className="mt-0.5 text-[11.5px] text-[var(--ink-soft)]">{r.sub}</div>
+                                        {locked && (
+                                            <Lock className="absolute right-2.5 top-2.5 h-3 w-3 text-[var(--ink-soft)]" />
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
+                    </Field>
 
-                        {/* Pole Selection - Only for agents */}
-                        {selectedRole === 'agent' && poles.length > 0 && (
-                            <FormField
-                                control={form.control}
-                                name="poleId"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel className="text-gray-700">
-                                            Pole / Service
-                                            <span className="ml-1 text-gray-400 font-normal">(optionnel)</span>
-                                        </FormLabel>
-                                        <FormControl>
-                                            <div className="space-y-2">
-                                                {polesLoading ? (
-                                                    <div className="flex items-center justify-center p-4 text-gray-500">
-                                                        <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                                                        Chargement des poles...
-                                                    </div>
-                                                ) : (
-                                                    <>
-                                                        {/* No pole option */}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => field.onChange(undefined)}
-                                                            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${!field.value
-                                                                ? 'border-green-500 bg-green-50'
-                                                                : 'border-gray-200 hover:border-gray-300 bg-white'
-                                                                }`}
-                                                        >
-                                                            <div className="p-2 rounded-lg bg-gray-100">
-                                                                <Building2 className="h-5 w-5 text-gray-500" />
-                                                            </div>
-                                                            <div className="flex-1 text-left">
-                                                                <p className={`font-medium ${!field.value ? 'text-green-700' : 'text-gray-900'}`}>
-                                                                    Aucun pole
-                                                                </p>
-                                                                <p className="text-sm text-gray-500">
-                                                                    L'agent n'est affecte a aucun pole specifique
-                                                                </p>
-                                                            </div>
-                                                            {!field.value && (
-                                                                <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
-                                                                    <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                                    </svg>
-                                                                </div>
-                                                            )}
-                                                        </button>
+                    {role === 'agent' && poles.length > 0 && (
+                        <Field label="Pôle">
+                            <Select value={poleId} onValueChange={setPoleId}>
+                                <SelectTrigger className="h-11 w-full border-[var(--ink-200)] bg-[var(--paper-white)]">
+                                    <SelectValue placeholder="Sélectionner un pôle" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">Aucun pôle</SelectItem>
+                                    {poles.map((p) => (
+                                        <SelectItem key={p.id} value={p.id}>
+                                            {p.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </Field>
+                    )}
 
-                                                        {/* Pole options */}
-                                                        {poles.map((pole) => {
-                                                            const isSelected = field.value === pole.id
-                                                            return (
-                                                                <button
-                                                                    key={pole.id}
-                                                                    type="button"
-                                                                    onClick={() => field.onChange(pole.id)}
-                                                                    className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all ${isSelected
-                                                                        ? 'border-green-500 bg-green-50'
-                                                                        : 'border-gray-200 hover:border-gray-300 bg-white'
-                                                                        }`}
-                                                                >
-                                                                    <div
-                                                                        className="p-2 rounded-lg"
-                                                                        style={{ backgroundColor: `${pole.color}20` }}
-                                                                    >
-                                                                        <Building2
-                                                                            className="h-5 w-5"
-                                                                            style={{ color: pole.color || '#6366f1' }}
-                                                                        />
-                                                                    </div>
-                                                                    <div className="flex-1 text-left">
-                                                                        <p className={`font-medium ${isSelected ? 'text-green-700' : 'text-gray-900'}`}>
-                                                                            {pole.name}
-                                                                        </p>
-                                                                        {pole.description && (
-                                                                            <p className="text-sm text-gray-500">
-                                                                                {pole.description}
-                                                                            </p>
-                                                                        )}
-                                                                        <p className="text-xs text-gray-400 mt-0.5">
-                                                                            {pole.memberCount} {pole.memberCount === 1 ? 'membre' : 'membres'}
-                                                                        </p>
-                                                                    </div>
-                                                                    {isSelected && (
-                                                                        <div className="h-5 w-5 rounded-full bg-green-500 flex items-center justify-center">
-                                                                            <svg className="h-3 w-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                                                                            </svg>
-                                                                        </div>
-                                                                    )}
-                                                                </button>
-                                                            )
-                                                        })}
-                                                    </>
-                                                )}
-                                            </div>
-                                        </FormControl>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                        )}
+                    <div className="flex items-center gap-3 rounded-lg bg-[var(--paper-warm)] px-3.5 py-3 text-[12px] text-[var(--ink-500)]">
+                        <Users className="h-3.5 w-3.5 shrink-0 text-[var(--ink-soft)]" />
+                        <span>Vous pourrez inviter d&apos;autres membres à tout moment depuis cette page.</span>
+                    </div>
 
-                        {/* Error */}
-                        {error && (
-                            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
-                                {error}
-                            </div>
-                        )}
+                    {error && (
+                        <div className="rounded-lg border border-[var(--status-danger)]/30 bg-[var(--status-danger-soft)] px-3.5 py-2.5 text-[12.5px] text-[var(--status-danger)]">
+                            {error}
+                        </div>
+                    )}
+                </div>
 
-                        <DialogFooter>
-                            <ButtonGroup>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => handleOpenChange(false)}
-                                >
-                                    Annuler
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={form.formState.isSubmitting || isLimitReached}
-                                    className="bg-green-600 hover:bg-green-700"
-                                >
-                                    {form.formState.isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                    Envoyer l'invitation
-                                </Button>
-                            </ButtonGroup>
-                        </DialogFooter>
-                    </form>
-                </Form>
+                {/* Footer */}
+                <div className="flex items-center justify-end gap-2 border-t border-[var(--ink-200)] bg-[var(--paper-warm)] px-5 py-3.5">
+                    <button
+                        type="button"
+                        onClick={() => handleOpenChange(false)}
+                        className="rounded-md px-3.5 py-2 text-[13px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--ink-100)]"
+                    >
+                        Annuler
+                    </button>
+                    <button
+                        type="button"
+                        onClick={handleSubmit}
+                        disabled={submitting || isLimitReached}
+                        className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3.5 py-2 text-[13px] font-medium text-white transition-colors hover:bg-[var(--ink-700)] disabled:opacity-50"
+                    >
+                        {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                        Envoyer l&apos;invitation
+                    </button>
+                </div>
             </DialogContent>
         </Dialog>
+    )
+}
+
+function Field({
+    label,
+    hint,
+    children,
+}: {
+    label: string
+    hint?: string
+    children: React.ReactNode
+}) {
+    return (
+        <div>
+            <div className="mb-1.5 text-[12px] font-medium tracking-tight text-[var(--ink-700)]">{label}</div>
+            {children}
+            {hint && (
+                <div className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-[var(--status-warn)]">
+                    <Lock className="h-2.5 w-2.5" />
+                    {hint}
+                </div>
+            )}
+        </div>
     )
 }

@@ -24,6 +24,10 @@ import { requireMembership } from "./lib/auth";
 export const listWithPresence = query({
     args: { organizationId: v.id("organizations") },
     handler: async (ctx, args) => {
+        // SECURITY: l'appelant doit être membre de l'org — sinon n'importe qui
+        // pouvait énumérer le roster (noms/emails) avec un simple organizationId.
+        await requireMembership(ctx, args.organizationId);
+
         const memberships = await ctx.db
             .query("memberships")
             .withIndex("by_organization", (q) => q.eq("organizationId", args.organizationId))

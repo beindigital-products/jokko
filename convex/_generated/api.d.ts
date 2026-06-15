@@ -56,13 +56,15 @@ import type * as crm_registry from "../crm/registry.js";
 import type * as crm_seed from "../crm/seed.js";
 import type * as crm_webhooks from "../crm/webhooks.js";
 import type * as crons from "../crons.js";
+import type * as dashboard from "../dashboard.js";
 import type * as debug from "../debug.js";
+import type * as demo from "../demo.js";
 import type * as diagAuth from "../diagAuth.js";
 import type * as emails_components_button from "../emails/components/button.js";
 import type * as emails_components_layout from "../emails/components/layout.js";
 import type * as emails_invitation from "../emails/invitation.js";
+import type * as emails_mention from "../emails/mention.js";
 import type * as emails_password_reset from "../emails/password_reset.js";
-import type * as emails_verification from "../emails/verification.js";
 import type * as engine from "../engine.js";
 import type * as facebook from "../facebook.js";
 import type * as files from "../files.js";
@@ -70,21 +72,26 @@ import type * as flows from "../flows.js";
 import type * as http from "../http.js";
 import type * as invitations from "../invitations.js";
 import type * as lib_auth from "../lib/auth.js";
+import type * as lib_callPricing from "../lib/callPricing.js";
 import type * as lib_email from "../lib/email.js";
 import type * as lib_encryption from "../lib/encryption.js";
 import type * as lib_encryptionMigration from "../lib/encryptionMigration.js";
+import type * as lib_messagePreview from "../lib/messagePreview.js";
 import type * as lib_permissions from "../lib/permissions.js";
 import type * as lib_planEnforcement from "../lib/planEnforcement.js";
 import type * as lib_planFeatures from "../lib/planFeatures.js";
 import type * as lib_planHelpers from "../lib/planHelpers.js";
 import type * as lib_planLimits from "../lib/planLimits.js";
 import type * as lib_rateLimits from "../lib/rateLimits.js";
+import type * as lib_registration from "../lib/registration.js";
 import type * as lib_stripePlans from "../lib/stripePlans.js";
 import type * as lib_templateBuilder from "../lib/templateBuilder.js";
 import type * as lib_templateTypes from "../lib/templateTypes.js";
 import type * as lib_templateValidation from "../lib/templateValidation.js";
 import type * as lib_templateValidators from "../lib/templateValidators.js";
 import type * as lib_visibility from "../lib/visibility.js";
+import type * as mention_emails from "../mention_emails.js";
+import type * as mentions from "../mentions.js";
 import type * as messages from "../messages.js";
 import type * as migration from "../migration.js";
 import type * as notifications from "../notifications.js";
@@ -98,9 +105,9 @@ import type * as search from "../search.js";
 import type * as seed from "../seed.js";
 import type * as sessions from "../sessions.js";
 import type * as shortcuts from "../shortcuts.js";
+import type * as spike_apple from "../spike_apple.js";
 import type * as stripe from "../stripe.js";
 import type * as stripe_actions from "../stripe_actions.js";
-import type * as syncUser from "../syncUser.js";
 import type * as tags from "../tags.js";
 import type * as team from "../team.js";
 import type * as teams from "../teams.js";
@@ -171,13 +178,15 @@ declare const fullApi: ApiFromModules<{
   "crm/seed": typeof crm_seed;
   "crm/webhooks": typeof crm_webhooks;
   crons: typeof crons;
+  dashboard: typeof dashboard;
   debug: typeof debug;
+  demo: typeof demo;
   diagAuth: typeof diagAuth;
   "emails/components/button": typeof emails_components_button;
   "emails/components/layout": typeof emails_components_layout;
   "emails/invitation": typeof emails_invitation;
+  "emails/mention": typeof emails_mention;
   "emails/password_reset": typeof emails_password_reset;
-  "emails/verification": typeof emails_verification;
   engine: typeof engine;
   facebook: typeof facebook;
   files: typeof files;
@@ -185,21 +194,26 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   invitations: typeof invitations;
   "lib/auth": typeof lib_auth;
+  "lib/callPricing": typeof lib_callPricing;
   "lib/email": typeof lib_email;
   "lib/encryption": typeof lib_encryption;
   "lib/encryptionMigration": typeof lib_encryptionMigration;
+  "lib/messagePreview": typeof lib_messagePreview;
   "lib/permissions": typeof lib_permissions;
   "lib/planEnforcement": typeof lib_planEnforcement;
   "lib/planFeatures": typeof lib_planFeatures;
   "lib/planHelpers": typeof lib_planHelpers;
   "lib/planLimits": typeof lib_planLimits;
   "lib/rateLimits": typeof lib_rateLimits;
+  "lib/registration": typeof lib_registration;
   "lib/stripePlans": typeof lib_stripePlans;
   "lib/templateBuilder": typeof lib_templateBuilder;
   "lib/templateTypes": typeof lib_templateTypes;
   "lib/templateValidation": typeof lib_templateValidation;
   "lib/templateValidators": typeof lib_templateValidators;
   "lib/visibility": typeof lib_visibility;
+  mention_emails: typeof mention_emails;
+  mentions: typeof mentions;
   messages: typeof messages;
   migration: typeof migration;
   notifications: typeof notifications;
@@ -213,9 +227,9 @@ declare const fullApi: ApiFromModules<{
   seed: typeof seed;
   sessions: typeof sessions;
   shortcuts: typeof shortcuts;
+  spike_apple: typeof spike_apple;
   stripe: typeof stripe;
   stripe_actions: typeof stripe_actions;
-  syncUser: typeof syncUser;
   tags: typeof tags;
   team: typeof team;
   teams: typeof teams;
@@ -259,5 +273,138 @@ export declare const internal: FilterApi<
 >;
 
 export declare const components: {
-  rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  rateLimiter: {
+    lib: {
+      checkRateLimit: FunctionReference<
+        "query",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          count?: number;
+          key?: string;
+          name: string;
+          reserve?: boolean;
+          throws?: boolean;
+        },
+        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
+      >;
+      clearAll: FunctionReference<
+        "mutation",
+        "internal",
+        { before?: number },
+        null
+      >;
+      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
+      getValue: FunctionReference<
+        "query",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          key?: string;
+          name: string;
+          sampleShards?: number;
+        },
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          shard: number;
+          ts: number;
+          value: number;
+        }
+      >;
+      rateLimit: FunctionReference<
+        "mutation",
+        "internal",
+        {
+          config:
+            | {
+                capacity?: number;
+                kind: "token bucket";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: null;
+              }
+            | {
+                capacity?: number;
+                kind: "fixed window";
+                maxReserved?: number;
+                period: number;
+                rate: number;
+                shards?: number;
+                start?: number;
+              };
+          count?: number;
+          key?: string;
+          name: string;
+          reserve?: boolean;
+          throws?: boolean;
+        },
+        { ok: true; retryAfter?: number } | { ok: false; retryAfter: number }
+      >;
+      resetRateLimit: FunctionReference<
+        "mutation",
+        "internal",
+        { key?: string; name: string },
+        null
+      >;
+    };
+    time: {
+      getServerTime: FunctionReference<"mutation", "internal", {}, number>;
+    };
+  };
 };

@@ -49,7 +49,7 @@ export function GuidesHero() {
                     transition={{ duration: 0.8, delay: 0.5 }}
                     className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-muted-foreground"
                 >
-                    Pas de théorie. Des captures d'écran, des exemples copier-coller,
+                    Pas de théorie. Des captures d&apos;écran, des exemples copier-coller,
                     des vidéos courtes. Apprenez en faisant.
                 </motion.p>
 

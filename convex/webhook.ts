@@ -1,7 +1,56 @@
 import { internalMutation } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
+import { enqueueConversationEvent } from "./crm/enqueue";
+import { formatConversationPreview } from "./lib/messagePreview";
+import { createNotification } from "./notifications";
+
+/**
+ * Create NEW_MESSAGE notifications (which drive the push) for an inbound message.
+ * The assigned agent always gets it; an unassigned conversation pings the whole
+ * org once — only when the thread first becomes unread — so a busy thread never
+ * spams everyone on every message. Per-user category prefs / per-conversation
+ * mute / DND are enforced downstream in the push-send path. Exported so the
+ * recipient logic can be unit-tested without the webhook's engine side-effects.
+ */
+export async function notifyTeamOfInboundMessage(
+    ctx: MutationCtx,
+    params: {
+        organizationId: Id<"organizations">;
+        conversationId: Id<"conversations">;
+        assignedTo?: Id<"users"> | null;
+        wasUnread: boolean;
+        title: string;
+        preview: string;
+        whatsappChannelId?: Id<"whatsappChannels"> | null;
+    },
+): Promise<void> {
+    const metadata: Record<string, string> = { conversationId: String(params.conversationId) };
+    if (params.whatsappChannelId) metadata.whatsappChannelId = String(params.whatsappChannelId);
+    const base = {
+        organizationId: params.organizationId,
+        type: "NEW_MESSAGE",
+        title: params.title,
+        message: params.preview,
+        link: `/dashboard/conversations/${params.conversationId}`,
+        metadata,
+    };
+
+    if (params.assignedTo) {
+        await createNotification(ctx, { ...base, userId: params.assignedTo });
+        return;
+    }
+    if (params.wasUnread) return; // already surfaced — don't re-ping the org
+    const members = await ctx.db
+        .query("memberships")
+        .withIndex("by_organization", (q) => q.eq("organizationId", params.organizationId))
+        .collect();
+    for (const member of members) {
+        await createNotification(ctx, { ...base, userId: member.userId });
+    }
+}
 
 // Gérer un message entrant (internal only — called from http.ts webhook handler)
 export const handleIncomingMessage = internalMutation({
@@ -128,6 +177,17 @@ export const handleIncomingMessage = internalMutation({
                 updatedAt: Date.now(),
             });
             conversation = await ctx.db.get(conversationId);
+
+            // Nouvelle conversation entrante → push "conversation_opened" vers
+            // les CRM connectés en mode poussant (no-op si aucune connexion
+            // active poussante — la garde vit dans enqueueConversationEvent).
+            await enqueueConversationEvent(ctx, {
+                organizationId,
+                eventType: "conversation_opened",
+                contactId: contact._id,
+                conversationId,
+                occurredAtMs: Date.now(),
+            });
         } else {
             // Auto-assign pole/team from channel if conversation doesn't have them yet
             const patches: Record<string, any> = {};
@@ -187,7 +247,6 @@ export const handleIncomingMessage = internalMutation({
             const button = message.button;
 
             if (interactive) {
-                console.log("Interactive Payload:", JSON.stringify(interactive));
 
                 if (interactive.type === "button_reply" || message.type === "button") {
                     const reply = interactive.button_reply;
@@ -241,17 +300,8 @@ export const handleIncomingMessage = internalMutation({
         }
 
         // 6. Mettre à jour la conversation
-        const MEDIA_PREVIEW: Record<string, string> = {
-            AUDIO: "🎵 Audio",
-            IMAGE: "📷 Photo",
-            VIDEO: "🎥 Vidéo",
-            DOCUMENT: "📄 Document",
-            STICKER: "🎭 Sticker",
-        };
-        const mediaLabel = MEDIA_PREVIEW[type];
-        const preview = mediaLabel
-            ? (content && !content.startsWith("[") ? `${mediaLabel} — ${content}` : mediaLabel)
-            : (content || `[${type}]`);
+        const preview = formatConversationPreview({ type, content });
+        const wasUnread = (conversation.unreadCount || 0) > 0; // before this message
         await ctx.db.patch(conversation._id, {
             lastMessageAt: Date.now(),
             lastMessageDirection: "INBOUND",
@@ -259,6 +309,21 @@ export const handleIncomingMessage = internalMutation({
             unreadCount: (conversation.unreadCount || 0) + 1,
             updatedAt: Date.now(),
         });
+
+        // 6b. Notify the team of the inbound message (drives the push).
+        try {
+            await notifyTeamOfInboundMessage(ctx, {
+                organizationId,
+                conversationId: conversation._id,
+                assignedTo: conversation.assignedTo ?? null,
+                wasUnread,
+                title: contact.name || from,
+                preview,
+                whatsappChannelId: whatsappChannelId ?? null,
+            });
+        } catch (e) {
+            console.error("[WHATSAPP] Failed to create new-message notification:", e);
+        }
 
         // 7. Trigger Automation Engine
         await ctx.scheduler.runAfter(0, internal.engine.processMessage, {

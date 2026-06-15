@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseWebhookEvent, verifyWebhookSignature } from "./rest";
+import { parseWebhookEvent, verifyWebhookSignature, toUnifiedContact } from "./rest";
 
 async function signV3(secret: string, base: string): Promise<string> {
     const key = await crypto.subtle.importKey(
@@ -128,5 +128,42 @@ describe("parseWebhookEvent", () => {
         ]);
         const out = await parseWebhookEvent({ rawBody: raw, headers: {} });
         expect(out[0].entityType).toBe("unknown");
+    });
+});
+
+describe("toUnifiedContact field mapping", () => {
+    const raw = {
+        id: "42",
+        properties: {
+            firstname: "Awa",
+            lastname: "Diop",
+            email: "awa@perso.com",
+            work_email: "awa@work.com",
+            phone: "+221770000000",
+            mobilephone: "+221780000000",
+            custom_phone: "+221760000000",
+        } as Record<string, string | null>,
+    };
+
+    it("uses HubSpot defaults when no mapping is given", () => {
+        const c = toUnifiedContact(raw);
+        expect(c.firstName).toBe("Awa");
+        expect(c.emails).toEqual(["awa@perso.com", "awa@work.com"]);
+        expect(c.phones.map((p) => p.raw)).toEqual(["+221770000000", "+221780000000"]);
+    });
+
+    it("honors a custom mapping for email + phone source properties", () => {
+        const c = toUnifiedContact(raw, { email: "work_email", phone: "custom_phone" });
+        expect(c.emails).toEqual(["awa@work.com"]);
+        expect(c.phones.map((p) => p.raw)).toEqual(["+221760000000"]);
+        // unmapped fields keep their defaults
+        expect(c.firstName).toBe("Awa");
+        expect(c.lastName).toBe("Diop");
+    });
+
+    it("falls back to default when a mapped property is absent on the record", () => {
+        const c = toUnifiedContact(raw, { firstName: "given_name" });
+        // given_name doesn't exist → undefined (no crash)
+        expect(c.firstName).toBeUndefined();
     });
 });

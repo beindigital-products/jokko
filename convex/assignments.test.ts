@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
 import { describe, it, expect, beforeEach } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { modules } from "./test.modules";
 
@@ -505,6 +505,35 @@ describe("Assignments", () => {
             expect(notifications).toHaveLength(1);
             expect(notifications[0].type).toBe("ASSIGNMENT");
         });
+
+        // M4: an AGENT lacks `conversations:assign` and must not be able to
+        // (re)assign conversations — only OWNER/ADMIN can.
+        it("forbids an AGENT from assigning a conversation", async () => {
+            const { orgId } = await setupTestEnv(t);
+            const { agentUserId } = await createAgent(t, orgId, "Acting Agent");
+            const { agentUserId: targetUserId } = await createAgent(t, orgId, "Target Agent");
+            const { convId } = await createConversation(t, orgId);
+
+            // The acting AGENT needs an active session (getContext reads it).
+            await t.run(async (ctx: any) => {
+                await ctx.db.insert("userSessions", {
+                    userId: agentUserId,
+                    currentOrganizationId: orgId,
+                    lastActivityAt: Date.now(),
+                });
+            });
+
+            await expect(
+                t.withIdentity({ subject: agentUserId }).mutation(api.assignments.assign, {
+                    conversationId: convId,
+                    memberId: targetUserId,
+                }),
+            ).rejects.toThrow(/conversations:assign/i);
+
+            // Conversation remains unassigned.
+            const conv = await t.run(async (ctx: any) => ctx.db.get(convId));
+            expect(conv.assignedTo).toBeUndefined();
+        });
     });
 
     // ============================================
@@ -602,6 +631,41 @@ describe("Assignments", () => {
                     excludeOfflineAgents: true,
                 })
             ).rejects.toThrow("Only admins can update settings");
+        });
+    });
+
+    // ============================================
+    // analyzeAndRoute (auto-routing) — regression
+    // ============================================
+    describe("analyzeAndRoute", () => {
+        it("does not crash when no pole is resolved (regression: poleId=null → ArgumentValidationError)", async () => {
+            const { userId, orgId } = await setupTestEnv(t);
+
+            // Enable auto-assign so the routing context is "enabled" and the action
+            // actually reaches the assignToBestAvailable call (the buggy line).
+            await t.withIdentity({ subject: userId }).mutation(api.assignments.updateAssignmentSettings, {
+                autoAssignEnabled: true,
+                maxConcurrentChats: 5,
+                excludeOfflineAgents: false,
+            });
+
+            const { agentUserId } = await createAgent(t, orgId, "Routing Agent", { status: "ONLINE" });
+            const { convId } = await createConversation(t, orgId);
+
+            // No channelPoleId arg + no OPENAI_API_KEY in the vitest env → the
+            // AI block is skipped and the resolved pole is null. Before the fix,
+            // the action passed `poleId: null` into v.optional(v.id("poles")) and
+            // threw on EVERY unrouted inbound message; after the fix it omits the arg.
+            await t.action(internal.assignments.analyzeAndRoute, {
+                conversationId: convId,
+                organizationId: orgId,
+                messageText: "Bonjour, j'ai une question",
+            });
+
+            // It completed without throwing AND routed the conversation to an agent.
+            const conv = await t.run(async (ctx: any) => ctx.db.get(convId));
+            expect(conv.assignedTo).toBeDefined();
+            expect([userId, agentUserId]).toContain(conv.assignedTo);
         });
     });
 });

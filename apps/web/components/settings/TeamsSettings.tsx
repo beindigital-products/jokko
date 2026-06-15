@@ -22,9 +22,27 @@ import {
     AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
 
+type TeamsHook = ReturnType<typeof useTeams>
+type TeamSummary = TeamsHook['teams'][number]
+
+interface TeamCardProps {
+    team: TeamSummary
+    isExpanded: boolean
+    onToggle: () => void
+    canManageMembers: boolean
+    onArchive: TeamsHook['archiveTeam']
+    onAddMember: TeamsHook['addMember']
+    onRemoveMember: TeamsHook['removeMember']
+    onUpdateRole: TeamsHook['updateMemberRole']
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback
+}
+
 export function TeamsSettings() {
     const { currentOrg } = useCurrentOrg()
-    const { teams, isLoading, createTeam, updateTeam, archiveTeam, addMember, removeMember, updateMemberRole } = useTeams()
+    const { teams, isLoading, createTeam, archiveTeam, addMember, removeMember, updateMemberRole } = useTeams()
     const canCreate = usePermission('teams:create')
     const canManageMembers = usePermission('teams:manage_members')
 
@@ -50,8 +68,8 @@ export function TeamsSettings() {
             setNewName('')
             setNewDescription('')
             setShowCreate(false)
-        } catch (e: any) {
-            toast.error(e.message || 'Erreur lors de la création')
+        } catch (e) {
+            toast.error(getErrorMessage(e, 'Erreur lors de la création'))
         } finally {
             setCreating(false)
         }
@@ -142,7 +160,7 @@ export function TeamsSettings() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {teams.map((team: any) => (
+                            {teams.map((team) => (
                                 <TeamCard
                                     key={team._id}
                                     team={team}
@@ -163,7 +181,7 @@ export function TeamsSettings() {
     )
 }
 
-function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onAddMember, onRemoveMember, onUpdateRole }: any) {
+function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onAddMember, onRemoveMember, onUpdateRole }: TeamCardProps) {
     const teamDetail = useQuery(api.teams.getById, isExpanded ? { id: team._id } : "skip")
     const { currentOrg } = useCurrentOrg()
     const membersData = useQuery(
@@ -171,6 +189,10 @@ function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onA
         currentOrg ? { organizationId: currentOrg._id as Id<"organizations"> } : "skip"
     )
     const members = membersData?.members || []
+    type TeamMemberResult = NonNullable<NonNullable<typeof teamDetail>['members']>[number]
+    type PresentTeamMember = NonNullable<TeamMemberResult> & { userId: Id<"users"> }
+    type OrgMemberResult = (typeof members)[number]
+    type PresentOrgMember = NonNullable<OrgMemberResult> & { userId: Id<"users"> }
 
     const [addingMember, setAddingMember] = useState(false)
     const [selectedUserId, setSelectedUserId] = useState('')
@@ -187,8 +209,8 @@ function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onA
             toast.success('Membre ajouté')
             setAddingMember(false)
             setSelectedUserId('')
-        } catch (e: any) {
-            toast.error(e.message || 'Erreur')
+        } catch (e) {
+            toast.error(getErrorMessage(e, 'Erreur'))
         }
     }
 
@@ -196,16 +218,19 @@ function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onA
         try {
             await onArchive({ id: team._id })
             toast.success('Équipe archivée')
-        } catch (e: any) {
-            toast.error(e.message || 'Erreur')
+        } catch (e) {
+            toast.error(getErrorMessage(e, 'Erreur'))
         }
     }
 
     // Get team member user IDs to filter them out from add list
-    const teamMemberIds = new Set(teamDetail?.members?.map((m: any) => m.userId) || [])
+    const teamMembers = (teamDetail?.members || []).filter((m): m is PresentTeamMember => Boolean(m?.userId))
+    const teamMemberIds = new Set(teamMembers.map((m) => m.userId))
 
     // Available org members not already in team
-    const availableMembers = (members || []).filter((m: any) => !teamMemberIds.has(m.userId))
+    const availableMembers = members
+        .filter((m): m is PresentOrgMember => Boolean(m?.userId))
+        .filter((m) => !teamMemberIds.has(m.userId))
 
     return (
         <div className="border rounded-lg overflow-hidden">
@@ -235,9 +260,9 @@ function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onA
             {isExpanded && teamDetail && (
                 <div className="border-t bg-gray-50/50 p-4 space-y-3">
                     {/* Members list */}
-                    {teamDetail.members?.length > 0 ? (
+                    {teamMembers.length > 0 ? (
                         <div className="space-y-2">
-                            {teamDetail.members.map((member: any) => (
+                            {teamMembers.map((member) => (
                                 <div key={member._id} className="flex items-center justify-between bg-white rounded-lg p-3 border">
                                     <div className="flex items-center gap-3">
                                         <Avatar className="h-8 w-8">
@@ -303,7 +328,7 @@ function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onA
                                                 <SelectValue placeholder="Choisir un membre..." />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                {availableMembers.map((m: any) => (
+                                                {availableMembers.map((m) => (
                                                     <SelectItem key={m.userId} value={m.userId}>
                                                         {m.user?.name || m.user?.email}
                                                     </SelectItem>
@@ -345,9 +370,9 @@ function TeamCard({ team, isExpanded, onToggle, canManageMembers, onArchive, onA
                                         </AlertDialogTrigger>
                                         <AlertDialogContent>
                                             <AlertDialogHeader>
-                                                <AlertDialogTitle>Archiver l'équipe "{team.name}" ?</AlertDialogTitle>
+                                                <AlertDialogTitle>Archiver l&apos;équipe &quot;{team.name}&quot; ?</AlertDialogTitle>
                                                 <AlertDialogDescription>
-                                                    L'équipe sera masquée mais les données seront conservées.
+                                                    L&apos;équipe sera masquée mais les données seront conservées.
                                                 </AlertDialogDescription>
                                             </AlertDialogHeader>
                                             <AlertDialogFooter>

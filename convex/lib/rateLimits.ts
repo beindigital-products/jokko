@@ -19,4 +19,22 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
 
     // WhatsApp channel operations
     whatsappConnect: { kind: "fixed window", rate: 10, period: HOUR },
+
+    // Public marketing mutations (unauthenticated, keyed by email/user) —
+    // abuse/spam protection on waiting-list, newsletter, and support tickets.
+    waitingListJoin: { kind: "fixed window", rate: 5, period: HOUR },
+    newsletterSubscribe: { kind: "fixed window", rate: 5, period: HOUR },
+    createTicket: { kind: "fixed window", rate: 10, period: HOUR },
 });
+
+/**
+ * Minimal RFC-5322-ish email format check + length bound. Used by public
+ * marketing mutations to reject obviously malformed / oversized input before
+ * it ever hits the database. NOT a deliverability check.
+ */
+export function isValidEmail(email: string): boolean {
+    if (typeof email !== "string") return false;
+    if (email.length < 3 || email.length > 254) return false;
+    // Single @, non-empty local part, domain with a dot, no whitespace.
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}

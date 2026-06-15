@@ -207,7 +207,7 @@ export function DashboardHeader({
                                                 </div>
                                             ) : (searchResults.contacts.length === 0 && searchResults.pages.length === 0) ? (
                                                 <div className="p-4 text-center text-sm text-gray-500">
-                                                    Aucun résultat trouvé pour "{searchQuery}"
+                                                    Aucun résultat trouvé pour &quot;{searchQuery}&quot;
                                                 </div>
                                             ) : (
                                                 <div className="max-h-[300px] overflow-y-auto">
@@ -391,7 +391,7 @@ export function DashboardHeader({
                                             </AvatarFallback>
                                         </Avatar>
                                         <StatusIndicator
-                                            status={currentStatus as any}
+                                            status={currentStatus as Parameters<typeof StatusIndicator>[0]['status']}
                                             size="sm"
                                             className="absolute -bottom-0.5 -right-0.5 ring-2 ring-white"
                                         />

@@ -9,6 +9,7 @@
 import type { MutationCtx } from "../_generated/server";
 import type { Id } from "../_generated/dataModel";
 import { getMaxChannels, isUnlimited } from "./planHelpers";
+import { createNotification } from "../notifications";
 
 export async function enforceChannelDowngrade(
     ctx: MutationCtx,
@@ -80,14 +81,13 @@ export async function enforceChannelDowngrade(
         .collect();
     for (const m of memberships) {
         if (m.role !== "OWNER" && m.role !== "ADMIN") continue;
-        await ctx.db.insert("notifications", {
+        await createNotification(ctx, {
             organizationId,
             userId: m.userId,
             type: "PLAN_DOWNGRADE",
             title: "Canaux désactivés après changement de plan",
             message: `Votre plan ${newPlan} autorise ${maxChannels} canal${maxChannels > 1 ? "aux" : ""}. ${disabledIds.length} canal${disabledIds.length > 1 ? "aux ont été désactivés" : " a été désactivé"}.`,
             link: "/dashboard/channels",
-            isRead: false,
             metadata: {
                 disabledChannelIds: disabledIds.map((id) => id.toString()),
                 newPlan,

@@ -1,19 +1,6 @@
 import { v } from "convex/values";
-import { mutation, query, internalMutation, QueryCtx, MutationCtx } from "./_generated/server";
-import { getAuthUserId } from "@convex-dev/auth/server";
-
-// Helper to get current organization
-async function getCurrentOrgId(ctx: QueryCtx | MutationCtx) {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) return null;
-
-    const session = await ctx.db
-        .query("userSessions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .first();
-
-    return session?.currentOrganizationId ?? null;
-}
+import { query, internalMutation } from "./_generated/server";
+import { getCurrentOrgId } from "./lib/auth";
 
 /**
  * Get the current credit balance for the active organization
@@ -88,51 +75,13 @@ export const addCredits = internalMutation({
 });
 
 /**
- * Deduct credits for the current user's organization (User initiated action)
- */
-export const deductCredits = mutation({
-    args: {
-        amount: v.number(),
-        description: v.string(),
-        referenceId: v.optional(v.string()), // e.g. broadcast ID
-    },
-    handler: async (ctx, args) => {
-        const orgId = await getCurrentOrgId(ctx);
-        if (!orgId) throw new Error("Unauthorized");
-        const userId = await getAuthUserId(ctx);
-
-        const org = await ctx.db.get(orgId);
-        if (!org) throw new Error("Org not found");
-
-        const currentBalance = org.creditBalance ?? 0;
-
-        if (currentBalance < args.amount) {
-            throw new Error("Insufficient credits");
-        }
-
-        const newBalance = currentBalance - args.amount;
-
-        await ctx.db.patch(orgId, {
-            creditBalance: newBalance,
-        });
-
-        await ctx.db.insert("creditTransactions", {
-            organizationId: orgId,
-            amount: -args.amount,
-            type: "USAGE",
-            description: args.description,
-            referenceId: args.referenceId,
-            balanceAfter: newBalance,
-            createdAt: Date.now(),
-            performedBy: userId ?? undefined,
-        });
-
-        return { success: true, newBalance };
-    },
-});
-
-/**
- * Deduct credits from a specific organization (Internal/System usage)
+ * Deduct credits from a specific organization (Internal/System usage).
+ *
+ * NOTE: the former public `deductCredits` mutation was removed. Letting the
+ * client pick the amount and when to call it meant credit consumption was
+ * enforced client-side (skippable / spoofable). Debiting now happens
+ * server-side and atomically inside the billable action (e.g. broadcasts.ts)
+ * through this internal mutation.
  */
 export const internalDeductCredits = internalMutation({
     args: {

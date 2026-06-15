@@ -58,5 +58,11 @@ next-env.d.ts
 certificates
 .env*.local
 
+# Expo
+.expo/
+**/.expo/
+apps/mobile/dist/
+
 # Claude Code runtime
 .claude/
+.gstack/

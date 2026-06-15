@@ -2,23 +2,34 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Check, Mail } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { Check, Loader2, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export function BlogNewsletter() {
+    const subscribeNewsletter = useMutation(api.waitingList.subscribeNewsletter);
     const [email, setEmail] = useState("");
     const [subscribed, setSubscribed] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+    const [newsletterError, setNewsletterError] = useState<string | null>(null);
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email) return;
-        setSubscribed(true);
-        setTimeout(() => {
-            setSubscribed(false);
+        setIsLoading(true);
+        setNewsletterError(null);
+        try {
+            await subscribeNewsletter({ email, source: "blog" });
+            setSubscribed(true);
             setEmail("");
-        }, 3000);
+        } catch {
+            setNewsletterError("Erreur, veuillez réessayer.");
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -75,7 +86,7 @@ export function BlogNewsletter() {
                         <Button
                             type="submit"
                             size="lg"
-                            disabled={subscribed}
+                            disabled={subscribed || isLoading}
                             className={cn(
                                 "h-12 shrink-0 rounded-full px-6 font-medium transition-all",
                                 subscribed
@@ -83,7 +94,9 @@ export function BlogNewsletter() {
                                     : "bg-white text-[var(--surface-dark)] hover:bg-white/90"
                             )}
                         >
-                            {subscribed ? (
+                            {isLoading ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : subscribed ? (
                                 <>
                                     <Check className="h-4 w-4" />
                                     Inscrit
@@ -94,6 +107,9 @@ export function BlogNewsletter() {
                         </Button>
                     </form>
 
+                    {newsletterError && (
+                        <p className="mt-2 text-xs text-red-400">{newsletterError}</p>
+                    )}
                     <p className="mt-4 text-xs text-white/50">
                         4 300+ professionnels reçoivent déjà le lundi matin.
                     </p>

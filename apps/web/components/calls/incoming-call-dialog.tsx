@@ -6,7 +6,8 @@ import { useCallStore } from '@/lib/stores/call-store';
 import { useWebRTCCall } from '@/hooks/use-webrtc-call';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { startRingtone, stopRingtone } from '@/lib/ringtone';
 
 interface IncomingCallDialogProps {
     sdpOffer: string;
@@ -14,9 +15,17 @@ interface IncomingCallDialogProps {
 
 export function IncomingCallDialog({ sdpOffer }: IncomingCallDialogProps) {
     const { activeCallId, callState, contactName, contactPhone } = useCallStore();
-    const { answerCall, remoteAudioRef } = useWebRTCCall();
+    const { answerCall } = useWebRTCCall();
     const rejectCallMutation = useMutation(api.calls.rejectCall);
     const [isAccepting, setIsAccepting] = useState(false);
+
+    // Ring while the call is incoming; stop as soon as it's answered/rejected
+    // (the dialog unmounts) or the state leaves 'ringing'.
+    useEffect(() => {
+        if (callState !== 'ringing') return;
+        startRingtone();
+        return () => stopRingtone();
+    }, [callState]);
 
     if (callState !== 'ringing' || !activeCallId) return null;
 
@@ -44,9 +53,6 @@ export function IncomingCallDialog({ sdpOffer }: IncomingCallDialogProps) {
 
     return (
         <>
-            {/* Hidden audio element for remote audio playback */}
-            <audio ref={remoteAudioRef} autoPlay playsInline />
-
             {/* Full-screen overlay */}
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                 <div className="flex w-80 flex-col items-center gap-6 rounded-2xl bg-white p-8 shadow-2xl dark:bg-zinc-900">

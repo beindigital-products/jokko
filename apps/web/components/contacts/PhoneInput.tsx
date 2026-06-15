@@ -1,5 +1,5 @@
 'use client'
-import { useState, forwardRef, useEffect } from 'react'
+import { useState, forwardRef, useMemo } from 'react'
 import { Check, X } from 'lucide-react'
 import {
     Select,
@@ -8,13 +8,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import {
     validatePhone,
     formatAsYouType,
     detectCountry,
-    getNationalNumber,
     SUPPORTED_COUNTRIES,
     type PhoneValidationResult,
     type CountryCode,
@@ -57,82 +55,34 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
         },
         ref
     ) {
-        const [country, setCountry] = useState<CountryCode>(defaultCountry)
-        const [displayValue, setDisplayValue] = useState('')
-        const [validation, setValidation] = useState<PhoneValidationResult | null>(null)
-        const [indicatorNumber, setIndicatorNumber] = useState<CountryCode | null | undefined>(null)
+        const [selectedCountry, setSelectedCountry] = useState<CountryCode>(defaultCountry)
+        const detectedCountry = useMemo(() => indicator || detectCountry(value), [indicator, value])
+        const country = detectedCountry || selectedCountry
+        const displayValue = useMemo(() => {
+            if (!value) return ''
 
-        // Initialize from prop value if present
-        useEffect(() => {
-            if (value) {
-                setIndicatorNumber(indicator);
-                // If indicator explicit (from outside detection), use it. Or auto-detect.
-                const detected = indicatorNumber || detectCountry(value);
-                console.log('PhoneInput value:', value, 'Detected:', detected, "indicatorNumber", indicatorNumber);
+            const countryObj = SUPPORTED_COUNTRIES.find(c => c.code === country)
+            let national = value
 
-                let nextCountry = detected || defaultCountry;
+            if (countryObj) {
+                const cleanVal = value.replace(/[^\d+]/g, '')
+                const cleanDial = countryObj.dialCode.replace('+', '')
 
-                // Sticky logic: If detection is null (e.g. ambiguity), but we have a currently selected country
-                // that matches the prefix of the value, preserve it to prevent jumping to defaultCountry.
-                if (!detected) {
-                    const currentDialCode = SUPPORTED_COUNTRIES.find(c => c.code === country)?.dialCode;
-                    if (currentDialCode) {
-                        const cleanVal = value.replace(/[^\d+]/g, '');
-                        const normalizedCtx = cleanVal.startsWith('+') ? cleanVal : '+' + cleanVal;
-                        if (normalizedCtx.startsWith(currentDialCode)) {
-                            // The number still matches the currently selected country, keep it.
-                            nextCountry = country;
-                        }
-                    }
+                if (cleanVal.startsWith(countryObj.dialCode)) {
+                    national = cleanVal.substring(countryObj.dialCode.length)
+                } else if (cleanVal.startsWith(cleanDial)) {
+                    national = cleanVal.substring(cleanDial.length)
+                } else if (('+' + cleanVal).startsWith(countryObj.dialCode)) {
+                    national = cleanVal.substring(cleanDial.length)
                 }
-
-                setCountry(nextCountry);
-
-                // Strip prefix to get national digits
-                const countryObj = SUPPORTED_COUNTRIES.find(c => c.code === nextCountry);
-                let national = value;
-
-                if (countryObj) {
-                    // Normalize value for stripping
-                    const cleanVal = value.replace(/[^\d+]/g, '');
-                    const cleanDial = countryObj.dialCode.replace('+', '');
-
-                    // Check against +DialCode
-                    if (cleanVal.startsWith(countryObj.dialCode)) {
-                        national = cleanVal.substring(countryObj.dialCode.length);
-                    }
-                    // Check against DialCode (no plus)
-                    else if (cleanVal.startsWith(cleanDial)) {
-                        national = cleanVal.substring(cleanDial.length);
-                    }
-                    // Check against +DialCode (stripping + manual check)
-                    else if (('+' + cleanVal).startsWith(countryObj.dialCode)) {
-                        // This case handles e.g. "33..." -> "+33..." matches "+33"
-                        // We need to strip "33" from "33..."
-                        national = cleanVal.substring(cleanDial.length);
-                    }
-                }
-
-                // Format for display
-                const formatted = formatAsYouType(national, nextCountry);
-                setDisplayValue(formatted);
-
-                // Validate initial
-                setValidation(validatePhone(value, { defaultCountry }));
-            } else {
-                setCountry(defaultCountry);
-                setDisplayValue('');
             }
-        }, [value, defaultCountry]); // Careful with dependency loop if onChange updates value fast
 
-        // We need to break the loop: if user types, we update internal displayValue, AND call onChange.
-        // Parent updates `value`. `useEffect` triggers.
-        // If `useEffect` logic rebuilds exact same displayValue, no render loop.
-        // To be safe, we can check if `value` matches our reconstructed current state?
-        // Actually, easiest way is to trust `value` prop as source of truth for country/initial, but drive input from local state for smooth typing.
-        // But if we separate, we might desync.
-        // Let's stick to: useEffect updates local state ONLY if the derived value from prop is different from current local state?
-        // Or just let it sync. React handles same-value state updates efficiently.
+            return formatAsYouType(national, country)
+        }, [country, value])
+        const validation = useMemo(
+            () => (value ? validatePhone(value, { defaultCountry }) : null),
+            [defaultCountry, value]
+        )
 
         const currentCountryObj = SUPPORTED_COUNTRIES.find((c) => c.code === country);
 
@@ -142,7 +92,6 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
             // Limit to allowed chars (digits, maybe space)
             // But user might type arbitrary stuff, formatAsYouType handles clean up
             const formatted = formatAsYouType(raw, country);
-            setDisplayValue(formatted);
 
             // Reconstruct full E.164
             const cleanDigits = formatted.replace(/\D/g, '');
@@ -150,26 +99,22 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
             const fullNumber = prefix + cleanDigits;
 
             const res = validatePhone(fullNumber, { defaultCountry: country });
-            setValidation(res);
 
             onChange?.(fullNumber, res);
         };
 
         const handleCountryChange = (code: string) => {
             const newCountry = code as CountryCode;
-            setCountry(newCountry);
+            setSelectedCountry(newCountry);
 
             // Reformat existing digits with new country format
             const cleanDigits = displayValue.replace(/\D/g, '');
-            const newFormatted = formatAsYouType(cleanDigits, newCountry);
-            setDisplayValue(newFormatted);
 
             const newCountryObj = SUPPORTED_COUNTRIES.find(c => c.code === newCountry);
             const prefix = newCountryObj?.dialCode || '';
             const fullNumber = prefix + cleanDigits;
 
             const res = validatePhone(fullNumber, { defaultCountry: newCountry });
-            setValidation(res);
 
             onChange?.(fullNumber, res);
         };
@@ -181,17 +126,18 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
         return (
             <div className={cn('space-y-1', className)}>
                 <div className={cn(
-                    "flex h-12 w-full rounded-xl border border-gray-200 bg-gray-50 focus-within:ring-2 focus-within:ring-green-500/20 focus-within:border-green-500 overflow-hidden",
-                    hasError && "border-destructive ring-destructive/20"
+                    // v3 tokens: paper-warm bg, ink-200 border, accent focus ring.
+                    "flex h-11 w-full rounded-xl border border-[var(--ink-200)] bg-[var(--paper-warm)] focus-within:ring-2 focus-within:ring-[var(--accent-ring)] focus-within:border-[var(--accent)] overflow-hidden transition-colors",
+                    hasError && "border-[var(--status-danger)] ring-[var(--status-danger)]/20"
                 )}>
                     {/* Country Selector */}
-                    <div className="flex-none border-r border-gray-200 bg-gray-50/50">
+                    <div className="flex-none border-r border-[var(--ink-200)]">
                         <Select value={country} onValueChange={handleCountryChange} disabled={disabled}>
-                            <SelectTrigger className="h-full border-0 bg-transparent px-3 rounded-none shadow-none focus:ring-0 gap-2 w-[100px]">
+                            <SelectTrigger className="h-full border-0 bg-transparent px-3 rounded-none shadow-none focus:ring-0 gap-1 w-[92px]">
                                 <SelectValue>
-                                    <span className="flex items-center gap-1">
-                                        <span className="text-lg leading-none">{currentCountryObj?.flag}</span>
-                                        <span className="text-xs text-muted-foreground">{currentCountryObj?.dialCode}</span>
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="text-base leading-none">{currentCountryObj?.flag}</span>
+                                        <span className="text-xs text-[var(--ink-500)]">{currentCountryObj?.dialCode}</span>
                                     </span>
                                 </SelectValue>
                             </SelectTrigger>
@@ -201,7 +147,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
                                         <span className="flex items-center gap-2">
                                             <span>{c.flag}</span>
                                             <span>{c.name}</span>
-                                            <span className="text-xs text-muted-foreground">{c.dialCode}</span>
+                                            <span className="text-xs text-[var(--ink-500)]">{c.dialCode}</span>
                                         </span>
                                     </SelectItem>
                                 ))}
@@ -220,23 +166,23 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
                         onBlur={onBlur}
                         placeholder={placeholder}
                         disabled={disabled}
-                        className="flex-1 bg-transparent px-3 text-sm focus:outline-none placeholder:text-muted-foreground"
+                        className="flex-1 bg-transparent px-3 text-sm text-[var(--ink-900)] focus:outline-none placeholder:text-[var(--ink-400)]"
                     />
 
                     {/* Validation Status */}
                     {showValidation && displayValue && (
                         <div className="flex items-center px-3">
                             {showValid ? (
-                                <Check className="h-4 w-4 text-green-500" />
+                                <Check className="h-4 w-4 text-[var(--status-good)]" strokeWidth={2.5} />
                             ) : showInvalid ? (
-                                <X className="h-4 w-4 text-destructive" />
+                                <X className="h-4 w-4 text-[var(--status-danger)]" strokeWidth={2.5} />
                             ) : null}
                         </div>
                     )}
                 </div>
 
                 {/* Error message */}
-                {error && <p className="text-sm text-destructive">{error}</p>}
+                {error && <p className="text-xs text-[var(--status-danger)]">{error}</p>}
             </div>
         )
     }

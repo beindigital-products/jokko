@@ -5,6 +5,8 @@ const PUBLIC_ROUTES = [
     '/',
     '/auth/sign-in',
     '/auth/sign-up',
+    '/auth/forgot-password',
+    '/auth/reset-password',
     '/pricing',
     '/about',
     '/contact',
@@ -13,6 +15,10 @@ const PUBLIC_ROUTES = [
     '/terms',
     '/api',
     '/invite',
+    // /dev pages are dev-only by construction — each page guards itself with
+    // a NODE_ENV check that returns notFound() in production. Public here to
+    // allow local QA without a sign-in.
+    '/dev',
 ]
 
 function isPublicRoute(pathname: string): boolean {
@@ -67,7 +73,12 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
+         * - any path ending in a file extension (static assets in public/:
+         *   logo.png, logo-mark.png, apple-touch-icon.png, site.webmanifest,
+         *   og-image.png, *.svg, robots.txt, sitemap.xml, …). Without this,
+         *   the auth gate 307-redirects public assets to sign-in, which breaks
+         *   them on unauthenticated pages and makes next/image return 400.
          */
-        '/((?!api|_next/static|_next/image|favicon.ico).*)',
+        '/((?!api|_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)',
     ],
 }

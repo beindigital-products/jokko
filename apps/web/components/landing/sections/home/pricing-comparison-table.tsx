@@ -1,15 +1,16 @@
 'use client'
 
 import React from 'react'
-import { Check, Minus, HelpCircle, Info } from 'lucide-react'
+import { Check, Minus, Info } from 'lucide-react'
 import {
     Tooltip,
     TooltipContent,
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { FadeInView } from '@/components/animations'
 import { COMPARISON_TABLE } from '@/lib/plans'
+
+const PLAN_KEYS = ['starter', 'business', 'pro'] as const
 
 export function PricingComparisonTable() {
     return (
@@ -31,14 +32,14 @@ export function PricingComparisonTable() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {COMPARISON_TABLE.map((section, sIndex) => (
+                            {COMPARISON_TABLE.map((section) => (
                                 <React.Fragment key={section.category}>
                                     <tr>
                                         <td colSpan={4} className="py-6 px-6 bg-white">
                                             <h3 className="text-lg font-bold text-slate-900">{section.category}</h3>
                                         </td>
                                     </tr>
-                                    {section.items.map((item, iIndex) => (
+                                    {section.items.map((item) => (
                                         <tr key={item.name} className="hover:bg-slate-50/50 transition-colors">
                                             <td className="py-4 px-6 text-slate-600 font-medium flex items-center gap-2">
                                                 {item.name}
@@ -55,8 +56,8 @@ export function PricingComparisonTable() {
                                                     </TooltipProvider>
                                                 )}
                                             </td>
-                                            {['starter', 'business', 'pro'].map((plan) => {
-                                                const value = (item as any)[plan]
+                                            {PLAN_KEYS.map((plan) => {
+                                                const value = item[plan]
                                                 return (
                                                     <td key={plan} className={`text-center py-4 px-6 ${plan === 'business' ? 'bg-green-50/30' : ''}`}>
                                                         <div className="flex justify-center items-center">

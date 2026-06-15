@@ -1,9 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Check, Shield, Twitter, Linkedin, Github } from "lucide-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
+import { ArrowRight, Check, Shield, Twitter, Linkedin, Github, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -67,17 +70,26 @@ const socialLinks = [
 ];
 
 export function Footer() {
+  const subscribeNewsletter = useMutation(api.waitingList.subscribeNewsletter);
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [newsletterError, setNewsletterError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    setSubscribed(true);
-    setTimeout(() => {
-      setSubscribed(false);
+    setIsLoading(true);
+    setNewsletterError(null);
+    try {
+      await subscribeNewsletter({ email, source: "footer" });
+      setSubscribed(true);
       setEmail("");
-    }, 3000);
+    } catch {
+      setNewsletterError("Erreur, veuillez réessayer.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -101,10 +113,13 @@ export function Footer() {
         <div className="grid gap-12 lg:grid-cols-12">
           <div className="lg:col-span-4">
             <Link href="/" className="inline-flex items-center gap-2.5">
-              <span className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-hover)] text-sm font-bold text-white shadow-[0_8px_24px_-6px_var(--accent-glow)]">
-                J
-                <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--whatsapp)] ring-2 ring-[var(--surface-dark)]" />
-              </span>
+              <Image
+                src="/logo-mark.png"
+                alt=""
+                width={36}
+                height={36}
+                className="h-9 w-9 object-contain brightness-0 invert"
+              />
               <span className="font-display text-xl font-semibold tracking-tight text-white">
                 Jokko
               </span>
@@ -132,7 +147,7 @@ export function Footer() {
                 <Button
                   type="submit"
                   size="sm"
-                  disabled={subscribed}
+                  disabled={subscribed || isLoading}
                   className={cn(
                     "h-11 shrink-0 rounded-full px-5 font-medium transition-all",
                     subscribed
@@ -140,7 +155,9 @@ export function Footer() {
                       : "bg-white text-[var(--surface-dark)] hover:bg-white/90"
                   )}
                 >
-                  {subscribed ? (
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : subscribed ? (
                     <>
                       <Check className="h-4 w-4" />
                       Inscrit
@@ -153,6 +170,9 @@ export function Footer() {
                   )}
                 </Button>
               </div>
+              {newsletterError && (
+                <p className="mt-1 text-xs text-red-400">{newsletterError}</p>
+              )}
               <p className="mt-2 text-xs text-white/40">
                 Une fois par mois. Pas de spam, désinscription en 1 clic.
               </p>
@@ -233,7 +253,7 @@ export function Footer() {
           aria-hidden
         >
           <div
-            className="font-display text-[18vw] font-bold leading-none tracking-tighter text-transparent"
+            className="text-center font-display text-[18vw] font-bold leading-none tracking-tighter text-transparent"
             style={{
               WebkitTextStroke: "1px rgba(255,255,255,0.08)",
               backgroundImage:

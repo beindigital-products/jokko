@@ -3,8 +3,10 @@ import { describe, it, expect } from "vitest";
 import {
     featureUnlockSource,
     getTrialEndsAt,
+    hasActiveStripeSubscription,
     hasChosenPlan,
     hasFeatureAccess,
+    hasPaidAccess,
     isTrialing,
 } from "./planHelpers";
 
@@ -12,12 +14,16 @@ import {
 const DAY = 24 * 60 * 60 * 1000;
 const now = 1_700_000_000_000; // date pivot arbitraire pour tests déterministes
 
+/** Abonnement Stripe actif factice : requis pour débloquer un plan payant post-essai. */
+const ACTIVE_STRIPE = { customerId: "cus_test", status: "active" };
+
 function org(overrides: Partial<{
     plan: string;
     hasSelectedPlan: boolean;
     trialStartedAt: number;
     trialEndsAt: number;
     createdAt: number;
+    stripe: { customerId?: string; status?: string };
 }> = {}) {
     return {
         plan: "FREE",
@@ -87,6 +93,7 @@ describe("planHelpers — hasFeatureAccess", () => {
             plan: "BUSINESS",
             trialEndsAt: now - DAY,
             hasSelectedPlan: true,
+            stripe: ACTIVE_STRIPE,
         });
         expect(hasFeatureAccess(o, "broadcasts", now)).toBe(true);
         expect(hasFeatureAccess(o, "chatbot", now)).toBe(true);
@@ -100,6 +107,7 @@ describe("planHelpers — hasFeatureAccess", () => {
             plan: "PRO",
             trialEndsAt: now - DAY,
             hasSelectedPlan: true,
+            stripe: ACTIVE_STRIPE,
         });
         expect(hasFeatureAccess(o, "ai", now)).toBe(true);
         expect(hasFeatureAccess(o, "flows", now)).toBe(true);
@@ -112,6 +120,7 @@ describe("planHelpers — hasFeatureAccess", () => {
             plan: "STARTER",
             trialEndsAt: now - DAY,
             hasSelectedPlan: true,
+            stripe: ACTIVE_STRIPE,
         });
         expect(hasFeatureAccess(o, "inbox", now)).toBe(true);
         expect(hasFeatureAccess(o, "quickReplies", now)).toBe(true);
@@ -126,6 +135,7 @@ describe("planHelpers — featureUnlockSource", () => {
             plan: "BUSINESS",
             hasSelectedPlan: true,
             trialEndsAt: now - DAY,
+            stripe: ACTIVE_STRIPE,
         });
         expect(featureUnlockSource(o, "broadcasts", now)).toBe("plan");
     });
@@ -144,6 +154,7 @@ describe("planHelpers — featureUnlockSource", () => {
             plan: "PRO",
             hasSelectedPlan: true,
             trialEndsAt: now + 3 * DAY,
+            stripe: ACTIVE_STRIPE,
         });
         expect(featureUnlockSource(o, "ai", now)).toBe("plan");
         expect(featureUnlockSource(o, "broadcasts", now)).toBe("plan");
@@ -164,8 +175,44 @@ describe("planHelpers — featureUnlockSource", () => {
             plan: "STARTER",
             hasSelectedPlan: true,
             trialEndsAt: now - DAY,
+            stripe: ACTIVE_STRIPE,
         });
         expect(featureUnlockSource(o, "ai", now)).toBe("locked");
         expect(featureUnlockSource(o, "inbox", now)).toBe("plan");
+    });
+});
+
+describe("planHelpers — accès payant adossé à Stripe", () => {
+    it("hasActiveStripeSubscription : active/trialing = true, canceled/absent = false", () => {
+        expect(hasActiveStripeSubscription(org({ stripe: { status: "active" } }))).toBe(true);
+        expect(hasActiveStripeSubscription(org({ stripe: { status: "trialing" } }))).toBe(true);
+        expect(hasActiveStripeSubscription(org({ stripe: { status: "canceled" } }))).toBe(false);
+        expect(hasActiveStripeSubscription(org({ stripe: { status: "past_due" } }))).toBe(false);
+        expect(hasActiveStripeSubscription(org())).toBe(false);
+    });
+
+    it("hasPaidAccess : plan payant exige un abonnement Stripe actif", () => {
+        const base = { plan: "PRO", hasSelectedPlan: true, trialEndsAt: now - DAY };
+        expect(hasPaidAccess(org({ ...base }))).toBe(false); // pas de Stripe
+        expect(hasPaidAccess(org({ ...base, stripe: { status: "canceled" } }))).toBe(false);
+        expect(hasPaidAccess(org({ ...base, stripe: ACTIVE_STRIPE }))).toBe(true);
+    });
+
+    it("hasPaidAccess : ENTERPRISE est exempté de Stripe (octroi manuel)", () => {
+        const o = org({ plan: "ENTERPRISE", hasSelectedPlan: true, trialEndsAt: now - DAY });
+        expect(hasPaidAccess(o)).toBe(true);
+    });
+
+    it("trial expiré + plan PRO SANS Stripe → features verrouillées", () => {
+        const o = org({ plan: "PRO", hasSelectedPlan: true, trialEndsAt: now - DAY });
+        expect(hasFeatureAccess(o, "ai", now)).toBe(false);
+        expect(hasFeatureAccess(o, "flows", now)).toBe(false);
+        expect(featureUnlockSource(o, "ai", now)).toBe("locked");
+    });
+
+    it("trial expiré + ENTERPRISE SANS Stripe → débloqué (octroi manuel)", () => {
+        const o = org({ plan: "ENTERPRISE", hasSelectedPlan: true, trialEndsAt: now - DAY });
+        expect(hasFeatureAccess(o, "ai", now)).toBe(true);
+        expect(featureUnlockSource(o, "ai", now)).toBe("plan");
     });
 });

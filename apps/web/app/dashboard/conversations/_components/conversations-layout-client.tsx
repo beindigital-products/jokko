@@ -17,17 +17,10 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { ConversationLayout } from '@/components/conversations'
 import { useCurrentOrg } from '@/hooks/use-current-org'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Loader2 } from 'lucide-react'
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
-interface ConversationsLayoutClientProps {
-    children: React.ReactNode
-}
-
-export function ConversationsLayoutClient({
-    children,
-}: ConversationsLayoutClientProps) {
+export function ConversationsLayoutClient() {
     const { currentOrg, isLoading } = useCurrentOrg()
     const router = useRouter()
 
@@ -39,9 +32,9 @@ export function ConversationsLayoutClient({
 
     if (isLoading) {
         return (
-            <div className="flex h-full -m-4 lg:-m-6 gap-0">
+            <div className="flex h-full gap-0">
                 {/* Contact List Skeleton */}
-                <div className="hidden md:flex w-80 md:w-96 lg:w-[420px] flex-col border-r border-gray-200/80 bg-white p-4 gap-4">
+                <div className="hidden md:flex w-80 md:w-96 lg:w-[340px] flex-col border-r border-gray-200/80 bg-white p-4 gap-4">
                     <div className="space-y-3">
                         <Skeleton className="h-10 w-full" />
                         <div className="flex gap-2">
@@ -86,9 +79,10 @@ export function ConversationsLayoutClient({
 
     return (
         <TooltipProvider delayDuration={0}>
-            {/* Negative margins to escape parent padding (p-4 lg:p-6) */}
-            {/* Height compensates for the padding we're escaping */}
-            <div className="-m-4 lg:-m-6 h-[calc(100vh-4rem)]">
+            {/* Full-bleed route: the layout renders us straight into #main-content
+                (no padding wrapper), so a plain `h-full` fills the box exactly —
+                banner-independent, no 100vh calc. */}
+            <div className="h-full">
                 <ConversationLayout
                     organizationId={currentOrg._id}
                     basePath="/dashboard/conversations"

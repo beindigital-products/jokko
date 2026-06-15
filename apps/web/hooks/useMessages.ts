@@ -23,6 +23,7 @@ export interface Message {
         id: string
         content: string | null
         type: string
+        direction?: 'INBOUND' | 'OUTBOUND'
     }
     isForwarded?: boolean
     reaction?: string
@@ -30,7 +31,39 @@ export interface Message {
     longitude?: number
     locationName?: string
     locationAddress?: string
-    interactive?: any
+    interactive?: InteractiveMessageContent
+    /** Team-only internal note (not sent to WhatsApp). */
+    isInternal?: boolean
+    /** @mentions inside an internal note. */
+    mentions?: { userId: string; name: string }[]
+}
+
+export interface InteractiveMessageContent {
+    header?: {
+        type?: string
+        text?: string
+    }
+    body?: {
+        text?: string
+    }
+    footer?: {
+        text?: string
+    }
+    action?: {
+        buttons?: {
+            reply?: {
+                title?: string
+            }
+        }[]
+        button?: string
+        sections?: {
+            title?: string
+            rows?: {
+                title?: string
+                description?: string
+            }[]
+        }[]
+    }
 }
 
 interface UseMessagesProps {
@@ -64,7 +97,12 @@ export function useMessages({ conversationId, organizationId }: UseMessagesProps
         // Usually chat UIs render newest at bottom.
         // If list returns newest first, we should reverse to get chronological order.
 
-        return results.map((msg: any) => ({
+        // Resolve quoted-reply content from the loaded window (id → message).
+        // Replies usually target a recent, in-view message; if the parent
+        // isn't loaded we fall back to a generic label downstream.
+        const byId = new Map(results.map((r) => [r._id, r]));
+
+        return results.map((msg) => ({
             id: msg._id,
             content: msg.content || null,
             type: msg.type as Message['type'],
@@ -81,15 +119,18 @@ export function useMessages({ conversationId, organizationId }: UseMessagesProps
             }] : undefined,
             replyTo: msg.replyToId ? {
                 id: msg.replyToId,
-                content: "Reponse", // Cannot resolve content synchronously here without join
-                type: "TEXT"
+                content: byId.get(msg.replyToId)?.content ?? null,
+                type: byId.get(msg.replyToId)?.type ?? "TEXT",
+                direction: byId.get(msg.replyToId)?.direction as 'INBOUND' | 'OUTBOUND' | undefined,
             } : undefined,
             isForwarded: msg.isForwarded,
             latitude: msg.latitude,
             longitude: msg.longitude,
             locationName: msg.locationName,
             locationAddress: msg.locationAddress,
-            interactive: msg.interactive,
+            interactive: msg.interactive as InteractiveMessageContent | undefined,
+            isInternal: msg.isInternal,
+            mentions: msg.mentions,
         })).reverse();
     }, [results]);
 

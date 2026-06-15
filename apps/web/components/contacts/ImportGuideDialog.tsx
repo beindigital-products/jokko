@@ -22,13 +22,13 @@ interface ImportGuideDialogProps {
 
 function StepList({ steps }: { steps: string[] }) {
     return (
-        <ol className="space-y-3 mt-3">
+        <ol className="mt-3 space-y-3">
             {steps.map((step, i) => (
-                <li key={i} className="flex gap-3 text-sm">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                <li key={i} className="flex gap-3 text-[13px]">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-muted)] font-mono text-[11px] font-semibold text-[var(--accent)]">
                         {i + 1}
                     </span>
-                    <span className="text-muted-foreground leading-6">{step}</span>
+                    <span className="leading-6 text-[var(--ink-700)]">{step}</span>
                 </li>
             ))}
         </ol>
@@ -82,21 +82,24 @@ const ANDROID_DIRECT_STEPS = [
 export function ImportGuideDialog({ open, onOpenChange }: ImportGuideDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Smartphone className="h-5 w-5 text-primary" />
+            <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto border-[var(--ink-200)] bg-[var(--paper-white)]">
+                <DialogHeader className="space-y-0 text-left">
+                    <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                        Contacts · guide
+                    </p>
+                    <DialogTitle className="mt-1 flex items-center gap-2 font-editorial text-[20px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                        <Smartphone className="h-5 w-5 text-[var(--ink-400)]" />
                         Comment récupérer mes contacts ?
                     </DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="mt-1 text-[13px] leading-snug text-[var(--ink-500)]">
                         Suivez ces étapes pour exporter vos contacts depuis votre smartphone, puis importez le fichier CSV dans Jokko.
                     </DialogDescription>
                 </DialogHeader>
 
                 <Accordion type="single" collapsible className="w-full">
                     {/* iPhone Section */}
-                    <AccordionItem value="iphone-icloud">
-                        <AccordionTrigger className="text-sm">
+                    <AccordionItem value="iphone-icloud" className="border-[var(--ink-100)]">
+                        <AccordionTrigger className="text-[13px] text-[var(--ink-900)]">
                             <span className="flex items-center gap-2">
                                 <span className="text-lg">🍎</span>
                                 iPhone — via iCloud (recommandé)
@@ -107,8 +110,8 @@ export function ImportGuideDialog({ open, onOpenChange }: ImportGuideDialogProps
                         </AccordionContent>
                     </AccordionItem>
 
-                    <AccordionItem value="iphone-direct">
-                        <AccordionTrigger className="text-sm">
+                    <AccordionItem value="iphone-direct" className="border-[var(--ink-100)]">
+                        <AccordionTrigger className="text-[13px] text-[var(--ink-900)]">
                             <span className="flex items-center gap-2">
                                 <span className="text-lg">🍎</span>
                                 iPhone — export direct (iOS 16+)
@@ -120,8 +123,8 @@ export function ImportGuideDialog({ open, onOpenChange }: ImportGuideDialogProps
                     </AccordionItem>
 
                     {/* Android Section */}
-                    <AccordionItem value="android-google">
-                        <AccordionTrigger className="text-sm">
+                    <AccordionItem value="android-google" className="border-[var(--ink-100)]">
+                        <AccordionTrigger className="text-[13px] text-[var(--ink-900)]">
                             <span className="flex items-center gap-2">
                                 <span className="text-lg">🤖</span>
                                 Android — via Google Contacts (recommandé)
@@ -132,8 +135,8 @@ export function ImportGuideDialog({ open, onOpenChange }: ImportGuideDialogProps
                         </AccordionContent>
                     </AccordionItem>
 
-                    <AccordionItem value="android-direct">
-                        <AccordionTrigger className="text-sm">
+                    <AccordionItem value="android-direct" className="border-[var(--ink-100)]">
+                        <AccordionTrigger className="text-[13px] text-[var(--ink-900)]">
                             <span className="flex items-center gap-2">
                                 <span className="text-lg">🤖</span>
                                 Android — export depuis l&apos;app Contacts
@@ -146,20 +149,20 @@ export function ImportGuideDialog({ open, onOpenChange }: ImportGuideDialogProps
                 </Accordion>
 
                 {/* Tips */}
-                <div className="rounded-lg bg-blue-50 border border-blue-100 p-4 mt-2">
-                    <p className="text-sm font-medium text-blue-900 mb-2">💡 Conseils</p>
-                    <ul className="text-xs text-blue-800 space-y-1.5">
+                <div className="mt-2 rounded-xl border border-[var(--ink-100)] bg-[var(--paper-warm)] p-4">
+                    <p className="mb-2 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-[var(--ink-soft)]">Conseils</p>
+                    <ul className="space-y-1.5 text-[12px] text-[var(--ink-700)]">
                         <li className="flex items-start gap-1.5">
-                            <ChevronRight className="h-3 w-3 mt-0.5 shrink-0" />
-                            Le fichier CSV doit contenir au minimum une colonne <strong>phone</strong> ou <strong>Téléphone</strong>.
+                            <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-[var(--ink-400)]" />
+                            <span>Le fichier CSV doit contenir au minimum une colonne <strong className="font-medium text-[var(--ink-900)]">phone</strong> ou <strong className="font-medium text-[var(--ink-900)]">Téléphone</strong>.</span>
                         </li>
                         <li className="flex items-start gap-1.5">
-                            <ChevronRight className="h-3 w-3 mt-0.5 shrink-0" />
-                            Les colonnes <strong>name</strong>, <strong>email</strong> et <strong>company</strong> seront automatiquement détectées.
+                            <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-[var(--ink-400)]" />
+                            <span>Les colonnes <strong className="font-medium text-[var(--ink-900)]">name</strong>, <strong className="font-medium text-[var(--ink-900)]">email</strong> et <strong className="font-medium text-[var(--ink-900)]">company</strong> seront automatiquement détectées.</span>
                         </li>
                         <li className="flex items-start gap-1.5">
-                            <ChevronRight className="h-3 w-3 mt-0.5 shrink-0" />
-                            Les numéros doivent inclure l&apos;indicatif pays (ex: +221 77 123 45 67).
+                            <ChevronRight className="mt-0.5 h-3 w-3 shrink-0 text-[var(--ink-400)]" />
+                            <span>Les numéros doivent inclure l&apos;indicatif pays (ex: +221 77 123 45 67).</span>
                         </li>
                     </ul>
                 </div>

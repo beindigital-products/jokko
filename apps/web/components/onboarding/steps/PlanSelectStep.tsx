@@ -15,25 +15,18 @@ interface PlanSelectStepProps {
     onComplete: () => void;
 }
 
+// v3 — ghost-style icons in a subtle accent-muted pastille (per PDF spec).
+// Drop the green gradient blobs.
 const PLAN_CONFIG = {
-    STARTER: {
-        icon: Zap,
-        gradient: 'from-[#14532d] to-[#059669]',
-    },
-    BUSINESS: {
-        icon: Store,
-        gradient: 'from-[#166534] to-[#0d9488]',
-    },
-    PRO: {
-        icon: Building2,
-        gradient: 'from-[#15803d] to-[#10b981]',
-    },
+    STARTER: { icon: Zap },
+    BUSINESS: { icon: Store },
+    PRO: { icon: Building2 },
 } as const;
 
 type PlanKey = keyof typeof PLAN_CONFIG;
 
 export function PlanSelectStep({ onComplete }: PlanSelectStepProps) {
-    const [selectedPlan, setSelectedPlan] = useState<string>('BUSINESS');
+    const [selectedPlan, setSelectedPlan] = useState<PlanKey>('BUSINESS');
     const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -55,19 +48,17 @@ export function PlanSelectStep({ onComplete }: PlanSelectStepProps) {
                     `${formatLimit(p.maxAgents)} agent${p.maxAgents > 1 ? 's' : ''}`,
                     `${formatLimit(p.maxWhatsappChannels)} canal${p.maxWhatsappChannels > 1 ? 'aux' : ''} WhatsApp`,
                     `${formatLimit(p.maxConversationsPerMonth)} conversations/mois`,
-                    ...p.features.filter((f: any) => f.included).slice(0, 2).map((f: any) => f.label),
+                    ...p.features.filter((f) => f.included).slice(0, 2).map((f) => f.label),
                 ],
-                ...config,
+                icon: config.icon,
             };
         });
 
-    const handleSelectPlan = async (planKey: string) => {
+    const handleSelectPlan = async (planKey: PlanKey) => {
         setIsLoading(true);
         try {
-            await updateOrgPlan({ plan: planKey as any });
-            if (planKey !== 'FREE') {
-                sessionStorage.setItem('jokko_billing_interval', billingInterval);
-            }
+            await updateOrgPlan({ plan: planKey });
+            sessionStorage.setItem('jokko_billing_interval', billingInterval);
             onComplete();
         } catch (error) {
             console.error('Failed to update plan:', error);
@@ -93,14 +84,14 @@ export function PlanSelectStep({ onComplete }: PlanSelectStepProps) {
     return (
         <div className="space-y-6">
             <div className="flex justify-center">
-                <div className="inline-flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 p-1">
+                <div className="inline-flex items-center gap-1 rounded-full border border-[var(--ink-200)] bg-[var(--paper-warm)] p-1">
                     <button
                         onClick={() => setBillingInterval('month')}
                         className={cn(
                             'rounded-full px-4 py-1.5 text-sm font-medium transition-all',
                             billingInterval === 'month'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-white text-[var(--ink-900)] shadow-sm'
+                                : 'text-[var(--ink-500)] hover:text-[var(--ink-700)]'
                         )}
                     >
                         Mensuel
@@ -110,12 +101,12 @@ export function PlanSelectStep({ onComplete }: PlanSelectStepProps) {
                         className={cn(
                             'rounded-full px-4 py-1.5 text-sm font-medium transition-all',
                             billingInterval === 'year'
-                                ? 'bg-white text-gray-900 shadow-sm'
-                                : 'text-gray-500 hover:text-gray-700'
+                                ? 'bg-white text-[var(--ink-900)] shadow-sm'
+                                : 'text-[var(--ink-500)] hover:text-[var(--ink-700)]'
                         )}
                     >
                         Annuel
-                        <span className="ml-1.5 text-[10px] font-bold text-green-600">-20%</span>
+                        <span className="ml-1.5 text-[10px] font-bold text-[var(--status-good)]">-20%</span>
                     </button>
                 </div>
             </div>
@@ -136,83 +127,102 @@ export function PlanSelectStep({ onComplete }: PlanSelectStepProps) {
                             transition={{ duration: 0.25, delay: index * 0.06, ease: [0.32, 0.72, 0, 1] }}
                             onClick={() => setSelectedPlan(plan.key)}
                             disabled={isLoading}
+                            aria-pressed={isSelected}
                             className={cn(
-                                'relative flex flex-col rounded-2xl border p-6 lg:p-7 text-left transition-all duration-200 bg-white',
+                                'relative flex flex-col rounded-2xl border bg-[var(--paper-white)] p-6 lg:p-7 text-left transition-all duration-200',
                                 isSelected
-                                    ? 'border-green-500 ring-4 ring-green-100 shadow-sm'
-                                    : 'border-gray-200 hover:border-green-200 hover:bg-green-50/30 hover:shadow-sm',
+                                    ? 'border-[var(--accent)] ring-4 ring-[var(--accent-muted)] shadow-sm'
+                                    : 'border-[var(--ink-200)] hover:border-[var(--ink-300)] hover:shadow-sm',
                             )}
                         >
-                            {plan.popular && (
-                                <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-[#14532d] to-[#059669] px-3.5 py-1 text-[11px] font-bold text-white shadow-sm shadow-green-900/20">
+                            {plan.popular ? (
+                                /* v3 — minimal pill : near-black bg, violet dot, mono caps */
+                                <span className="absolute -top-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 rounded-full bg-[var(--ink-900)] px-3 py-1 font-mono text-[10px] font-medium uppercase tracking-[0.1em] text-white">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
                                     Recommandé
                                 </span>
-                            )}
+                            ) : null}
 
                             <div className="flex items-center gap-3 mb-5">
-                                <div className={cn(
-                                    'flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br shadow-sm shadow-green-900/20',
-                                    plan.gradient
-                                )}>
-                                    <Icon className="h-6 w-6 text-white" />
+                                {/* v3 — ghost icon. Gris par défaut, violet uniquement
+                                    pour le plan recommandé (Business). */}
+                                <div
+                                    className={cn(
+                                        "flex h-11 w-11 items-center justify-center rounded-xl",
+                                        plan.popular
+                                            ? "bg-[var(--accent-muted)] text-[var(--accent)]"
+                                            : "bg-[var(--paper-warm)] text-[var(--ink-500)]",
+                                    )}
+                                >
+                                    <Icon className="h-5 w-5" strokeWidth={1.75} />
                                 </div>
                                 <div className="min-w-0">
-                                    <h3 className="text-base font-semibold text-gray-900">{plan.name}</h3>
-                                    <p className="text-xs text-gray-500 truncate">{plan.description}</p>
+                                    <h3 className="text-base font-semibold text-[var(--ink-900)]">{plan.name}</h3>
+                                    <p className="text-xs text-[var(--ink-500)] truncate">{plan.description}</p>
                                 </div>
                             </div>
 
                             <div className="mb-5">
-                                <span className="text-3xl font-bold text-gray-900 tracking-tight">
+                                <span className="text-3xl font-bold text-[var(--ink-900)] tracking-tight">
                                     {new Intl.NumberFormat('fr-FR').format(price)}
                                 </span>
-                                <span className="text-sm text-gray-500 ml-1">F CFA</span>
-                                <div className="text-xs text-gray-500 mt-0.5">par mois</div>
+                                <span className="text-sm text-[var(--ink-500)] ml-1">F CFA</span>
+                                <div className="text-xs text-[var(--ink-500)] mt-0.5">
+                                    {billingInterval === 'month' ? 'par mois' : '/mois, facturé annuellement'}
+                                </div>
                             </div>
 
                             <ul className="space-y-2.5 flex-1">
                                 {plan.features.map((feature, i) => (
-                                    <li key={i} className="flex items-start gap-2 text-sm text-gray-600">
-                                        <Check className="h-4 w-4 shrink-0 text-green-600 mt-0.5" strokeWidth={2.5} />
+                                    <li key={i} className="flex items-start gap-2 text-sm text-[var(--ink-600)]">
+                                        <Check className="h-4 w-4 shrink-0 text-[var(--accent)] mt-0.5" strokeWidth={2.5} />
                                         <span>{feature}</span>
                                     </li>
                                 ))}
                             </ul>
 
-                            {isSelected && (
-                                <div className="mt-5 flex items-center justify-center gap-1.5 rounded-lg bg-green-50 border border-green-100 py-2 text-sm font-semibold text-green-700">
-                                    <Check className="h-4 w-4" strokeWidth={2.5} />
-                                    Sélectionné
-                                </div>
-                            )}
+                            {/* v3 — per-card CTA inside the card (outline / filled selon état) */}
+                            <div
+                                className={cn(
+                                    "mt-6 flex items-center justify-center gap-1.5 rounded-xl py-2.5 text-sm font-semibold transition-colors",
+                                    isSelected
+                                        ? "bg-[var(--accent)] text-white"
+                                        : "border border-[var(--ink-200)] bg-[var(--paper-white)] text-[var(--ink-700)]",
+                                )}
+                            >
+                                {isSelected ? (
+                                    <>
+                                        <Check className="h-4 w-4" strokeWidth={2.5} />
+                                        Sélectionné
+                                    </>
+                                ) : (
+                                    `Choisir ${plan.name}`
+                                )}
+                            </div>
                         </motion.button>
                     );
                 })}
             </div>
 
-            <Button
-                onClick={() => handleSelectPlan(selectedPlan)}
-                disabled={isLoading}
-                size="lg"
-                className="w-full h-12 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-semibold rounded-xl shadow-sm hover:shadow-md transition-all group"
-            >
-                {isLoading ? (
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                ) : (
-                    <>
-                        Continuer avec {displayPlans.find(p => p.key === selectedPlan)?.name}
-                        <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-0.5 transition-transform" />
-                    </>
-                )}
-            </Button>
-
-            <button
-                onClick={() => handleSelectPlan('FREE')}
-                disabled={isLoading}
-                className="w-full text-center text-sm text-gray-500 hover:text-gray-900 transition-colors py-1"
-            >
-                Continuer gratuitement avec le plan Free
-            </button>
+            {/* v3 — CTA seule (pas de plan gratuit, l'essai 14 j s'applique sur
+                tous les plans sans carte). */}
+            <div className="border-t border-[var(--ink-200)] pt-5 flex justify-end">
+                <Button
+                    onClick={() => handleSelectPlan(selectedPlan)}
+                    disabled={isLoading}
+                    variant="accent"
+                    className="group"
+                >
+                    {isLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                        <>
+                            Continuer avec {displayPlans.find(p => p.key === selectedPlan)?.name}
+                            <ArrowRight className="ml-1.5 h-4 w-4 group-hover:translate-x-0.5 transition-transform" />
+                        </>
+                    )}
+                </Button>
+            </div>
         </div>
     );
 }

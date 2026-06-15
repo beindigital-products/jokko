@@ -20,6 +20,11 @@ import type {
     UnifiedContact,
     UnifiedDeal,
 } from "../../core/types";
+import { mappedIdentity, type FieldMapping } from "../../core/mapping";
+
+// Valid SOQL field / relationship path (e.g. "Custom_Email__c", "Account.Name").
+// Gates user-supplied mapped field names before they reach a SOQL SELECT.
+const SF_FIELD_RE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z][A-Za-z0-9_]*)*$/;
 
 const SF_AUTH = "https://login.salesforce.com/services/oauth2/authorize";
 const SF_TOKEN = "https://login.salesforce.com/services/oauth2/token";
@@ -165,16 +170,23 @@ interface SFContact {
     LastModifiedDate?: string | null;
 }
 
-function toUnifiedContact(raw: SFContact): UnifiedContact {
+function toUnifiedContact(raw: SFContact, mapping?: FieldMapping): UnifiedContact {
     const phones: Array<{ raw: string; type?: string }> = [];
     if (raw.Phone) phones.push({ raw: raw.Phone, type: "primary" });
     if (raw.MobilePhone) phones.push({ raw: raw.MobilePhone, type: "mobile" });
-    return {
-        externalId: raw.Id,
+    const id = mappedIdentity(raw, mapping, {
         firstName: raw.FirstName ?? undefined,
         lastName: raw.LastName ?? undefined,
         emails: raw.Email ? [raw.Email] : [],
         phones,
+    });
+    return {
+        externalId: raw.Id,
+        firstName: id.firstName,
+        lastName: id.lastName,
+        emails: id.emails,
+        phones: id.phones,
+        externalTags: id.tags,
         company: raw.Account?.Name ?? undefined,
         externalOwnerId: raw.OwnerId ?? undefined,
         externalUpdatedAtMs: raw.LastModifiedDate ? Date.parse(raw.LastModifiedDate) : undefined,
@@ -200,15 +212,24 @@ export async function pullContactsPage(p: {
             nextRecordsUrl?: string;
         };
         return {
-            items: json.records.map(toUnifiedContact),
+            items: json.records.map((r) => toUnifiedContact(r, p.ctx.fieldMapping)),
             nextCursor: json.done ? undefined : json.nextRecordsUrl,
             hasMore: !json.done,
         };
     }
 
+    // Base SELECT + any custom-mapped fields (sanitized to prevent SOQL injection).
+    const m = p.ctx.fieldMapping ?? {};
+    const baseFields = [
+        "Id", "FirstName", "LastName", "Email", "Phone", "MobilePhone",
+        "OwnerId", "LastModifiedDate", "Account.Name",
+    ];
+    const customFields = [m.firstName, m.lastName, m.email, m.phone].filter(
+        (f): f is string => typeof f === "string" && SF_FIELD_RE.test(f),
+    );
+    const fields = Array.from(new Set([...baseFields, ...customFields]));
     const soql = [
-        "SELECT Id, FirstName, LastName, Email, Phone, MobilePhone, OwnerId, LastModifiedDate,",
-        "Account.Name FROM Contact",
+        `SELECT ${fields.join(", ")} FROM Contact`,
         p.sinceMs ? `WHERE LastModifiedDate > ${new Date(p.sinceMs).toISOString()}` : "",
         "ORDER BY LastModifiedDate ASC LIMIT 200",
     ].filter(Boolean).join(" ");
@@ -223,7 +244,7 @@ export async function pullContactsPage(p: {
     };
 
     return {
-        items: json.records.map(toUnifiedContact),
+        items: json.records.map((r) => toUnifiedContact(r, p.ctx.fieldMapping)),
         nextCursor: json.done ? undefined : json.nextRecordsUrl,
         hasMore: !json.done,
     };

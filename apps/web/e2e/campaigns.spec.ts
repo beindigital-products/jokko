@@ -107,22 +107,19 @@ test.describe('Campaigns Page', () => {
     });
 
     test('should navigate to new campaign page', async ({ page }) => {
-        const newBtn = page.getByRole('button', { name: /nouvelle campagne|nouveau|créer/i });
+        // v3 : the "Nouvelle campagne" CTA opens the creation wizard in place
+        // (a modal overlay) instead of routing to /campagnes/new. Assert the
+        // wizard surface appears — same intent (the creation flow is reachable).
+        const newBtn = page.getByRole('button', { name: /nouvelle campagne|nouveau|créer/i }).first();
         const visible = await newBtn.isVisible().catch(() => false);
         if (!visible) {
-            // Try link variant
-            const newLink = page.getByRole('link', { name: /nouvelle campagne|nouveau|créer/i });
-            const linkVisible = await newLink.isVisible().catch(() => false);
-            if (!linkVisible) {
-                test.skip();
-                return;
-            }
-            await newLink.click();
-        } else {
-            await newBtn.click();
+            test.skip();
+            return;
         }
-        await page.waitForLoadState('networkidle');
-        expect(page.url()).toContain('/campagnes/new');
+        await newBtn.click();
+        // Step 1 of the wizard: heading + stepper.
+        await expect(page.getByRole('heading', { name: /Nommez votre campagne/i })).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText(/Étape 1 · objectif/i)).toBeVisible();
     });
 
     test('should display audience estimation on new page', async ({ page }) => {

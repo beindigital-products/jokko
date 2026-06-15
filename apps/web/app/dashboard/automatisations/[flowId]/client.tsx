@@ -2,7 +2,7 @@
 
 import { Id } from '@/convex/_generated/dataModel';
 import { FlowEditor } from './components/FlowEditor';
-import { GuidedFlowBuilder } from '../components/GuidedFlowBuilder';
+import { FlowAIAssistant } from '../components/FlowAIAssistant';
 
 interface FlowEditorClientProps {
     flowId: string;
@@ -11,7 +11,7 @@ interface FlowEditorClientProps {
 
 export default function FlowEditorClient({ flowId, mode }: FlowEditorClientProps) {
     if (mode === 'guided') {
-        return <GuidedFlowBuilder flowId={flowId} />;
+        return <FlowAIAssistant flowId={flowId} />;
     }
 
     return <FlowEditor flowId={flowId as Id<"flows">} />;

@@ -1,6 +1,6 @@
 import { convexTest } from "convex-test";
-import { describe, it, expect, beforeEach } from "vitest";
-import { api } from "./_generated/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { api, internal } from "./_generated/api";
 import schema from "./schema";
 import { modules } from "./test.modules";
 
@@ -584,5 +584,258 @@ describe("Broadcasts", () => {
                 expect(item.sentCount).toBe(0);
             }
         });
+    });
+});
+
+describe("broadcasts — pause / resume (resumable send)", () => {
+    let t: any;
+    let orgId: string;
+    let templateId: string;
+    let asMember: any;
+    let asOutsider: any;
+
+    const mkBroadcast = (status: string, extra: Record<string, any> = {}) =>
+        t.run(async (ctx: any) =>
+            ctx.db.insert("broadcasts", {
+                organizationId: orgId, name: "Promo", templateId,
+                audienceConfig: { type: "ALL" }, status,
+                sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0, failedCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(), ...extra,
+            }),
+        );
+
+    beforeEach(async () => {
+        t = convexTest(schema, modules);
+        const ids = await t.run(async (ctx: any) => {
+            const member = await ctx.db.insert("users", { email: "m@a.com", name: "M" });
+            const outsider = await ctx.db.insert("users", { email: "o@b.com", name: "O" });
+            const org = await ctx.db.insert("organizations", {
+                name: "Org", ownerId: member, plan: "BUSINESS", creditBalance: 1_000_000,
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            await ctx.db.insert("memberships", {
+                userId: member, organizationId: org, role: "OWNER", status: "ONLINE",
+                maxConversations: 10, activeConversations: 0, lastSeenAt: Date.now(), joinedAt: Date.now(),
+            });
+            await ctx.db.insert("userSessions", { userId: member, currentOrganizationId: org, lastActivityAt: Date.now() });
+            const tpl = await ctx.db.insert("templates", {
+                organizationId: org, name: "Welcome", slug: "welcome", type: "TEXT",
+                category: "MARKETING", language: "fr", status: "APPROVED", body: "Bonjour",
+                sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0,
+                clickedCount: 0, convertedCount: 0, failedCount: 0, blockedCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            return { org, member, outsider, tpl };
+        });
+        orgId = ids.org;
+        templateId = ids.tpl;
+        asMember = t.withIdentity({ subject: ids.member, issuer: "test" });
+        asOutsider = t.withIdentity({ subject: ids.outsider, issuer: "test" });
+    });
+
+    // sendBroadcast self-schedules + sendSingleToContact schedules WA sends —
+    // convex-test can't run scheduled actions in teardown, so cancel pending jobs.
+    afterEach(async () => {
+        await t.run(async (ctx: any) => {
+            const jobs = await ctx.db.system.query("_scheduled_functions").collect();
+            for (const j of jobs) if (j.state.kind === "pending") await ctx.scheduler.cancel(j._id);
+        });
+    });
+
+    it("pauseBroadcast: SENDING → PAUSED for a member", async () => {
+        const id = await mkBroadcast("SENDING");
+        await asMember.mutation(api.broadcasts.pauseBroadcast, { id });
+        const b = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(b.status).toBe("PAUSED");
+    });
+
+    it("pauseBroadcast: rejects when the campaign is not SENDING", async () => {
+        const id = await mkBroadcast("DRAFT");
+        await expect(asMember.mutation(api.broadcasts.pauseBroadcast, { id })).rejects.toThrow(/cours d'envoi|pause/i);
+    });
+
+    it("pauseBroadcast: rejects a non-member (cross-tenant)", async () => {
+        const id = await mkBroadcast("SENDING");
+        await expect(asOutsider.mutation(api.broadcasts.pauseBroadcast, { id })).rejects.toThrow(/membre|permission/i);
+    });
+
+    it("resumeBroadcast: PAUSED → SENDING + schedules the continuation", async () => {
+        const id = await mkBroadcast("PAUSED", { sentCount: 50, audienceTotal: 200 });
+        await asMember.mutation(api.broadcasts.resumeBroadcast, { id });
+        const b = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(b.status).toBe("SENDING");
+        const jobs = await t.run(async (ctx: any) => ctx.db.system.query("_scheduled_functions").collect());
+        expect(jobs.some((j: any) => String(j.name).includes("broadcasts"))).toBe(true);
+    });
+
+    it("resumeBroadcast: rejects when the campaign is not PAUSED", async () => {
+        const id = await mkBroadcast("SENDING");
+        await expect(asMember.mutation(api.broadcasts.resumeBroadcast, { id })).rejects.toThrow(/en pause|reprise/i);
+    });
+
+    it("sendBroadcast guard: a PAUSED campaign is a no-op (cursor preserved)", async () => {
+        const id = await mkBroadcast("PAUSED", { sentCount: 50, audienceTotal: 200 });
+        await t.action(internal.broadcasts.sendBroadcast, { broadcastId: id, organizationId: orgId });
+        const b = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(b.status).toBe("PAUSED");
+        expect(b.sentCount).toBe(50);
+    });
+});
+
+// ============================================================================
+// sendBroadcast — audience filtering by tags + WhatsApp components built from
+// the saved templateVariables mapping. Asserts on the scheduled
+// `whatsapp_actions:sendMessage` jobs (convex-test can't run the Node action).
+// ============================================================================
+describe("broadcasts — sendBroadcast (tags filter + template components)", () => {
+    let t: any;
+    let orgId: string;
+    let templateId: string;
+    let tagVip: string;
+    let cMamadou: string;
+
+    // Read the `template` arg of every scheduled WhatsApp send.
+    const scheduledSends = () =>
+        t.run(async (ctx: any) => {
+            const jobs = await ctx.db.system.query("_scheduled_functions").collect();
+            return jobs
+                .filter((j: any) => String(j.name).includes("whatsapp_actions"))
+                .map((j: any) => j.args[0]);
+        });
+
+    const mkBroadcast = (extra: Record<string, any> = {}) =>
+        t.run(async (ctx: any) =>
+            ctx.db.insert("broadcasts", {
+                organizationId: orgId, name: "Promo", templateId,
+                audienceConfig: { type: "ALL" }, status: "SENDING",
+                sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0, failedCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(), ...extra,
+            }),
+        );
+
+    beforeEach(async () => {
+        t = convexTest(schema, modules);
+        const ids = await t.run(async (ctx: any) => {
+            const owner = await ctx.db.insert("users", { email: "o@s.com", name: "Owner" });
+            const org = await ctx.db.insert("organizations", {
+                name: "Org", ownerId: owner, plan: "BUSINESS", creditBalance: 1_000_000,
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            const tpl = await ctx.db.insert("templates", {
+                organizationId: org, name: "Welcome", slug: "welcome", type: "MARKETING",
+                category: "MARKETING", language: "fr", status: "APPROVED",
+                body: "Bonjour {{1}}, voici {{2}}",
+                sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0,
+                clickedCount: 0, convertedCount: 0, failedCount: 0, blockedCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            const vip = await ctx.db.insert("tags", { organizationId: org, name: "VIP", createdAt: Date.now() });
+            const prospect = await ctx.db.insert("tags", { organizationId: org, name: "Prospect", createdAt: Date.now() });
+            // 2 tagged VIP (Mamadou, Fatou) + 1 untagged-from-VIP (Pierre, prospect only).
+            const mamadou = await ctx.db.insert("contacts", {
+                organizationId: org, phone: "+221701111111", name: "Mamadou Diop",
+                firstName: "Mamadou", lastName: "Diop", company: "Sonatel", city: "Dakar",
+                searchName: "mamadou", tags: [vip], createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            await ctx.db.insert("contacts", {
+                organizationId: org, phone: "+221702222222", name: "Fatou Sow",
+                firstName: "Fatou", searchName: "fatou", tags: [vip, prospect],
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            await ctx.db.insert("contacts", {
+                organizationId: org, phone: "+33612345678", name: "Pierre Martin",
+                firstName: "Pierre", searchName: "pierre", tags: [prospect],
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            return { org, tpl, vip, mamadou };
+        });
+        orgId = ids.org;
+        templateId = ids.tpl;
+        tagVip = ids.vip;
+        cMamadou = ids.mamadou;
+    });
+
+    // sendSingleToContact schedules Node WA sends convex-test can't run in teardown.
+    afterEach(async () => {
+        await t.run(async (ctx: any) => {
+            const jobs = await ctx.db.system.query("_scheduled_functions").collect();
+            for (const j of jobs) if (j.state.kind === "pending") await ctx.scheduler.cancel(j._id);
+        });
+    });
+
+    it("filters the audience by tags — only tagged contacts are sent to", async () => {
+        const id = await mkBroadcast({ audienceConfig: { type: "TAGS", tags: [tagVip] } });
+        await t.action(internal.broadcasts.sendBroadcast, { broadcastId: id, organizationId: orgId });
+
+        const sends = await scheduledSends();
+        const phones = sends.map((s: any) => s.to).sort();
+        // VIP = Mamadou + Fatou only; Pierre (prospect, +33) must be excluded.
+        expect(phones).toEqual(["+221701111111", "+221702222222"]);
+        expect(phones).not.toContain("+33612345678");
+
+        const b = await t.run(async (ctx: any) => ctx.db.get(id));
+        expect(b.sentCount).toBe(2);
+    });
+
+    it("does NOT fall back to all contacts when a TAGS campaign has tags", async () => {
+        // Regression for the legacy /new over-diffusion bug: a tag-scoped campaign
+        // must never reach the full directory (3 contacts here).
+        const id = await mkBroadcast({ audienceConfig: { type: "TAGS", tags: [tagVip] } });
+        await t.action(internal.broadcasts.sendBroadcast, { broadcastId: id, organizationId: orgId });
+        const sends = await scheduledSends();
+        expect(sends).toHaveLength(2);
+    });
+
+    it("builds WhatsApp components from templateVariables, resolved per contact", async () => {
+        // Single-contact audience (Mamadou via VIP) to assert one send's payload.
+        const id = await mkBroadcast({
+            audienceConfig: { type: "TAGS", tags: [tagVip] },
+            templateVariables: [
+                { token: "{{1}}", src: "first" },
+                { token: "{{2}}", src: "fixed", fixed: "Promo -20%" },
+            ],
+        });
+        await t.action(internal.broadcasts.sendBroadcast, { broadcastId: id, organizationId: orgId });
+
+        const sends = await scheduledSends();
+        const mamadouSend = sends.find((s: any) => s.to === "+221701111111");
+        expect(mamadouSend).toBeDefined();
+        expect(mamadouSend.template.name).toBe("Welcome");
+        expect(mamadouSend.template.language).toEqual({ code: "fr" });
+        // {{1}} → contact first name, {{2}} → fixed literal, in {{1}},{{2}} order.
+        expect(mamadouSend.template.components).toEqual([
+            {
+                type: "body",
+                parameters: [
+                    { type: "text", text: "Mamadou" },
+                    { type: "text", text: "Promo -20%" },
+                ],
+            },
+        ]);
+    });
+
+    it("keeps body parameters in {{1}},{{2}} order even if the mapping is stored out of order", async () => {
+        const id = await mkBroadcast({
+            audienceConfig: { type: "ALL" },
+            templateVariables: [
+                { token: "{{2}}", src: "fixed", fixed: "DEUX" },
+                { token: "{{1}}", src: "fixed", fixed: "UN" },
+            ],
+        });
+        await t.action(internal.broadcasts.sendBroadcast, { broadcastId: id, organizationId: orgId });
+        const sends = await scheduledSends();
+        expect(sends.length).toBeGreaterThan(0);
+        expect(sends[0].template.components[0].parameters).toEqual([
+            { type: "text", text: "UN" },
+            { type: "text", text: "DEUX" },
+        ]);
+    });
+
+    it("sends empty components (template as-is) when no variables are mapped", async () => {
+        const id = await mkBroadcast({ audienceConfig: { type: "ALL" } });
+        await t.action(internal.broadcasts.sendBroadcast, { broadcastId: id, organizationId: orgId });
+        const sends = await scheduledSends();
+        expect(sends.length).toBeGreaterThan(0);
+        for (const s of sends) expect(s.template.components).toEqual([]);
     });
 });

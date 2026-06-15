@@ -19,6 +19,8 @@ export default function GlobalError({
         <html>
             <body>
                 <div className="flex min-h-screen flex-col items-center justify-center bg-white px-4 text-center text-black dark:bg-black dark:text-white">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo-mark.png" alt="Jokko" width={40} height={40} className="mb-6 h-10 w-10" />
                     <h1 className="text-4xl font-bold">Oups ! Une erreur critique est survenue.</h1>
                     <p className="mt-4 text-lg text-gray-600 dark:text-gray-400">
                         Nous avons été notifiés et nous travaillons à la résolution du problème.

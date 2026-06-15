@@ -21,14 +21,11 @@ export default function DashboardLayout({
 
     // 1. Auth & Onboarding Redirect
     useEffect(() => {
-        console.log(`[DashboardLayout] Auth check: user=${user !== undefined ? (user ? 'present' : 'null') : 'loading'}`);
         if (user === null) {
-            console.log(`[DashboardLayout] Redirecting to /auth/sign-in (user is null)`);
             router.push('/auth/sign-in');
             return;
         }
         if (user && user.onboardingCompleted !== true) {
-            console.log(`[DashboardLayout] Redirecting to /onboarding (onboarding not completed)`);
             router.push('/onboarding');
             return;
         }
@@ -39,11 +36,9 @@ export default function DashboardLayout({
     useEffect(() => {
         if (sessionData === null && user && user.onboardingCompleted === true) {
             if (sessionRetries >= 3) {
-                console.log(`[DashboardLayout] Session init failed after retries, redirecting to onboarding`);
                 router.push('/onboarding');
                 return;
             }
-            console.log(`[DashboardLayout] Initializing session (attempt ${sessionRetries + 1})...`);
             ensureSession()
                 .then((result) => {
                     if (!result) {
@@ -56,33 +51,35 @@ export default function DashboardLayout({
         }
     }, [sessionData, user, ensureSession, sessionRetries, router]);
 
-    // 3. Subdomain Redirect — only after onboarding is complete
+    // 3. Subdomain Redirect — OPT-IN only.
+    //
+    // The tenant is resolved from the session (userSessions.currentOrganizationId),
+    // NOT from the host — so this redirect is purely cosmetic. It also BREAKS auth:
+    // `window.location.href` to `{slug}.<root>` is a new origin, and the Convex
+    // auth token cookie is host-only on localhost (no `domain` attribute, see
+    // ConvexClientProvider), so the token isn't carried over → user becomes null
+    // → bounce back to /auth/sign-in. It also adds a slow full-page reload.
+    //
+    // Disabled by default. Enable only once cross-subdomain cookie sharing is
+    // verified end-to-end (cookie `domain=.<root>` matching NEXT_PUBLIC_ROOT_DOMAIN,
+    // TLS cert covering the wildcard). Never on localhost (host-only cookies + the
+    // dev `--experimental-https` cert only covers `localhost`).
     useEffect(() => {
+        if (process.env.NEXT_PUBLIC_ENABLE_SUBDOMAIN_ROUTING !== 'true') return;
         if (!sessionData?.organization?.slug) return;
         if (user?.onboardingCompleted !== true) return;
 
-        const slug = sessionData.organization.slug;
         const hostname = window.location.hostname;
-        const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'jokko.co';
+        if (hostname.includes('localhost')) return; // never on localhost
 
-        console.log(`[DashboardLayout] Subdomain Check: host=${hostname}, targetSlug=${slug}, root=${rootDomain}`);
+        const slug = sessionData.organization.slug;
+        const rootDomain = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'jokko.co';
 
         // Preserve query params (critical for payment redirects like ?session=...&status=...)
         const fullPath = window.location.pathname + window.location.search;
 
-        if (hostname.includes('localhost')) {
-            if (hostname === 'localhost') {
-                const port = window.location.port ? `:${window.location.port}` : '';
-                const newUrl = `${window.location.protocol}//${slug}.localhost${port}${fullPath}`;
-                console.log(`[DashboardLayout] Redirecting to localhost subdomain: ${newUrl}`);
-                window.location.href = newUrl;
-            }
-        } else {
-            if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
-                const newUrl = `${window.location.protocol}//${slug}.${rootDomain}${fullPath}`;
-                console.log(`[DashboardLayout] Redirecting to production subdomain: ${newUrl}`);
-                window.location.href = newUrl;
-            }
+        if (hostname === rootDomain || hostname === `www.${rootDomain}`) {
+            window.location.href = `${window.location.protocol}//${slug}.${rootDomain}${fullPath}`;
         }
     }, [sessionData, user]);
 
@@ -139,7 +136,7 @@ export default function DashboardLayout({
         return (
             <div className="flex h-screen items-center justify-center flex-col gap-2 bg-gray-50">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <span className="text-sm text-gray-500">Redirection vers l'onboarding...</span>
+                <span className="text-sm text-gray-500">Redirection vers l&apos;onboarding...</span>
             </div>
         );
     }

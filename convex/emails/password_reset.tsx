@@ -40,7 +40,7 @@ export function PasswordResetEmail({ resetUrl }: PasswordResetEmailProps) {
             </Section>
 
             <Text className="text-slate-400 text-xs m-0">
-                Ce lien expire dans 1 heure. Si vous n'avez pas fait cette demande,
+                Ce lien expire dans 30 minutes. Si vous n'avez pas fait cette demande,
                 ignorez cet email.
             </Text>
         </Layout>

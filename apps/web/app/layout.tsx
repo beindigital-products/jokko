@@ -1,16 +1,23 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+
+// Display typeface (per the Primitives design system): JetBrains Mono 500
+// drives all big titles via --font-display.
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 import { ConvexClientProvider } from "./ConvexClientProvider";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-  display: "swap",
-});
+// Inter font was previously loaded here but never used in CSS — removed in
+// Slice 0 to drop a ~30KB font download. Geist Sans is now the primary UI font
+// (per Decision #9, italic display uses Geist Italic via .font-editorial class).
 
 export const metadata: Metadata = {
   title: {
@@ -59,7 +66,11 @@ export const metadata: Metadata = {
     creator: "@jokko_co",
   },
   icons: {
-    icon: "/favicon.ico",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
+      { url: "/icon-512.png", type: "image/png", sizes: "512x512" },
+    ],
     shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
@@ -75,16 +86,17 @@ export default function RootLayout({
     <html
       lang="fr"
       suppressHydrationWarning
-      className={`${GeistSans.variable} ${GeistMono.variable} ${inter.variable}`}
+      className={`${GeistSans.variable} ${GeistMono.variable} ${jetbrainsMono.variable}`}
       style={
         {
-          "--font-display": "var(--font-geist-sans)",
-          "--font-body": "var(--font-inter)",
+          "--font-display": "var(--font-jetbrains-mono)",
+          "--font-body": "var(--font-geist-sans)",
           "--font-mono": "var(--font-geist-mono)",
         } as React.CSSProperties
       }
     >
       <head>
+        {/* FB SDK — do not reorder. Sentry/CSP-sensitive block. */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -96,7 +108,6 @@ export default function RootLayout({
                   version: 'v22.0'
                 });
                 window.__FB_INITIALIZED__ = true;
-                console.log('[FB] SDK initialized globally');
               };
               (function(d, s, id) {
                 var fjs = d.getElementsByTagName(s)[0];

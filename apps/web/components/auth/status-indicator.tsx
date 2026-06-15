@@ -14,7 +14,6 @@
  * - OFFLINE: Slate
  */
 
-import { type Role } from "@/convex/lib/permissions";
 // We need Status type. It is defined in schema but maybe good to export from a shared types file or just use string literal here.
 // Let's use string literal matching schema.
 

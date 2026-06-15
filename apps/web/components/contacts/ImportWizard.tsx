@@ -15,13 +15,11 @@ import {
 } from 'lucide-react';
 import { ImportGuideDialog } from './ImportGuideDialog';
 
-import { ButtonGroup } from '@/components/ui/button-group';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Card } from '@/components/ui/card';
 import Papa from 'papaparse';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
+import { toast } from 'sonner';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'complete';
 
@@ -37,6 +35,22 @@ interface ImportWizardProps {
     onCancel?: () => void;
 }
 
+type CsvRow = Record<string, string | undefined>;
+
+interface ParsedContact {
+    phone: string;
+    name?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    company?: string;
+    tags: string[];
+}
+
+function getCell(row: CsvRow, ...keys: string[]): string | undefined {
+    return keys.map((key) => row[key]).find((value): value is string => Boolean(value));
+}
+
 const STEPS: { id: ImportStep; title: string }[] = [
     { id: 'upload', title: 'Fichier' },
     { id: 'mapping', title: 'Mapping' },
@@ -48,39 +62,40 @@ function StepIndicator({ currentStep, steps }: { currentStep: ImportStep; steps:
     const currentIndex = steps.findIndex((s) => s.id === currentStep);
 
     return (
-        <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
             {steps.map((step, index) => {
                 const isCompleted = index < currentIndex;
                 const isCurrent = index === currentIndex;
                 const isLast = index === steps.length - 1;
 
                 return (
-                    <div key={step.id} className="flex items-center flex-1">
-                        <div className="flex flex-col items-center">
-                            <div
-                                className={cn(
-                                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors border-2',
-                                    isCompleted && 'bg-primary text-primary-foreground border-primary',
-                                    isCurrent && 'bg-primary text-primary-foreground border-primary ring-4 ring-primary/20',
-                                    !isCompleted && !isCurrent && 'bg-muted text-muted-foreground border-muted-foreground/30'
-                                )}
-                            >
-                                {isCompleted ? <Check className="h-4 w-4" /> : index + 1}
-                            </div>
+                    <div key={step.id} className="flex flex-1 items-center gap-2">
+                        <span
+                            className={cn(
+                                'flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[10px] font-semibold',
+                                isCompleted && 'bg-[var(--accent)] text-white',
+                                isCurrent &&
+                                    'bg-[var(--accent-muted)] text-[var(--accent)] ring-1 ring-[var(--accent)]',
+                                !isCompleted &&
+                                    !isCurrent &&
+                                    'bg-[var(--paper-warm)] text-[var(--ink-soft)]'
+                            )}
+                        >
+                            {isCompleted ? <Check className="h-3 w-3" strokeWidth={3} /> : index + 1}
+                        </span>
+                        <span
+                            className={cn(
+                                'font-mono text-[9.5px] uppercase tracking-[0.1em]',
+                                isCurrent ? 'text-[var(--ink-900)]' : 'text-[var(--ink-soft)]'
+                            )}
+                        >
+                            {step.title}
+                        </span>
+                        {!isLast && (
                             <span
                                 className={cn(
-                                    'text-xs mt-2 font-medium',
-                                    isCurrent ? 'text-primary' : 'text-muted-foreground'
-                                )}
-                            >
-                                {step.title}
-                            </span>
-                        </div>
-                        {!isLast && (
-                            <div
-                                className={cn(
-                                    'h-0.5 flex-1 mx-4',
-                                    index < currentIndex ? 'bg-primary' : 'bg-muted'
+                                    'h-px flex-1',
+                                    index < currentIndex ? 'bg-[var(--accent)]' : 'bg-[var(--ink-100)]'
                                 )}
                             />
                         )}
@@ -95,7 +110,7 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
     const [currentStep, setCurrentStep] = useState<ImportStep>('upload');
     const [isLoading, setIsLoading] = useState(false);
     const [file, setFile] = useState<File | null>(null);
-    const [parsedContacts, setParsedContacts] = useState<any[]>([]);
+    const [parsedContacts, setParsedContacts] = useState<ParsedContact[]>([]);
     const [importStats, setImportStats] = useState<ImportResult | null>(null);
     const [showGuide, setShowGuide] = useState(false);
 
@@ -112,34 +127,34 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
         if (!file) return;
         setIsLoading(true);
 
-        Papa.parse(file, {
+        Papa.parse<CsvRow>(file, {
             header: true,
-            complete: (results: any) => {
+            complete: (results) => {
                 // Simplified mapping: map keys directly if they match, or guess
-                const mapped = results.data.map((row: any) => {
+                const mapped: ParsedContact[] = results.data.map((row): ParsedContact | null => {
                     // Basic normalization
-                    const phone = row['phone'] || row['Phone'] || row['Mobile'] || row['Téléphone'];
+                    const phone = getCell(row, 'phone', 'Phone', 'Mobile', 'Téléphone');
                     if (!phone) return null; // Skip without phone
 
                     return {
                         phone: String(phone),
-                        name: row['name'] || row['Name'] || row['Nom'] || (row['First Name'] ? `${row['First Name']} ${row['Last Name']}` : undefined),
-                        firstName: row['firstName'] || row['First Name'] || row['Prénom'],
-                        lastName: row['lastName'] || row['Last Name'] || row['Nom'],
-                        email: row['email'] || row['Email'] || row['E-mail'],
-                        company: row['company'] || row['Company'] || row['Entreprise'],
+                        name: getCell(row, 'name', 'Name', 'Nom') || (row['First Name'] ? `${row['First Name']} ${row['Last Name'] || ''}`.trim() : undefined),
+                        firstName: getCell(row, 'firstName', 'First Name', 'Prénom'),
+                        lastName: getCell(row, 'lastName', 'Last Name', 'Nom'),
+                        email: getCell(row, 'email', 'Email', 'E-mail'),
+                        company: getCell(row, 'company', 'Company', 'Entreprise'),
                         tags: row['tags'] ? String(row['tags']).split(',').map(t => t.trim()) : []
                     };
-                }).filter(Boolean);
+                }).filter((contact): contact is ParsedContact => contact !== null);
 
                 setParsedContacts(mapped);
                 setIsLoading(false);
                 setCurrentStep('mapping'); // Skip custom mapping UI for now, assume auto-map
             },
-            error: (err: any) => {
+            error: (err) => {
                 console.error("Parse error", err);
                 setIsLoading(false);
-                alert("Erreur lors de la lecture du fichier");
+                toast.error("Erreur lors de la lecture du fichier");
             }
         });
 
@@ -166,55 +181,54 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
                 skipped: 0,
                 errors: result.errors || []
             });
-        } catch (err: any) {
+        } catch (err) {
             console.error("Import failed", err);
-            alert("Erreur lors de l'import: " + err.message);
+            const message = err instanceof Error ? err.message : "Erreur inconnue";
+            toast.error("Erreur lors de l'import: " + message);
         } finally {
             setIsLoading(false);
         }
     };
 
     const renderUploadStep = () => (
-        <div className="py-8">
-            <div
-                className="border-2 border-dashed border-muted-foreground/25 rounded-xl p-8 text-center hover:bg-muted/30 transition-colors cursor-pointer relative"
-            >
+        <div className="py-6">
+            <div className="relative rounded-xl border border-dashed border-[var(--ink-200)] bg-[var(--paper-warm)]/40 p-8 text-center transition-colors hover:bg-[var(--paper-warm)]">
                 <input
                     type="file"
                     accept=".csv"
-                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    className="absolute inset-0 cursor-pointer opacity-0"
                     onChange={handleFileChange}
                 />
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
-                    <Upload className="h-8 w-8 text-primary" />
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[var(--accent-muted)]">
+                    <Upload className="h-7 w-7 text-[var(--accent)]" />
                 </div>
-                <h3 className="text-lg font-medium mb-1">
+                <h3 className="mb-1 text-[15px] font-medium text-[var(--ink-900)]">
                     {file ? file.name : "Glissez-déposez votre fichier"}
                 </h3>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="mb-4 text-[12.5px] text-[var(--ink-soft)]">
                     CSV supporté
                 </p>
-                <Button variant="outline" size="sm" type="button" className="pointer-events-none">
+                <span className="pointer-events-none inline-flex items-center rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-700)]">
                     Parcourir
-                </Button>
+                </span>
             </div>
 
-            <div className="mt-6 w-full grid gap-4">
-                <Card className="p-4 w-full flex items-center gap-3 bg-muted/20">
-                    <div className="p-2 rounded-lg bg-green-100 text-green-700">
-                        <FileSpreadsheet className="h-6 w-6" />
+            <div className="mt-6 grid w-full gap-4">
+                <div className="flex w-full items-center gap-3 rounded-xl border border-[var(--ink-200)] bg-[var(--paper-warm)]/40 p-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--status-good-soft)] text-[var(--status-good)]">
+                        <FileSpreadsheet className="h-5 w-5" />
                     </div>
                     <div>
-                        <p className="font-medium">Fichier CSV</p>
-                        <p className="text-xs text-muted-foreground">Format recommandé</p>
+                        <p className="text-[13.5px] font-medium text-[var(--ink-900)]">Fichier CSV</p>
+                        <p className="text-[11.5px] text-[var(--ink-soft)]">Format recommandé</p>
                     </div>
-                </Card>
+                </div>
             </div>
 
             <button
                 type="button"
                 onClick={() => setShowGuide(true)}
-                className="mt-4 flex items-center gap-2 text-sm text-primary hover:underline mx-auto"
+                className="mx-auto mt-4 flex items-center gap-2 text-[12.5px] font-medium text-[var(--accent)] hover:underline"
             >
                 <HelpCircle className="h-4 w-4" />
                 Comment récupérer mes contacts depuis mon smartphone ?
@@ -225,50 +239,50 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
     );
 
     const renderMappingStep = () => (
-        <div className="py-12 text-center text-muted-foreground">
-            <div className="flex flex-col items-center justify-center mb-6">
-                <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-2">
-                    <Check className="h-6 w-6" />
+        <div className="py-12 text-center">
+            <div className="mb-6 flex flex-col items-center justify-center">
+                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[var(--status-good-soft)] text-[var(--status-good)]">
+                    <Check className="h-6 w-6" strokeWidth={2.5} />
                 </div>
-                <p className="font-medium text-foreground">{parsedContacts.length} contacts détectés</p>
+                <p className="text-[15px] font-semibold text-[var(--ink-900)]">{parsedContacts.length} contacts détectés</p>
             </div>
-            <p className="max-w-md mx-auto">
-                Les colonnes ont été automatiquement associées. Cliquez sur continuer pour vérifier l'aperçu.
+            <p className="mx-auto max-w-md text-[13px] text-[var(--ink-soft)]">
+                Les colonnes ont été automatiquement associées. Cliquez sur continuer pour vérifier l&apos;aperçu.
             </p>
         </div>
     );
 
     const renderPreviewStep = () => (
-        <div className="py-12 text-center text-muted-foreground">
-            <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-yellow-500" />
-            <p className="font-medium text-foreground">Prêt à importer {parsedContacts.length} contacts</p>
-            <p className="text-sm">Veuillez confirmer l'importation</p>
+        <div className="py-12 text-center">
+            <AlertTriangle className="mx-auto mb-4 h-11 w-11 text-[var(--ink-400)]" />
+            <p className="text-[15px] font-semibold text-[var(--ink-900)]">Prêt à importer {parsedContacts.length} contacts</p>
+            <p className="text-[12.5px] text-[var(--ink-soft)]">Veuillez confirmer l&apos;importation</p>
 
-            <div className="mt-4 max-h-40 overflow-y-auto border rounded-md text-left p-2 text-xs bg-muted/20">
+            <div className="mt-4 max-h-40 overflow-y-auto rounded-xl border border-[var(--ink-200)] bg-[var(--paper-warm)]/40 p-3 text-left text-[12px]">
                 {parsedContacts.slice(0, 5).map((c, i) => (
-                    <div key={i} className="mb-1 truncate">{c.name || c.phone} - {c.phone}</div>
+                    <div key={i} className="mb-1 truncate text-[var(--ink-700)]">{c.name || c.phone} - {c.phone}</div>
                 ))}
-                {parsedContacts.length > 5 && <div className="text-center italic mt-2">...et {parsedContacts.length - 5} autres</div>}
+                {parsedContacts.length > 5 && <div className="mt-2 text-center italic text-[var(--ink-soft)]">...et {parsedContacts.length - 5} autres</div>}
             </div>
         </div>
     );
 
     const renderCompleteStep = () => (
-        <div className="text-center space-y-4 py-8">
-            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
-                <CheckCircle2 className="h-8 w-8 text-primary" />
+        <div className="space-y-4 py-8 text-center">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-[var(--status-good-soft)] text-[var(--status-good)]">
+                <CheckCircle2 className="h-7 w-7" strokeWidth={2.5} />
             </div>
 
             <div>
-                <h3 className="text-lg font-semibold">Import terminé</h3>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h3 className="font-editorial text-[18px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">Import terminé</h3>
+                <p className="mt-1 text-[13px] text-[var(--ink-soft)]">
                     {importStats?.created} contacts créés. {importStats?.errors?.length ? `${importStats.errors.length} erreurs.` : ''}
                 </p>
             </div>
 
             {importStats?.errors && importStats.errors.length > 0 && (
-                <div className="text-left bg-red-50 p-3 rounded-md text-xs text-red-600 mt-4 max-h-40 overflow-auto">
-                    <p className="font-bold mb-1">Erreurs:</p>
+                <div className="mt-4 max-h-40 overflow-auto rounded-xl border border-[var(--status-danger)]/20 bg-[var(--status-danger-soft)] p-3 text-left text-[12px] text-[var(--status-danger)]">
+                    <p className="mb-1 font-semibold">Erreurs:</p>
                     {importStats.errors.map((e, i) => (
                         <div key={i}>{e.phone}: {e.error}</div>
                     ))}
@@ -278,9 +292,14 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
     );
 
     return (
-        <div className="flex flex-col h-full min-h-[480px]">
-            <div className="px-6 pt-6 pb-4 border-b">
-                <h2 className="text-lg font-semibold mb-4">Importer des contacts</h2>
+        <div className="flex h-full min-h-[480px] flex-col">
+            <div className="border-b border-[var(--ink-200)] px-6 pb-4 pt-5">
+                <p className="font-mono text-[10px] font-medium uppercase tracking-[0.15em] text-[var(--ink-soft)]">
+                    Contacts · import
+                </p>
+                <h2 className="mb-4 mt-1 font-editorial text-[20px] font-normal leading-tight tracking-[-0.01em] text-[var(--ink-900)]">
+                    Importer des contacts
+                </h2>
                 <StepIndicator currentStep={currentStep} steps={STEPS} />
             </div>
 
@@ -291,47 +310,55 @@ export function ImportWizard({ onComplete, onCancel }: ImportWizardProps) {
                 {currentStep === 'complete' && renderCompleteStep()}
             </div>
 
-            <div className="px-6 py-4 border-t bg-muted/30 flex justify-end">
+            <div className="flex justify-end border-t border-[var(--ink-200)] bg-[var(--paper-warm)]/40 px-6 py-3.5">
                 {currentStep !== 'complete' ? (
-                    <ButtonGroup>
-                        <Button
-                            variant="outline"
+                    <div className="flex w-full items-center justify-between gap-2">
+                        <button
+                            type="button"
                             disabled={isLoading}
                             onClick={() => {
                                 if (currentStep === 'upload') onCancel?.();
                                 else if (currentStep === 'mapping') setCurrentStep('upload');
                                 else if (currentStep === 'preview') setCurrentStep('mapping');
                             }}
+                            className="inline-flex items-center gap-1.5 rounded-md border border-[var(--ink-200)] bg-[var(--paper-white)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink-700)] transition-colors hover:bg-[var(--paper-warm)] disabled:opacity-60"
                         >
-                            <ChevronLeft className="mr-1 h-4 w-4" />
+                            <ChevronLeft className="h-4 w-4" />
                             {currentStep === 'upload' ? 'Annuler' : 'Retour'}
-                        </Button>
+                        </button>
 
-                        <Button onClick={() => {
-                            if (currentStep === 'upload') handleUpload();
-                            else if (currentStep === 'mapping') handleMapping();
-                            else if (currentStep === 'preview') handleConfirm();
-                        }}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (currentStep === 'upload') handleUpload();
+                                else if (currentStep === 'mapping') handleMapping();
+                                else if (currentStep === 'preview') handleConfirm();
+                            }}
                             disabled={isLoading || (currentStep === 'upload' && !file)}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--ink-700)] disabled:opacity-60"
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                     Traitement...
                                 </>
                             ) : (
                                 <>
                                     {currentStep === 'preview' ? 'Importer' : 'Continuer'}
-                                    {currentStep !== 'preview' && <ChevronRight className="ml-1 h-4 w-4" />}
+                                    {currentStep !== 'preview' && <ChevronRight className="h-4 w-4" />}
                                 </>
                             )}
-                        </Button>
-                    </ButtonGroup>
+                        </button>
+                    </div>
                 ) : (
-                    <Button className="w-full" onClick={onCancel}>
-                        <Users className="mr-2 h-4 w-4" />
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--ink-900)] px-3 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--ink-700)]"
+                    >
+                        <Users className="h-4 w-4" />
                         Voir les contacts
-                    </Button>
+                    </button>
                 )}
             </div>
         </div>

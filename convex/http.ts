@@ -657,7 +657,7 @@ http.route({
                 const params = new URLSearchParams(text);
                 signedRequest = params.get("signed_request");
             } else if (contentType.includes("multipart/form-data")) {
-                const formData = await request.formData();
+                const formData = (await request.formData()) as unknown as FormData;
                 signedRequest = formData.get("signed_request") as string;
             }
 

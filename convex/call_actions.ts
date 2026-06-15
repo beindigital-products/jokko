@@ -16,8 +16,12 @@
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { decrypt } from "./lib/encryption";
 
-const GRAPH_API_VERSION = "v20.0";
+// v24.0 — the WhatsApp Business Calling API (`/calls`, `call_permission_request`)
+// requires a recent Graph API version; v24.0 matches what Meta delivers our
+// call webhooks on. Older versions (v20.0) reject the calling endpoints.
+const GRAPH_API_VERSION = "v24.0";
 const GRAPH_API_BASE = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
 
 /**
@@ -55,6 +59,12 @@ async function resolveCallCredentials(
     if (!phoneNumberId || !accessToken) {
         throw new Error(`Missing WhatsApp credentials for call ${callId}`);
     }
+
+    // Tokens are stored encrypted at-rest (AES-256-GCM). Every other WhatsApp
+    // path decrypts before use; the calling path must too, otherwise Meta gets
+    // the ciphertext as the Bearer token and rejects it with code 190.
+    // decrypt() is graceful: plaintext env tokens pass through unchanged.
+    accessToken = await decrypt(accessToken);
 
     return { call, phoneNumberId, accessToken };
 }
@@ -242,6 +252,10 @@ export const sendCallPermissionRequest = internalAction({
                 throw new Error(`Missing WhatsApp credentials for CPR`);
             }
 
+            // Decrypt the at-rest token (see resolveCallCredentials). Without
+            // this the CPR send goes out with ciphertext → Meta 190.
+            accessToken = await decrypt(accessToken);
+
             // Update fromPhone on the call record
             await ctx.runMutation(internal.utils.updateCallStatus, {
                 callId: args.callId,
@@ -281,6 +295,26 @@ export const sendCallPermissionRequest = internalAction({
             const responseText = await response.text();
 
             if (!response.ok) {
+                // 138017 = "the business account can already call this consumer"
+                // — a PERMANENT call permission was already approved. This is NOT a
+                // failure: skip the CPR and jump straight to PERMISSION_GRANTED so the
+                // agent's browser auto-initiates the call (same path as a granted CPR).
+                let alreadyAllowed = false;
+                try {
+                    alreadyAllowed = JSON.parse(responseText)?.error?.code === 138017;
+                } catch {
+                    // non-JSON error body → fall through to the failure path
+                }
+
+                if (alreadyAllowed) {
+                    console.log(`[CALL_ACTION] CPR not needed — permission already granted for ${recipientPhone}`);
+                    await ctx.runMutation(internal.utils.updateCallStatus, {
+                        callId: args.callId,
+                        status: "PERMISSION_GRANTED",
+                    });
+                    return;
+                }
+
                 console.error(`[CALL_ACTION] CPR failed ${response.status}:`, responseText);
                 await ctx.runMutation(internal.utils.updateCallStatus, {
                     callId: args.callId,
@@ -328,15 +362,16 @@ export const sendOutboundCallOffer = internalAction({
                 },
             });
 
-            // Store the external call ID returned by Meta
-            if (result?.call_id) {
-                const callDoc = await ctx.runQuery(internal.utils.getCall, { id: args.callId });
-                if (callDoc) {
-                    await ctx.runMutation(internal.calls.updateExternalCallId, {
-                        callId: args.callId,
-                        externalCallId: result.call_id,
-                    });
-                }
+            // Store the external call ID Meta assigned to this outbound call.
+            // Meta returns it at result.calls[0].id (NOT result.call_id). Without
+            // this the inbound SDP-answer webhook can't match the call, the answer
+            // is dropped, and the call connects but stays SILENT both ways.
+            const metaCallId = result?.calls?.[0]?.id ?? result?.call_id;
+            if (metaCallId) {
+                await ctx.runMutation(internal.calls.updateExternalCallId, {
+                    callId: args.callId,
+                    externalCallId: metaCallId,
+                });
             }
 
             console.log(`[CALL_ACTION] Outbound call offer sent to ${recipientPhone}`);

@@ -6,6 +6,7 @@ import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
 import { ConvexError } from "convex/values";
 import { hasPermission, type Role } from "./lib/permissions";
+import { requirePlanFeature } from "./lib/planFeatures";
 
 // Helper to normalize search text
 const getSearchName = (args: { name?: string, firstName?: string, lastName?: string, phone?: string, email?: string }) => {
@@ -76,6 +77,22 @@ export const list = query({
 
         const orgId = session.currentOrganizationId;
 
+        // Resolve an optional tag-name filter to its id. A tag that doesn't
+        // exist in this org matches no contact.
+        let tagId: Id<"tags"> | null = null;
+        if (args.tag) {
+            const tagDoc = await ctx.db
+                .query("tags")
+                .withIndex("by_org_name", q =>
+                    q.eq("organizationId", orgId).eq("name", args.tag!),
+                )
+                .first();
+            if (!tagDoc) {
+                return { page: [], isDone: true, continueCursor: "" };
+            }
+            tagId = tagDoc._id;
+        }
+
         let results;
 
         if (args.search) {
@@ -87,11 +104,6 @@ export const list = query({
                 )
                 .paginate(args.paginationOpts);
         } else {
-            // Default listing
-            // TODO: Filter by tag if provided. For now ignore tag filter in query, do strictly on client or fetch all?
-            // Given pagination, filtering in memory effectively requires fetching *more*.
-            // We will skip tag filtering on backend for now as it needs a dedicated index/table structure.
-
             results = await ctx.db
                 .query("contacts")
                 .withIndex("by_org_created", q => q.eq("organizationId", orgId))
@@ -99,8 +111,13 @@ export const list = query({
                 .paginate(args.paginationOpts);
         }
 
-        // Enrich with tags
-        const contacts = results.page;
+        // Tag filter: contacts hold tag ids in an array, which Convex can't index
+        // for array-membership, so we filter the fetched page in memory. The
+        // cursor still advances over the full set, so the paginated loader keeps
+        // fetching until every match is delivered (pages may be uneven).
+        const contacts = tagId
+            ? results.page.filter(c => c.tags?.includes(tagId!))
+            : results.page;
         const allTagIds = new Set<string>();
         contacts.forEach(c => c.tags?.forEach((t: string) => allTagIds.add(t)));
 
@@ -171,9 +188,14 @@ export const get = query({
             }
         }
 
+        const profilePictureUrl = contact.profilePictureStorageId
+            ? await ctx.storage.getUrl(contact.profilePictureStorageId)
+            : null;
+
         return {
             ...contact,
             id: contact._id, // Client expects 'id'
+            profilePictureUrl,
             tags: tags.filter(t => t).map(t => ({ id: t!._id, name: t!.name, color: t!.color || '#808080' })),
             notes: enrichedNotes // Return structured array
         };
@@ -281,6 +303,7 @@ export const update = mutation({
         country: v.optional(v.string()),
         notes: v.optional(v.string()), // Legacy string override
         addNote: v.optional(v.string()), // New structured append
+        profilePictureStorageId: v.optional(v.id("_storage")),
         tags: v.array(v.string()),
     },
     handler: async (ctx, args) => {
@@ -1029,6 +1052,9 @@ export const createSegment = mutation({
 
         if (!session || !session.currentOrganizationId) throw new Error("No active organization");
         const orgId = session.currentOrganizationId;
+
+        // Segments = feature BUSINESS+ (gating serveur ; honore le trial).
+        await requirePlanFeature(ctx, orgId, "segments");
 
         const now = Date.now();
         return await ctx.db.insert("contactSegments", {

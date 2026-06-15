@@ -17,7 +17,6 @@
 import { useState } from 'react'
 import {
     Building2,
-    Plus,
     Pencil,
     Trash2,
     MoreVertical,
@@ -34,11 +33,13 @@ import {
     Wallet,
     Globe,
     LayoutGrid,
+    type LucideIcon,
 } from 'lucide-react'
 import { useMutation } from "convex/react"
 import { api } from "@/convex/_generated/api"
 import { Id } from "@/convex/_generated/dataModel"
 
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
     DropdownMenu,
@@ -80,7 +81,7 @@ interface PolesSectionProps {
 // ICONS HELPER
 // ============================================
 
-const ICONS_MAP: Record<string, any> = {
+const ICONS_MAP: Record<string, LucideIcon> = {
     Building2,
     Users,
     MessageSquare,
@@ -123,7 +124,7 @@ export function PolesSection({
             await removePole({ id: deletingPole.id })
         } catch (error) {
             console.error('Delete pole error:', error)
-            alert("Erreur lors de la suppression")
+            toast.error("Erreur lors de la suppression")
         } finally {
             setDeleteLoading(false)
             setDeletingPole(null)
@@ -145,7 +146,7 @@ export function PolesSection({
                     Aucun pole cree
                 </h3>
                 <p className="text-gray-500 mb-6 max-w-sm mx-auto">
-                    Les pôles permettent d'organiser vos agents par service ou département
+                    Les pôles permettent d&apos;organiser vos agents par service ou département
                     (ex: Service Client, SAV, Commercial).
                 </p>
                 {/* Create action is now in the page header */}
@@ -243,10 +244,10 @@ export function PolesSection({
                             Supprimer le pole
                         </DialogTitle>
                         <DialogDescription className="space-y-4 pt-2">
-                            <p>Etes-vous sur de vouloir supprimer le pole <span className="font-semibold text-gray-900">"{deletingPole?.name}"</span> ?</p>
+                            <p>Etes-vous sur de vouloir supprimer le pole <span className="font-semibold text-gray-900">&quot;{deletingPole?.name}&quot;</span> ?</p>
                             {deletingPole && deletingPole.memberCount > 0 && (
                                 <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-                                    <span className="font-semibold">Attention :</span> Les {deletingPole.memberCount} membres assignes seront retires du pole mais resteront dans l'equipe.
+                                    <span className="font-semibold">Attention :</span> Les {deletingPole.memberCount} membres assignes seront retires du pole mais resteront dans l&apos;equipe.
                                 </div>
                             )}
                         </DialogDescription>

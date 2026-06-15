@@ -58,6 +58,9 @@ export function CallNotificationProvider() {
     const lastOutboundStatusRef = useRef<string | null>(null);
     const sdpAnswerAppliedRef = useRef<string | null>(null);
     const reportedFailureRef = useRef<string | null>(null);
+    // True once getMyActiveCall has actually returned the active call, so the
+    // remote-termination detector doesn't fire during the connect race.
+    const sawMyActiveCallRef = useRef(false);
     // Tracks the callId for which initiateCall is currently in-flight so that
     // the PERMISSION_GRANTED+dialing re-fire guard doesn't trigger a false error.
     const initiatingCallIdRef = useRef<string | null>(null);
@@ -69,6 +72,11 @@ export function CallNotificationProvider() {
     useEffect(() => {
         trackedCallStatusRef.current = trackedCallStatus;
     }, [trackedCallStatus]);
+
+    const getTerminationReason = (call: object): string | undefined => {
+        if (!('terminationReason' in call)) return undefined;
+        return typeof call.terminationReason === 'string' ? call.terminationReason : undefined;
+    };
 
     // Detect new incoming calls
     useEffect(() => {
@@ -97,12 +105,21 @@ export function CallNotificationProvider() {
         }
     }, [activeCall, callState, activeCallId, setIncomingCall, clearCall]);
 
-    // Detect when call was terminated remotely (webhook terminate)
+    // Detect when a connected call ends remotely (the phone hangs up → webhook
+    // terminate → the call leaves getMyActiveCall). Guard against the race where
+    // callState flips to 'connected' a moment before confirmConnected has marked
+    // the call CONNECTED in the DB: getMyActiveCall is briefly null then, and
+    // clearing on it would make the call bar vanish the instant ICE connects.
+    // Only clear once we've actually SEEN the call in getMyActiveCall.
     useEffect(() => {
-        if (callState === 'connected' || callState === 'connecting') {
-            if (!myActiveCall) {
-                clearCall();
-            }
+        if (callState !== 'connected' && callState !== 'connecting') {
+            sawMyActiveCallRef.current = false;
+            return;
+        }
+        if (myActiveCall) {
+            sawMyActiveCallRef.current = true;
+        } else if (sawMyActiveCallRef.current) {
+            clearCall();
         }
     }, [myActiveCall, callState, clearCall]);
 
@@ -220,8 +237,9 @@ export function CallNotificationProvider() {
             (callState === 'dialing' || callState === 'connecting') &&
             initiatingCallIdRef.current !== myOutboundCall._id
         ) {
-            console.warn('[call-flow] Provider: PERMISSION_GRANTED while dialing/connecting (no in-flight), surfacing error', (myOutboundCall as any).terminationReason);
-            setError(mapCallError((myOutboundCall as any).terminationReason));
+            const terminationReason = getTerminationReason(myOutboundCall);
+            console.warn('[call-flow] Provider: PERMISSION_GRANTED while dialing/connecting (no in-flight), surfacing error', terminationReason);
+            setError(mapCallError(terminationReason));
         }
     }, [myOutboundCall, callState, activeCallId, setCallState, setError, initiateCall]);
 

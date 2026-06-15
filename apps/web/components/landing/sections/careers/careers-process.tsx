@@ -51,8 +51,8 @@ export function CareersProcess() {
                         Rapide, transparent, rémunéré.
                     </h2>
                     <p className="mt-5 text-lg text-muted-foreground">
-                        De la candidature à l'offre : 10 jours max. On respecte votre
-                        temps et on paye les jours d'essai.
+                        De la candidature à l&apos;offre : 10 jours max. On respecte votre
+                        temps et on paye les jours d&apos;essai.
                     </p>
                 </motion.div>
 

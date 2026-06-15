@@ -209,3 +209,114 @@ describe("connections.disconnect (action)", () => {
         ).rejects.toThrow(/forbidden/);
     });
 });
+
+/**
+ * H2 regression: importer.triggerResync was a public action that kicked off a
+ * resync on a client-supplied connectionId WITHOUT any org/permission guard
+ * (cross-tenant IDOR). It now enforces org scoping + integrations:manage via
+ * connections._assertConnectionManager. These tests assert the rejection paths
+ * (the guard throws before any job is enqueued / scheduled).
+ */
+describe("importer.triggerResync access control (H2)", () => {
+    let t: any;
+
+    beforeEach(() => {
+        t = convexTest(schema, modules);
+    });
+
+    async function seedConnection(role: "OWNER" | "ADMIN" | "AGENT") {
+        return await t.run(async (ctx: any) => {
+            const userId = await ctx.db.insert("users", { email: `rs-${role}@t.com`, name: "RS" });
+            const orgId = await ctx.db.insert("organizations", {
+                name: "Org",
+                slug: `rs-${role}`,
+                ownerId: userId,
+                plan: "BUSINESS",
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            });
+            await ctx.db.insert("memberships", {
+                userId,
+                organizationId: orgId,
+                role,
+                status: "ONLINE",
+                maxConversations: 10,
+                activeConversations: 0,
+                lastSeenAt: Date.now(),
+                joinedAt: Date.now(),
+            });
+            await ctx.db.insert("userSessions", {
+                userId,
+                currentOrganizationId: orgId,
+                lastActivityAt: Date.now(),
+            });
+            const connectionId = await ctx.db.insert("crmConnections", {
+                organizationId: orgId,
+                provider: "hubspot",
+                status: "active",
+                authMode: "oauth2",
+                scalingMode: "standard",
+                remoteAccountId: "remote-rs-1",
+                connectedAt: Date.now(),
+                connectedBy: userId,
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            });
+            return { userId, orgId, connectionId };
+        });
+    }
+
+    it("rejects unauthenticated callers", async () => {
+        const { connectionId } = await seedConnection("OWNER");
+        await expect(
+            t.action(api.crm.importer.triggerResync, { connectionId }),
+        ).rejects.toThrow(/unauthenticated/);
+    });
+
+    it("rejects an AGENT (no integrations:manage)", async () => {
+        const { userId, connectionId } = await seedConnection("AGENT");
+        await expect(
+            t.withIdentity({ subject: userId }).action(api.crm.importer.triggerResync, { connectionId }),
+        ).rejects.toThrow(/forbidden/);
+    });
+
+    it("rejects a non-member of the connection's org (cross-tenant IDOR)", async () => {
+        const { connectionId } = await seedConnection("OWNER");
+        const outsiderId = await t.run(async (ctx: any) => {
+            const u = await ctx.db.insert("users", { email: "rs-outsider@t.com", name: "Outsider" });
+            const o = await ctx.db.insert("organizations", {
+                name: "OtherOrg",
+                slug: "rs-other",
+                ownerId: u,
+                plan: "BUSINESS",
+                createdAt: Date.now(),
+                updatedAt: Date.now(),
+            });
+            await ctx.db.insert("memberships", {
+                userId: u,
+                organizationId: o,
+                role: "OWNER",
+                status: "ONLINE",
+                maxConversations: 10,
+                activeConversations: 0,
+                lastSeenAt: Date.now(),
+                joinedAt: Date.now(),
+            });
+            await ctx.db.insert("userSessions", {
+                userId: u,
+                currentOrganizationId: o,
+                lastActivityAt: Date.now(),
+            });
+            return u;
+        });
+        await expect(
+            t.withIdentity({ subject: outsiderId }).action(api.crm.importer.triggerResync, { connectionId }),
+        ).rejects.toThrow(/forbidden/);
+
+        // No job was enqueued.
+        const jobs = await t.run(async (ctx: any) =>
+            ctx.db.query("crmImportJobs").collect(),
+        );
+        expect(jobs).toHaveLength(0);
+    });
+});

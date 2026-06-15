@@ -5,15 +5,19 @@
 
 import { v } from "convex/values";
 import { internal } from "../_generated/api";
+import { getAuthUserId } from "@convex-dev/auth/server";
 import { Id } from "../_generated/dataModel";
 import {
     action,
     internalAction,
     internalMutation,
     internalQuery,
+    type MutationCtx,
 } from "../_generated/server";
 import { getAdapter } from "./registry";
-import { decrypt } from "../lib/encryption";
+import { decrypt, encrypt } from "../lib/encryption";
+import { CRMAuthError } from "./core/errors";
+import { createNotification } from "../notifications";
 import { logJson, newCorrelationId, sanitizeError } from "./core/logger";
 import { normalizeToE164, fullNameFrom } from "./core/mapping";
 import type {
@@ -91,6 +95,54 @@ export const runTick = internalAction({
         }
 
         const adapter = getAdapter(connection.provider as CRMProvider);
+
+        // ── Token refresh (Tier 2) ───────────────────────────────────────
+        // OAuth access tokens are short-lived (HubSpot ~30 min). Refresh
+        // proactively when expired / near-expiry, using the stored refresh
+        // token. If the refresh itself fails the token chain is dead → the
+        // user must reconnect (Tier 1 path below).
+        const REFRESH_BUFFER_MS = 2 * 60 * 1000; // refresh 2 min before expiry
+        if (
+            connection.tokenExpiresAt != null &&
+            connection.tokenExpiresAt <= Date.now() + REFRESH_BUFFER_MS &&
+            connection.refreshTokenEnc &&
+            adapter.refreshToken
+        ) {
+            try {
+                const refreshTokenPlain = await decrypt(connection.refreshTokenEnc);
+                const fresh = await adapter.refreshToken({ refreshToken: refreshTokenPlain });
+                const accessTokenEnc = await encrypt(fresh.accessToken);
+                const refreshTokenEnc = fresh.refreshToken
+                    ? await encrypt(fresh.refreshToken)
+                    : connection.refreshTokenEnc;
+                await ctx.runMutation(internal.crm.importer._persistRefreshedTokens, {
+                    connectionId: connection._id,
+                    accessTokenEnc,
+                    refreshTokenEnc,
+                    tokenExpiresAt: fresh.expiresAtMs,
+                });
+                accessToken = fresh.accessToken;
+            } catch (err) {
+                logJson("error", {
+                    module: "crm.importer",
+                    event: "token_refresh_failed",
+                    provider: connection.provider as CRMProvider,
+                    connectionId: String(connection._id),
+                    correlationId,
+                    error: sanitizeError(err),
+                });
+                await ctx.runMutation(internal.crm.importer._markReconnectRequired, {
+                    connectionId: connection._id,
+                    reason: "token_refresh_failed",
+                });
+                await ctx.runMutation(internal.crm.importer._markFailed, {
+                    jobId,
+                    reason: "token_refresh_failed",
+                });
+                return;
+            }
+        }
+
         const callCtx: AdapterCallCtx = {
             provider: connection.provider as CRMProvider,
             connectionId: String(connection._id),
@@ -102,6 +154,7 @@ export const runTick = internalAction({
                 instanceUrl: connection.instanceUrl,
             },
             scalingMode: connection.scalingMode,
+            fieldMapping: connection.fieldMapping,
         };
 
         try {
@@ -188,9 +241,84 @@ export const runTick = internalAction({
                 correlationId,
                 error: sanitized,
             });
+            // Tier 1 : an auth failure means the credentials are dead — pause
+            // the connection so the (per-minute) poller stops re-enqueuing
+            // doomed jobs, and alert the org admins to reconnect.
+            if (err instanceof CRMAuthError) {
+                await ctx.runMutation(internal.crm.importer._markReconnectRequired, {
+                    connectionId: connection._id,
+                    reason: sanitized.message.slice(0, 200),
+                });
+            }
             await ctx.runMutation(internal.crm.importer._markFailed, {
                 jobId,
                 reason: sanitized.message.slice(0, 200),
+            });
+        }
+    },
+});
+
+export const _persistRefreshedTokens = internalMutation({
+    args: {
+        connectionId: v.id("crmConnections"),
+        accessTokenEnc: v.string(),
+        refreshTokenEnc: v.optional(v.string()),
+        tokenExpiresAt: v.optional(v.number()),
+    },
+    handler: async (ctx, args) => {
+        const conn = await ctx.db.get(args.connectionId);
+        if (!conn) return;
+        await ctx.db.patch(args.connectionId, {
+            accessTokenEnc: args.accessTokenEnc,
+            refreshTokenEnc: args.refreshTokenEnc,
+            tokenExpiresAt: args.tokenExpiresAt,
+            updatedAt: Date.now(),
+        });
+    },
+});
+
+/**
+ * Pauses a connection that can no longer authenticate (expired/revoked
+ * tokens). Idempotent — only the first transition writes an audit row and
+ * notifies admins, so the poller / importer can call it repeatedly without
+ * spamming. The connection leaves `active`, so the poller stops selecting it.
+ */
+export const _markReconnectRequired = internalMutation({
+    args: { connectionId: v.id("crmConnections"), reason: v.string() },
+    handler: async (ctx, { connectionId, reason }) => {
+        const conn = await ctx.db.get(connectionId);
+        if (!conn) return;
+        if (conn.status === "reconnect_required") return; // already paused — no-op
+
+        const now = Date.now();
+        await ctx.db.patch(connectionId, {
+            status: "reconnect_required",
+            updatedAt: now,
+        });
+        await ctx.db.insert("integrationAuditLog", {
+            organizationId: conn.organizationId,
+            connectionId,
+            action: "crm.connection.reconnect_required",
+            severity: "error",
+            metadataSanitized: { provider: conn.provider, reason },
+            createdAt: now,
+        });
+
+        // Alert org owners + admins so they can reconnect.
+        const members = await ctx.db
+            .query("memberships")
+            .withIndex("by_organization", (q) => q.eq("organizationId", conn.organizationId))
+            .collect();
+        for (const m of members) {
+            if (m.role !== "OWNER" && m.role !== "ADMIN") continue;
+            await createNotification(ctx, {
+                organizationId: conn.organizationId,
+                userId: m.userId,
+                type: "INTEGRATION",
+                title: "Reconnexion CRM requise",
+                message: `La connexion ${conn.provider} a expiré. Reconnectez-la dans Intégrations pour reprendre la synchronisation.`,
+                link: "/dashboard/integrations",
+                metadata: { connectionId: String(connectionId), provider: conn.provider, reason },
             });
         }
     },
@@ -290,6 +418,36 @@ export const _markFailed = internalMutation({
     },
 });
 
+/**
+ * Find-or-create org-scoped tags by name, returning their ids (deduped,
+ * case-insensitive). Used to enrich imported contacts with their CRM tags.
+ */
+async function resolveTagIds(
+    ctx: MutationCtx,
+    orgId: Id<"organizations">,
+    names: string[] | undefined,
+    now: number,
+): Promise<Id<"tags">[]> {
+    if (!names?.length) return [];
+    const out: Id<"tags">[] = [];
+    const seen = new Set<string>();
+    for (const rawName of names) {
+        const name = rawName.trim();
+        if (!name || seen.has(name.toLowerCase())) continue;
+        seen.add(name.toLowerCase());
+        const existing = await ctx.db
+            .query("tags")
+            .withIndex("by_org_name", (q) => q.eq("organizationId", orgId).eq("name", name))
+            .first();
+        out.push(
+            existing
+                ? existing._id
+                : await ctx.db.insert("tags", { organizationId: orgId, name, createdAt: now }),
+        );
+    }
+    return out;
+}
+
 export const _persistContactBatch = internalMutation({
     args: {
         jobId: v.id("crmImportJobs"),
@@ -351,6 +509,8 @@ export const _persistContactBatch = internalMutation({
                 }
             }
 
+            const tagIds = await resolveTagIds(ctx, orgId, raw.externalTags, now);
+
             if (!contactId) {
                 if (!phoneResult?.ok) {
                     continue;
@@ -375,6 +535,7 @@ export const _persistContactBatch = internalMutation({
                     email,
                     company: raw.company,
                     jobTitle: raw.jobTitle,
+                    tags: tagIds.length ? tagIds : undefined,
                     whatsappOptIn: {
                         status: "unknown",
                         source: "crm_import_unknown",
@@ -390,6 +551,11 @@ export const _persistContactBatch = internalMutation({
                 if (phoneResult?.ok) {
                     patch.phoneE164 = phoneResult.e164;
                     patch.phoneCountryCode = phoneResult.countryCode;
+                }
+                if (tagIds.length) {
+                    const existing = await ctx.db.get(contactId);
+                    const existingTags = (existing?.tags ?? []) as Id<"tags">[];
+                    patch.tags = Array.from(new Set<string>([...existingTags, ...tagIds])) as Id<"tags">[];
                 }
                 await ctx.db.patch(contactId, patch);
             }
@@ -535,6 +701,16 @@ function _firstPhoneE164(
 export const triggerResync = action({
     args: { connectionId: v.id("crmConnections") },
     handler: async (ctx, { connectionId }): Promise<{ jobId: Id<"crmImportJobs"> }> => {
+        // SECURITY: the connectionId is client-supplied — enforce org scoping +
+        // `integrations:manage` before kicking off a resync (was a cross-tenant
+        // IDOR that could trigger imports against another org's CRM connection).
+        const userId = await getAuthUserId(ctx);
+        if (!userId) throw new Error("unauthenticated");
+        await ctx.runQuery(internal.crm.connections._assertConnectionManager, {
+            connectionId,
+            userId,
+        });
+
         const jobId = await ctx.runMutation(internal.crm.importer._enqueueResync, {
             connectionId,
         });

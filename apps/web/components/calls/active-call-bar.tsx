@@ -9,7 +9,7 @@ import { CallErrorActionButton } from './call-error-action-button';
 
 export function ActiveCallBar() {
     const { activeCallId, callState, contactName, contactPhone, callStartedAt, callDirection, errorMessage, clearCall } = useCallStore();
-    const { hangUp, toggleMute, isMuted, remoteAudioRef } = useWebRTCCall();
+    const { hangUp, toggleMute, isMuted } = useWebRTCCall();
     const [elapsed, setElapsed] = useState(0);
 
     const isActive = callState === 'connecting' || callState === 'connected' || callState === 'dialing';
@@ -20,23 +20,29 @@ export function ActiveCallBar() {
     // Timer
     useEffect(() => {
         if (callState !== 'connected' || !callStartedAt) {
-            setElapsed(0);
             return;
         }
 
-        const interval = setInterval(() => {
+        const updateElapsed = () => {
             setElapsed(Math.floor((Date.now() - callStartedAt) / 1000));
-        }, 1000);
+        };
 
-        return () => clearInterval(interval);
+        const timeout = setTimeout(updateElapsed, 0);
+        const interval = setInterval(updateElapsed, 1000);
+
+        return () => {
+            clearTimeout(timeout);
+            clearInterval(interval);
+        };
     }, [callState, callStartedAt]);
 
     if (!showBar) return null;
     if (!activeCallId && !isError) return null;
 
     const displayName = contactName || contactPhone || 'Inconnu';
-    const minutes = Math.floor(elapsed / 60);
-    const seconds = elapsed % 60;
+    const displayedElapsed = callState === 'connected' && callStartedAt ? elapsed : 0;
+    const minutes = Math.floor(displayedElapsed / 60);
+    const seconds = displayedElapsed % 60;
     const timeStr = `${minutes}:${String(seconds).padStart(2, '0')}`;
 
     const handleHangUp = async () => {
@@ -71,8 +77,6 @@ export function ActiveCallBar() {
 
     return (
         <>
-            <audio ref={remoteAudioRef} autoPlay playsInline />
-
             <div className={`flex items-center justify-between border-b px-4 py-2 ${barColorClass}`}>
                 <div className="flex items-center gap-3">
                     <div className={`flex h-8 w-8 items-center justify-center rounded-full ${isError ? 'bg-red-600' : 'bg-green-600'}`}>

@@ -5,6 +5,19 @@ import { Loader2 } from 'lucide-react';
 
 const ROOT_DOMAIN = process.env.NEXT_PUBLIC_ROOT_DOMAIN || 'jokko.co';
 
+interface FacebookLoginResponse {
+    authResponse?: {
+        accessToken?: string;
+    };
+}
+
+interface FacebookSdk {
+    login: (
+        callback: (response: FacebookLoginResponse) => void,
+        options?: { scope?: string },
+    ) => void;
+}
+
 function getTargetOrigin(): string {
     const isLocalhost = window.location.hostname.includes('localhost');
     if (isLocalhost) {
@@ -15,23 +28,19 @@ function getTargetOrigin(): string {
 
 declare global {
     interface Window {
-        FB: any;
+        FB: FacebookSdk;
         fbAsyncInit: () => void;
         __FB_INITIALIZED__?: boolean;
     }
 }
 
 export default function FacebookConnectPage() {
-    const [status, setStatus] = useState<'loading' | 'ready' | 'logging-in' | 'done' | 'error'>('loading');
+    const [status, setStatus] = useState<'loading' | 'ready' | 'logging-in' | 'done' | 'error'>(() =>
+        typeof window !== 'undefined' && window.__FB_INITIALIZED__ && window.FB ? 'ready' : 'loading'
+    );
     const [errorMsg, setErrorMsg] = useState('');
 
     useEffect(() => {
-        // Wait for FB SDK to be initialized (loaded in layout.tsx)
-        if (window.__FB_INITIALIZED__ && window.FB) {
-            setStatus('ready');
-            return;
-        }
-
         // Poll until the SDK is ready
         const interval = setInterval(() => {
             if (window.__FB_INITIALIZED__ && window.FB) {
@@ -43,7 +52,7 @@ export default function FacebookConnectPage() {
         // Timeout after 10s
         const timeout = setTimeout(() => {
             clearInterval(interval);
-            if (status === 'loading') {
+            if (!window.__FB_INITIALIZED__ || !window.FB) {
                 setErrorMsg("Le SDK Facebook n'a pas pu être chargé. Vérifiez votre connexion.");
                 setStatus('error');
             }
@@ -65,7 +74,7 @@ export default function FacebookConnectPage() {
         setStatus('logging-in');
 
         window.FB.login(
-            (response: any) => {
+            (response) => {
                 if (response.authResponse?.accessToken) {
                     if (window.opener) {
                         const targetOrigin = getTargetOrigin();

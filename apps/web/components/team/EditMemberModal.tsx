@@ -102,7 +102,7 @@ export function EditMemberModal({
         try {
             await updateRole({
                 membershipId: member.id,
-                role: selectedRole.toUpperCase() as any,
+                role: selectedRole.toUpperCase() as Uppercase<Role>,
             })
 
             onSuccess()

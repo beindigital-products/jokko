@@ -65,7 +65,7 @@ export function getNationalNumber(phone: string): string {
 
 export function formatPhoneDisplay(phone: string, format: 'international' | 'national' | 'local' = 'international'): string {
     if (!phone) return '';
-    // Basic formatting could be added here
+    if (format === 'national' || format === 'local') return getNationalNumber(phone);
     return phone;
 }
 

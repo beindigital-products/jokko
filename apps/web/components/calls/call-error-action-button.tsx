@@ -1,13 +1,14 @@
 'use client';
 
 import Link from 'next/link';
-import { ExternalLink, RotateCcw, Link as LinkIcon, LogIn, MessageSquarePlus } from 'lucide-react';
+import { ExternalLink, RotateCcw, Link as LinkIcon, LogIn, MessageSquarePlus, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCallStore } from '@/lib/stores/call-store';
 import { useMutation } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import type { Id } from '@/convex/_generated/dataModel';
 import { useWebRTCCall } from '@/hooks/use-webrtc-call';
+import { useCan } from '@/hooks/use-permission';
 import { mapCallError } from './call-error-messages';
 import { MicPermissionButton } from './mic-permission-button';
 
@@ -26,8 +27,33 @@ export function CallErrorActionButton() {
     const clearCall = useCallStore((s) => s.clearCall);
     const { initiateCall } = useWebRTCCall();
     const requestOutboundCall = useMutation(api.calls.requestOutboundCall);
+    const { isAdmin } = useCan();
 
     if (!action) return null;
+
+    if (action.type === 'recharge') {
+        // Owner/Admin can top up directly; an agent must ask one of them.
+        if (isAdmin) {
+            return (
+                <Button
+                    asChild
+                    variant="outline"
+                    size="sm"
+                    className="gap-1 border-red-300 bg-white text-red-700 hover:bg-red-100"
+                >
+                    <Link href="/dashboard/billing">
+                        <Wallet className="h-4 w-4" />
+                        Recharger le compte
+                    </Link>
+                </Button>
+            );
+        }
+        return (
+            <span className="text-xs font-medium text-red-700">
+                Demandez a un administrateur de recharger le compte.
+            </span>
+        );
+    }
 
     if (action.type === 'mic') {
         return <MicPermissionButton />;

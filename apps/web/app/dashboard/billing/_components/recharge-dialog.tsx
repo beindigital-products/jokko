@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { toast } from "sonner";
@@ -26,11 +26,17 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { CREDIT_PACKS, PAYMENT_PROVIDERS, type CreditPack, type PaymentProvider } from "@/lib/credit-packs";
+import { CREDIT_PACKS, PAYMENT_PROVIDERS, findPack, type CreditPack, type PaymentProvider } from "@/lib/credit-packs";
 
 interface RechargeDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
+    /** Pre-select this pack (FCFA) and jump straight to the payment step. */
+    initialAmount?: number;
+}
+
+function getErrorMessage(error: unknown, fallback: string): string {
+    return error instanceof Error ? error.message : fallback;
 }
 
 const STEP_LABELS = ["Montant", "Paiement", "Confirmation"] as const;
@@ -87,7 +93,7 @@ const PROVIDER_GRADIENTS: Record<PaymentProvider, string> = {
     STRIPE: "from-[#14532d] to-[#059669]",
 };
 
-export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
+export function RechargeDialog({ open, onOpenChange, initialAmount }: RechargeDialogProps) {
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [selectedPack, setSelectedPack] = useState<CreditPack | null>(null);
     const [selectedProvider, setSelectedProvider] = useState<PaymentProvider | null>(null);
@@ -95,6 +101,17 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
 
     const initiateWave = useAction(api.payment_actions.initiateWavePayment);
     const initiateStripe = useAction(api.stripe_actions.createCreditsCheckoutSession);
+
+    // When opened with a pre-selected amount (from the v3 credit card), seed the
+    // pack and jump straight to the payment-method step.
+    useEffect(() => {
+        if (!open) return;
+        const pack = initialAmount ? findPack(initialAmount) : undefined;
+        if (pack) {
+            setSelectedPack(pack);
+            setStep(2);
+        }
+    }, [open, initialAmount]);
 
     const resetAndClose = () => {
         setStep(1);
@@ -127,9 +144,9 @@ export function RechargeDialog({ open, onOpenChange }: RechargeDialogProps) {
             }
 
             window.location.href = result.url;
-        } catch (error: any) {
+        } catch (error) {
             toast.error("Erreur", {
-                description: error.message || "Impossible de créer la session de paiement.",
+                description: getErrorMessage(error, "Impossible de créer la session de paiement."),
             });
             setLoading(false);
         }

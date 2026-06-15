@@ -1,120 +1,52 @@
+"use client"
+
+import * as React from "react"
+import { Check, X } from "lucide-react"
+
+import { cn } from "@/lib/utils"
+import {
+  PASSWORD_CRITERIA,
+  PASSWORD_LEVEL_LABEL,
+  evaluatePassword,
+  type PasswordEvaluation,
+  type PasswordStrengthLevel,
+} from "@/lib/password-policy"
+
 /**
- * ╔═══════════════════════════════════════════════════════════════╗
- * ║              components/ui/password-strength.tsx              ║
- * ╠═══════════════════════════════════════════════════════════════╣
- * ║ DESCRIPTION:                                                  ║
- * ║   Indicateur visuel de la force du mot de passe avec:         ║
- * ║   - Barre de progression colorée                              ║
- * ║   - Liste des critères avec statut                            ║
- * ║   - Texte descriptif de la force                              ║
- * ╚═══════════════════════════════════════════════════════════════╝
+ * PasswordStrength — v2 design system password meter.
+ *
+ * Visual recipe per design spec §5 :
+ *   - 4-segment bar (one segment per criterion passed)
+ *   - Mono uppercase level label : FAIBLE / MOYEN / FORT
+ *   - Criteria checklist kept for a11y (WCAG 3.3.3 Error Suggestion)
+ *
+ * Strength mapping (multi-agent review H2) :
+ *   0 criteria  → empty bar
+ *   1–2         → weak   (status-danger / status-warn segments)
+ *   3           → medium (status-moment)
+ *   4 (all)     → strong (status-good) — only level that backend accepts
+ *
+ * Public API preserved from v1 to keep any callers compiling. New consumers
+ * should prefer `evaluatePassword()` directly from `@/lib/password-policy`.
  */
 
-'use client'
-
-import * as React from 'react'
-import { Check, X } from 'lucide-react'
-import { cn } from '@/lib/utils'
-
-// ============================================
-// TYPES
-// ============================================
-
-interface PasswordCriteria {
-  id: string
-  label: string
-  test: (password: string) => boolean
+const SEGMENT_COLOR_BY_LEVEL: Record<PasswordStrengthLevel, string> = {
+  empty: "bg-transparent",
+  weak: "bg-[var(--status-danger)]",
+  medium: "bg-[var(--status-warn)]",
+  strong: "bg-[var(--status-good)]",
 }
 
-interface StrengthLevel {
-  label: string
-  color: string
-  bgColor: string
-  minScore: number
+const LABEL_COLOR_BY_LEVEL: Record<PasswordStrengthLevel, string> = {
+  empty: "text-[var(--ink-400)]",
+  weak: "text-[var(--status-danger)]",
+  medium: "text-[var(--status-warn)]",
+  strong: "text-[var(--status-good)]",
 }
-
-// ============================================
-// CONSTANTS
-// ============================================
-
-const PASSWORD_CRITERIA: PasswordCriteria[] = [
-  {
-    id: 'length',
-    label: 'Au moins 8 caractères',
-    test: (pwd) => pwd.length >= 8,
-  },
-  {
-    id: 'lowercase',
-    label: 'Une lettre minuscule',
-    test: (pwd) => /[a-z]/.test(pwd),
-  },
-  {
-    id: 'uppercase',
-    label: 'Une lettre majuscule',
-    test: (pwd) => /[A-Z]/.test(pwd),
-  },
-  {
-    id: 'number',
-    label: 'Un chiffre',
-    test: (pwd) => /[0-9]/.test(pwd),
-  },
-  {
-    id: 'special',
-    label: 'Un caractère spécial (!@#$%...)',
-    test: (pwd) => /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd),
-  },
-]
-
-const STRENGTH_LEVELS: StrengthLevel[] = [
-  { label: 'Très faible', color: 'bg-red-500', bgColor: 'bg-red-100', minScore: 0 },
-  { label: 'Faible', color: 'bg-orange-500', bgColor: 'bg-orange-100', minScore: 1 },
-  { label: 'Moyen', color: 'bg-yellow-500', bgColor: 'bg-yellow-100', minScore: 2 },
-  { label: 'Fort', color: 'bg-green-500', bgColor: 'bg-green-100', minScore: 4 },
-  { label: 'Très fort', color: 'bg-green-600', bgColor: 'bg-green-100', minScore: 5 },
-]
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-function calculateStrength(password: string): {
-  score: number
-  passed: string[]
-  failed: string[]
-} {
-  const passed: string[] = []
-  const failed: string[] = []
-
-  for (const criteria of PASSWORD_CRITERIA) {
-    if (criteria.test(password)) {
-      passed.push(criteria.id)
-    } else {
-      failed.push(criteria.id)
-    }
-  }
-
-  return {
-    score: passed.length,
-    passed,
-    failed,
-  }
-}
-
-function getStrengthLevel(score: number): StrengthLevel {
-  for (let i = STRENGTH_LEVELS.length - 1; i >= 0; i--) {
-    if (score >= STRENGTH_LEVELS[i].minScore) {
-      return STRENGTH_LEVELS[i]
-    }
-  }
-  return STRENGTH_LEVELS[0]
-}
-
-// ============================================
-// COMPONENTS
-// ============================================
 
 interface PasswordStrengthProps {
   password: string
+  /** Show the per-criterion checklist below the bar. Default: true. */
   showCriteria?: boolean
   className?: string
 }
@@ -124,88 +56,84 @@ export function PasswordStrength({
   showCriteria = true,
   className,
 }: PasswordStrengthProps) {
-  const { score, passed } = calculateStrength(password)
-  const strengthLevel = getStrengthLevel(score)
-  const percentage = (score / PASSWORD_CRITERIA.length) * 100
+  const evaluation = evaluatePassword(password)
+  // Hide entirely on empty input — saves vertical space until typing starts.
+  if (password.length === 0) return null
 
-  // Don't show anything if password is empty
-  if (!password) {
-    return null
-  }
-
+  const filled = evaluation.score
   return (
-    <div className={cn('space-y-3', className)}>
-      {/* Strength Bar */}
-      <div className="space-y-1.5">
-        <div className="flex justify-between items-center">
-          <span className="text-xs font-medium text-gray-500">
-            Force du mot de passe
-          </span>
-          <span
-            className={cn(
-              'text-xs font-semibold px-2 py-0.5 rounded-full',
-              strengthLevel.bgColor,
-              strengthLevel.color.replace('bg-', 'text-')
-            )}
-          >
-            {strengthLevel.label}
-          </span>
+    <div className={cn("space-y-2.5", className)} data-slot="password-strength">
+      {/* 4-segment bar + mono label */}
+      <div className="flex items-center gap-2.5">
+        <div
+          className="flex flex-1 items-stretch gap-1"
+          aria-label={`Force du mot de passe : ${PASSWORD_LEVEL_LABEL[evaluation.level] || "vide"}`}
+        >
+          {PASSWORD_CRITERIA.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "h-1.5 flex-1 rounded-sm transition-colors",
+                i < filled
+                  ? SEGMENT_COLOR_BY_LEVEL[evaluation.level]
+                  : "bg-[var(--ink-200)]"
+              )}
+            />
+          ))}
         </div>
-        <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className={cn(
-              'h-full rounded-full transition-all duration-300 ease-out',
-              strengthLevel.color
-            )}
-            style={{ width: `${percentage}%` }}
-          />
-        </div>
+        <span
+          aria-live="polite"
+          className={cn(
+            "font-mono text-[10px] font-medium uppercase tracking-[0.15em] leading-tight tabular-nums",
+            LABEL_COLOR_BY_LEVEL[evaluation.level]
+          )}
+        >
+          {PASSWORD_LEVEL_LABEL[evaluation.level] || "—"}
+        </span>
       </div>
 
-      {/* Criteria List */}
-      {showCriteria && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-          {PASSWORD_CRITERIA.map((criteria) => {
-            const isPassed = passed.includes(criteria.id)
+      {/* Criteria checklist (a11y — kept per WCAG Error Suggestion) */}
+      {showCriteria ? (
+        <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+          {PASSWORD_CRITERIA.map((c) => {
+            const passed = evaluation.passed.includes(c.id)
             return (
-              <div
-                key={criteria.id}
+              <li
+                key={c.id}
                 className={cn(
-                  'flex items-center gap-2 text-xs transition-colors',
-                  isPassed ? 'text-green-600' : 'text-gray-400'
+                  "flex items-center gap-1.5 text-xs transition-colors",
+                  passed
+                    ? "text-[var(--status-good)]"
+                    : "text-[var(--ink-500)]"
                 )}
               >
-                {isPassed ? (
-                  <Check className="w-3.5 h-3.5 flex-shrink-0" />
+                {passed ? (
+                  <Check className="h-3 w-3 shrink-0" aria-hidden />
                 ) : (
-                  <X className="w-3.5 h-3.5 flex-shrink-0" />
+                  <X className="h-3 w-3 shrink-0" aria-hidden />
                 )}
-                <span>{criteria.label}</span>
-              </div>
+                <span>{c.label}</span>
+              </li>
             )
           })}
-        </div>
-      )}
+        </ul>
+      ) : null}
+
+      {/* NIST/ANSSI guidance helper (UA review H8) — calms perceived "downgrade"
+          when users notice the special-char requirement is gone. */}
+      {evaluation.level !== "strong" ? (
+        <p className="text-[11px] leading-relaxed text-[var(--ink-500)]">
+          Un mot de passe long est plus sûr qu'un mot de passe complexe.
+        </p>
+      ) : null}
     </div>
   )
 }
 
-// ============================================
-// HOOK FOR EXTERNAL USE
-// ============================================
-
-export function usePasswordStrength(password: string) {
-  const { score, passed, failed } = calculateStrength(password)
-  const strengthLevel = getStrengthLevel(score)
-
-  return {
-    score,
-    maxScore: PASSWORD_CRITERIA.length,
-    passed,
-    failed,
-    level: strengthLevel,
-    isStrong: score >= 4,
-    isValid: score >= 3, // Minimum: length + 2 other criteria
-    percentage: (score / PASSWORD_CRITERIA.length) * 100,
-  }
+/**
+ * @deprecated Prefer importing `evaluatePassword` from `@/lib/password-policy`
+ * directly. Kept for back-compat with v1 callers.
+ */
+export function usePasswordStrength(password: string): PasswordEvaluation {
+  return React.useMemo(() => evaluatePassword(password), [password])
 }

@@ -116,20 +116,23 @@ export function AssignToMemberModal({
     const agents: Member[] = useMemo(() => {
         if (!membersData) return [];
         return (membersData.members || [])
-            .filter((m: any) => m.role === 'agent')
-            .map((m: any) => ({
-                id: m.userId, // Use User ID for assignment
-                role: m.role,
-                roleLabel: m.role === 'owner' ? 'Proprietaire' : m.role === 'admin' ? 'Admin' : 'Agent',
-                roleIcon: '', // Not used in UI yet?
-                poleId: m.poleId,
-                user: {
-                    id: m.userId,
-                    name: m.user.name,
-                    email: m.user.email,
-                    avatar: m.user.avatar
-                }
-            }));
+            .flatMap((m): Member[] => {
+                if (!m?.userId || !m.user || m.role !== 'agent') return [];
+
+                return [{
+                    id: m.userId, // Use User ID for assignment
+                    role: m.role,
+                    roleLabel: 'Agent',
+                    roleIcon: '', // Not used in UI yet?
+                    poleId: m.poleId,
+                    user: {
+                        id: m.userId,
+                        name: m.user.name ?? null,
+                        email: m.user.email,
+                        avatar: m.user.avatar ?? null
+                    }
+                }];
+            });
     }, [membersData])
 
     const poles: Pole[] = polesData?.poles || []
@@ -168,13 +171,6 @@ export function AssignToMemberModal({
 
         setIsSubmitting(true)
         try {
-            // We need to find the User ID for the selected Member (which is Membership ID currently)
-            // Wait, I need User ID.
-            // I'll update key mapping below.
-
-            // Actually, let's fix the mapping in useMemo above or update listMembers.
-            // For now, assume I fix listMembers to return userId.
-
             await assignTo(conversationId, selectedMemberId, note || undefined);
         } finally {
             setIsSubmitting(false)
@@ -187,7 +183,7 @@ export function AssignToMemberModal({
                 <DialogHeader>
                     <DialogTitle>Assigner a un membre</DialogTitle>
                     <DialogDescription>
-                        Choisissez un membre de l'equipe pour gerer cette conversation.
+                        Choisissez un membre de l&apos;equipe pour gerer cette conversation.
                     </DialogDescription>
                 </DialogHeader>
 
