@@ -150,7 +150,7 @@ export function MobileSidebar({
                 <SheetHeader className="p-4 border-b border-white/10">
                     <SheetTitle className="flex items-center gap-2.5">
                         <Image
-                            src="/logo.png"
+                            src="/logo-mark.png"
                             alt="Jokko"
                             width={28}
                             height={28}

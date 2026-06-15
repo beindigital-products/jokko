@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -163,9 +164,13 @@ export function NavigationHeader() {
 
 function LogoMark() {
   return (
-    <span className="relative flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-accent to-accent-hover text-[13px] font-bold text-white shadow-[0_6px_16px_-4px_var(--accent-glow)]">
-      <span aria-hidden>J</span>
-      <span className="absolute -bottom-0.5 -right-0.5 h-2 w-2 rounded-full bg-[var(--whatsapp)] ring-2 ring-background" />
-    </span>
+    <Image
+      src="/logo-mark.png"
+      alt="Jokko"
+      width={32}
+      height={32}
+      priority
+      className="h-8 w-8 object-contain"
+    />
   );
 }
