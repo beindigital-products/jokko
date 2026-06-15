@@ -253,7 +253,7 @@ export function Footer() {
           aria-hidden
         >
           <div
-            className="font-display text-[18vw] font-bold leading-none tracking-tighter text-transparent"
+            className="text-center font-display text-[18vw] font-bold leading-none tracking-tighter text-transparent"
             style={{
               WebkitTextStroke: "1px rgba(255,255,255,0.08)",
               backgroundImage:
