@@ -73,7 +73,12 @@ export const config = {
          * - _next/static (static files)
          * - _next/image (image optimization files)
          * - favicon.ico (favicon file)
+         * - any path ending in a file extension (static assets in public/:
+         *   logo.png, logo-mark.png, apple-touch-icon.png, site.webmanifest,
+         *   og-image.png, *.svg, robots.txt, sitemap.xml, …). Without this,
+         *   the auth gate 307-redirects public assets to sign-in, which breaks
+         *   them on unauthenticated pages and makes next/image return 400.
          */
-        '/((?!api|_next/static|_next/image|favicon.ico).*)',
+        '/((?!api|_next/static|_next/image|favicon.ico|.*\\.[\\w]+$).*)',
     ],
 }
