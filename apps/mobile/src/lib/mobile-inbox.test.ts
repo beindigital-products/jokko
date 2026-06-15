@@ -63,10 +63,13 @@ describe("mobile inbox helpers", () => {
     });
 
     it("formats timestamps for mobile rows", () => {
-        const now = new Date("2026-05-02T12:00:00.000Z");
-        expect(formatConversationTimestamp(new Date("2026-05-02T10:05:00.000Z").getTime(), now)).toBe("12:05");
-        expect(formatConversationTimestamp(new Date("2026-05-01T10:05:00.000Z").getTime(), now)).toBe("Hier");
-        expect(formatConversationTimestamp(new Date("2026-04-25T10:05:00.000Z").getTime(), now)).toBe("25/04");
+        // Dates construites en heure LOCALE : la fonction affiche l'heure locale,
+        // donc le test doit être indépendant du fuseau de la machine/CI (sinon
+        // il passe en UTC+2 mais casse en UTC, comme sur le runner GitHub).
+        const now = new Date(2026, 4, 2, 14, 0); // 2 mai 2026, 14:00
+        expect(formatConversationTimestamp(new Date(2026, 4, 2, 12, 5).getTime(), now)).toBe("12:05");
+        expect(formatConversationTimestamp(new Date(2026, 4, 1, 12, 5).getTime(), now)).toBe("Hier");
+        expect(formatConversationTimestamp(new Date(2026, 3, 25, 12, 5).getTime(), now)).toBe("25/04");
     });
 });
 
