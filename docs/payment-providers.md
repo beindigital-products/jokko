@@ -198,9 +198,19 @@ FCFA brut pour tous les providers.
 
 ## 3. Orange Money
 
-**Statut : A implementer**
+**Statut : Code implemente, desactive en attente de credentials marchand**
 
-L'action `initiateOrangeMoneyPayment` dans `convex/payment_actions.ts` est un stub qui lance une erreur. Le dialog affiche le provider mais il est desactive avec le label "Bientot disponible".
+L'action `initiateOrangeMoneyPayment` (`convex/payment_actions.ts`) et le webhook
+`/api/orange-money/webhook` (`convex/http.ts`) sont wires de bout en bout selon la
+spec Orange Web Payment (OAuth client-credentials → webpayment → notif). Le
+provider reste **desactive dans l'UI** (`PAYMENT_PROVIDERS.available = false` dans
+`lib/credit-packs.ts`) jusqu'a validation d'un compte marchand reel.
+
+**Pour activer** : renseigner les env vars ci-dessous (+ `ORANGE_MONEY_ENV=dev`
+pour le sandbox), tester un paiement en sandbox, puis passer `available` a `true`.
+Sans credentials, l'action renvoie une erreur "non configure" propre (pas de flow
+casse). L'authentification du callback se fait via le `notif_token` par transaction
+(Orange n'a pas de signature HMAC) ; l'ajout de credits reste idempotent.
 
 ### Prerequis
 
