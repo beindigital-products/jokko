@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { avatarColorFromString, initialsFromName } from '@/lib/dashboard/avatar-color'
 import { hiddenNavKeysForRole, navKeyFromPathname } from '@/lib/dashboard/nav'
+import { useCommandPalette } from '@/lib/stores/command-palette-store'
 
 const PLAN_LABELS: Record<string, string> = {
     FREE: 'Gratuit',
@@ -43,6 +44,7 @@ export function AppSidebar({ basePath = '/dashboard' }: { basePath?: string }) {
     const router = useRouter()
     const { signOut } = useAuthActions()
     const { currentOrg, allOrgs, switchOrg } = useCurrentOrg()
+    const openPalette = useCommandPalette((s) => s.openPalette)
     const me = useQuery(api.users.me)
     const role = useQuery(api.users.currentUserRole)
     const stats = useQuery(api.conversations.getSidebarStats)
@@ -149,7 +151,7 @@ export function AppSidebar({ basePath = '/dashboard' }: { basePath?: string }) {
                 subtitle: role ? ROLE_SUBTITLE[role] : undefined,
                 online: true,
             }}
-            onSearchClick={() => router.push(`${basePath}/conversations`)}
+            onSearchClick={openPalette}
             orgMenu={orgMenu}
             userMenu={userMenu}
         />

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useSearchParams } from "next/navigation"
 
 import { PageHeader } from "@/components/dashboard/shell"
 import { SettingsTabsNav, type SettingsTab } from "@/components/dashboard/settings"
@@ -80,7 +81,13 @@ function Section({ active }: { active: string }) {
 }
 
 export default function SettingsPage() {
-    const [active, setActive] = useState("profile")
+    // Deep-linkable sub-nav: /dashboard/settings?tab=whatsapp lands directly on
+    // the Canaux WhatsApp panel (used by the inbox "connect WhatsApp" CTA).
+    const params = useSearchParams()
+    const requested = params?.get("tab")
+    const [active, setActive] = useState(
+        requested && TABS.some((t) => t.key === requested) ? requested : "profile",
+    )
 
     return (
         <div className="flex h-full w-full flex-col overflow-hidden bg-[var(--paper-white)]">
