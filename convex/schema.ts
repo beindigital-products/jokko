@@ -339,6 +339,11 @@ export default defineSchema({
         joinedAt: v.number(),
         lastAssignedAt: v.optional(v.number()),
         invitedById: v.optional(v.id("users")),
+        // Suspended seat (e.g. freed by a plan downgrade). The row + history are
+        // kept, but the member loses access until reactivated by an owner/admin.
+        // Enforced centrally in requireMembership.
+        suspended: v.optional(v.boolean()),
+        suspendedReason: v.optional(v.string()),
     })
         .index("by_user", ["userId"])
         .index("by_organization", ["organizationId"])

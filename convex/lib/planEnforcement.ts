@@ -7,8 +7,8 @@
  */
 
 import type { MutationCtx } from "../_generated/server";
-import type { Id } from "../_generated/dataModel";
-import { getMaxChannels, isUnlimited } from "./planHelpers";
+import type { Doc, Id } from "../_generated/dataModel";
+import { getMaxChannels, getMaxAgents, isUnlimited } from "./planHelpers";
 import { createNotification } from "../notifications";
 
 export async function enforceChannelDowngrade(
@@ -16,6 +16,11 @@ export async function enforceChannelDowngrade(
     organizationId: Id<"organizations">,
     newPlan: string,
 ): Promise<number> {
+    // Seat reconciliation runs regardless of channel state (a plan change can
+    // affect seats without affecting channels), so it lives before the channel
+    // early-returns below.
+    await enforceSeatLimit(ctx, organizationId, newPlan, Date.now());
+
     const maxChannels = await getMaxChannels(ctx, newPlan);
     if (isUnlimited(maxChannels)) return 0;
 
@@ -98,4 +103,83 @@ export async function enforceChannelDowngrade(
     }
 
     return disabledIds.length;
+}
+
+/**
+ * Reconcile seat usage against the plan's agent limit after a plan change.
+ * - Over the limit → suspend the NEWEST agent seats (OWNER/ADMIN are never
+ *   suspended; oldest agents keep their seat). Notifies owners/admins.
+ * - Room available / upgrade → auto-reactivate seats previously suspended by a
+ *   downgrade, oldest first, up to the new limit.
+ * Suspended members lose access (enforced in requireMembership) but keep their
+ * row + history so an owner can reassign seats from the team screen.
+ */
+async function enforceSeatLimit(
+    ctx: MutationCtx,
+    organizationId: Id<"organizations">,
+    newPlan: string,
+    now: number,
+): Promise<void> {
+    const maxAgents = await getMaxAgents(ctx, newPlan);
+    const members = await ctx.db
+        .query("memberships")
+        .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
+        .collect();
+    const active = members.filter((m) => !m.suspended);
+
+    if (!isUnlimited(maxAgents) && active.length > maxAgents) {
+        const roleRank = (r: string) => (r === "OWNER" ? 0 : r === "ADMIN" ? 1 : 2);
+        const ranked = [...active].sort((a, b) =>
+            roleRank(a.role) !== roleRank(b.role)
+                ? roleRank(a.role) - roleRank(b.role)
+                : a.joinedAt - b.joinedAt,
+        );
+        // Keep the first `maxAgents` (owner/admins + oldest agents); suspend the
+        // agents beyond it. Owners/admins are never auto-suspended.
+        const toSuspend = ranked.slice(maxAgents).filter((m) => m.role === "AGENT");
+        for (const m of toSuspend) {
+            await ctx.db.patch(m._id, { suspended: true, suspendedReason: "plan_downgrade" });
+        }
+        if (toSuspend.length > 0) {
+            await notifySeatDowngrade(ctx, organizationId, members, newPlan, maxAgents, toSuspend.length, now);
+        }
+        return;
+    }
+
+    // Room available (or unlimited plan): restore seats suspended by a prior
+    // downgrade, oldest first, up to the limit.
+    const reactivatable = members
+        .filter((m) => m.suspended && m.suspendedReason === "plan_downgrade")
+        .sort((a, b) => a.joinedAt - b.joinedAt);
+    let slots = isUnlimited(maxAgents) ? Number.POSITIVE_INFINITY : maxAgents - active.length;
+    for (const m of reactivatable) {
+        if (slots <= 0) break;
+        await ctx.db.patch(m._id, { suspended: undefined, suspendedReason: undefined });
+        slots -= 1;
+    }
+}
+
+async function notifySeatDowngrade(
+    ctx: MutationCtx,
+    organizationId: Id<"organizations">,
+    members: Doc<"memberships">[],
+    newPlan: string,
+    maxAgents: number,
+    suspendedCount: number,
+    now: number,
+): Promise<void> {
+    for (const m of members) {
+        if (m.role !== "OWNER" && m.role !== "ADMIN") continue;
+        if (m.suspended) continue;
+        await createNotification(ctx, {
+            organizationId,
+            userId: m.userId,
+            type: "PLAN_DOWNGRADE",
+            title: "Sièges désactivés après changement de plan",
+            message: `Votre plan ${newPlan} autorise ${maxAgents} agent${maxAgents > 1 ? "s" : ""}. ${suspendedCount} siège${suspendedCount > 1 ? "s ont été désactivés" : " a été désactivé"}. Réactivez les membres souhaités depuis l'équipe.`,
+            link: "/dashboard/team",
+            metadata: { newPlan, maxAgents, suspendedCount },
+            createdAt: now,
+        });
+    }
 }

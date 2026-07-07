@@ -26,7 +26,8 @@ export async function countActiveChannels(
 }
 
 /**
- * Compte les memberships actifs + invitations PENDING (un seat en attente compte).
+ * Compte les seats consommés : memberships actifs (hors sièges suspendus, qui
+ * sont libérés) + invitations PENDING (un seat en attente compte).
  */
 export async function countActiveAgents(
     ctx: QueryCtx | MutationCtx,
@@ -36,13 +37,14 @@ export async function countActiveAgents(
         .query("memberships")
         .withIndex("by_organization", (q) => q.eq("organizationId", organizationId))
         .collect();
+    const activeMembers = memberships.filter((m) => !m.suspended);
     const pendingInvites = await ctx.db
         .query("invitations")
         .withIndex("by_org_status", (q) =>
             q.eq("organizationId", organizationId).eq("status", "PENDING"),
         )
         .collect();
-    return memberships.length + pendingInvites.length;
+    return activeMembers.length + pendingInvites.length;
 }
 
 /**

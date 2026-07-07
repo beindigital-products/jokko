@@ -70,7 +70,20 @@ export function Layout({ preview, children }: LayoutProps) {
 function Footer() {
     return (
         <Section className="text-center mt-8">
-            <Text className="text-slate-400 text-xs">
+            <Text className="text-slate-500 text-xs leading-5">
+                Vous recevez cet email car vous êtes membre d'une équipe sur Jokko.
+                Gérez vos alertes depuis Paramètres → Notifications dans l'application.
+            </Text>
+            <Text className="text-slate-400 text-xs mt-2">
+                <Link href="https://www.jokko.co/privacy" className="text-slate-400 underline">
+                    Confidentialité
+                </Link>
+                {"   ·   "}
+                <Link href="https://www.jokko.co/terms" className="text-slate-400 underline">
+                    Conditions
+                </Link>
+            </Text>
+            <Text className="text-slate-400 text-xs mt-2">
                 © {new Date().getFullYear()} Jokko. Tous droits réservés.
             </Text>
         </Section>
