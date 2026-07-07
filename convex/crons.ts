@@ -45,4 +45,11 @@ crons.interval("expire-missed-calls", { minutes: 1 }, internal.calls.expireMisse
 // Fail broadcasts stuck in SENDING with no progress for >15 min (broken chunk chain)
 crons.interval("cleanup-stale-broadcasts", { minutes: 5 }, internal.broadcasts.cleanupStale);
 
+// Remind orgs whose trial ends within 2 days and haven't chosen a plan (once/org)
+crons.daily(
+    "trial-ending-reminders",
+    { hourUTC: 9, minuteUTC: 0 },
+    internal.lifecycle_emails.runTrialReminders,
+);
+
 export default crons;

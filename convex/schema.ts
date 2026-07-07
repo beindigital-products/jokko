@@ -62,6 +62,8 @@ export default defineSchema({
         locale: v.optional(v.string()),
         timezone: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
+        // Timestamp of the one-off welcome email (sent once onboarding completes).
+        welcomeEmailSentAt: v.optional(v.number()),
         // RGPD : timestamp (ms epoch) auquel l'utilisateur a accepté les CGU
         // et la politique de confidentialité au moment du sign-up.
         // Persistance gérée par le callback Password.profile() dans convex/auth.ts.
@@ -136,6 +138,9 @@ export default defineSchema({
         // Toutes les fonctionnalités sont déverrouillées pendant cette période, peu importe le plan choisi.
         trialStartedAt: v.optional(v.number()),
         trialEndsAt: v.optional(v.number()),
+        // Timestamp of the one-off "your trial is ending" reminder email, so the
+        // daily cron sends it at most once per org.
+        trialReminderSentAt: v.optional(v.number()),
 
         // Indique si l'utilisateur a explicitement sélectionné un plan payant.
         // FREE est un sentinel "pas de plan choisi". Après expiration du trial et

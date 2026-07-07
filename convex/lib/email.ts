@@ -16,6 +16,8 @@ import { render } from "@react-email/render";
 import { InvitationEmail } from "../emails/invitation";
 import { PasswordResetEmail } from "../emails/password_reset";
 import { MentionEmail } from "../emails/mention";
+import { WelcomeEmail } from "../emails/welcome";
+import { TrialReminderEmail } from "../emails/trial_reminder";
 import { DOMParser } from "@xmldom/xmldom";
 
 // Polyfill DOMParser for AWS SDK in Convex runtime
@@ -116,6 +118,41 @@ export async function sendMentionEmail(params: {
             where: params.where,
             excerpt: params.excerpt,
             url: params.url,
+        }),
+    });
+}
+
+export async function sendWelcomeEmail(params: {
+    to: string;
+    userName: string;
+    dashboardUrl: string;
+}) {
+    return sendEmail({
+        to: params.to,
+        subject: "Bienvenue sur Jokko 👋",
+        react: WelcomeEmail({
+            userName: params.userName,
+            dashboardUrl: params.dashboardUrl,
+        }),
+    });
+}
+
+export async function sendTrialReminderEmail(params: {
+    to: string;
+    userName: string;
+    daysLeft: number;
+    billingUrl: string;
+}) {
+    return sendEmail({
+        to: params.to,
+        subject:
+            params.daysLeft <= 1
+                ? "Votre essai Jokko se termine aujourd'hui"
+                : `Votre essai Jokko se termine dans ${params.daysLeft} jours`,
+        react: TrialReminderEmail({
+            userName: params.userName,
+            daysLeft: params.daysLeft,
+            billingUrl: params.billingUrl,
         }),
     });
 }
