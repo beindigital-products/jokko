@@ -37,6 +37,10 @@ export default defineSchema({
         maxConversationsPerMonth: v.number(),
         maxTemplates: v.number(),
         historyDays: v.number(),
+        // Media storage cap in MB (-1 = illimité). Optionnel pour compat avec
+        // les plans seedés avant l'ajout — getMaxStorageMB traite l'absence
+        // comme illimité.
+        maxStorageMB: v.optional(v.number()),
         monthlyPriceFCFA: v.number(),
         yearlyPriceFCFA: v.number(),
         yearlyMonthlyPriceFCFA: v.number(),
@@ -133,6 +137,9 @@ export default defineSchema({
             v.literal("ENTERPRISE")
         ),
         creditBalance: v.optional(v.number()), // Solde de crédits (FCFA ou Unités)
+        // Octets de média stockés (inbound + sortant) — maintenu au store/suppression,
+        // réconciliable via storage_usage.recompute. Borné par plan.maxStorageMB.
+        storageBytesUsed: v.optional(v.number()),
 
         // App-level trial (14 jours à partir de la création de l'org)
         // Toutes les fonctionnalités sont déverrouillées pendant cette période, peu importe le plan choisi.

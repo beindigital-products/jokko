@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { query, mutation, QueryCtx, internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { recordStorageDelete } from "./lib/storageUsage";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
@@ -476,7 +477,13 @@ export const cascadeDeleteContactData = internalMutation({
                 .query("messages")
                 .withIndex("by_conversation", (q) => q.eq("conversationId", conv._id))
                 .take(MSG_BATCH);
-            for (const m of msgs) await ctx.db.delete(m._id);
+            for (const m of msgs) {
+                // Free the media blob + storage counter, then drop the row.
+                if (m.mediaStorageId) {
+                    await recordStorageDelete(ctx, args.organizationId, m.mediaStorageId);
+                }
+                await ctx.db.delete(m._id);
+            }
             if (msgs.length === MSG_BATCH) {
                 // More messages remain in this conversation → resume next tick.
                 await ctx.scheduler.runAfter(0, internal.contacts.cascadeDeleteContactData, args);

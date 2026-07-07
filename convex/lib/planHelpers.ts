@@ -145,6 +145,11 @@ export async function getMaxAgents(ctx: QueryCtx | MutationCtx, planKey: string)
     return (await getPlan(ctx, planKey)).maxAgents;
 }
 
+/** Media storage cap in MB. Absent field (plans seedés avant l'ajout) = illimité. */
+export async function getMaxStorageMB(ctx: QueryCtx | MutationCtx, planKey: string): Promise<number> {
+    return (await getPlan(ctx, planKey)).maxStorageMB ?? UNLIMITED;
+}
+
 export async function getConversationLimit(ctx: QueryCtx | MutationCtx, planKey: string): Promise<number> {
     return (await getPlan(ctx, planKey)).maxConversationsPerMonth;
 }

@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { requireMembership, requirePermission } from "./lib/auth";
 import { createNotification } from "./notifications";
 import { formatConversationPreview } from "./lib/messagePreview";
+import { recordStorageAdd } from "./lib/storageUsage";
 import { paginationOptsValidator } from "convex/server";
 
 // ============================================
@@ -257,6 +258,11 @@ export const send = mutation({
             createdAt: Date.now(),
             updatedAt: Date.now(),
         });
+
+        // Count outbound media (uploaded via generateUploadUrl) against the org.
+        if (args.mediaStorageId) {
+            await recordStorageAdd(ctx, conversation.organizationId, args.mediaStorageId);
+        }
 
         // Update conversation (last message, update time)
         await ctx.db.patch(args.conversationId, {

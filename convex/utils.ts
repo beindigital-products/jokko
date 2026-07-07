@@ -2,6 +2,7 @@
 import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { recordStorageAdd } from "./lib/storageUsage";
 
 export const getOrganization = internalQuery({
     args: { id: v.id("organizations") },
@@ -33,10 +34,15 @@ export const patchMessageMedia = internalMutation({
         mediaStorageId: v.id("_storage"),
     },
     handler: async (ctx, args) => {
+        const message = await ctx.db.get(args.messageId);
         await ctx.db.patch(args.messageId, {
             mediaStorageId: args.mediaStorageId,
             updatedAt: Date.now(),
         });
+        // Count the freshly-downloaded inbound media against the org's storage.
+        if (message) {
+            await recordStorageAdd(ctx, message.organizationId, args.mediaStorageId);
+        }
     },
 });
 

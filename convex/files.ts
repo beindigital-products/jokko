@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { getCurrentOrgId } from "./lib/auth";
+import { getMaxStorageMB, isUnlimited } from "./lib/planHelpers";
 import { rateLimiter } from "./lib/rateLimits";
 
 export const generateUploadUrl = mutation({
@@ -11,6 +12,20 @@ export const generateUploadUrl = mutation({
         if (!userId) throw new Error("Non authentifie");
 
         await rateLimiter.limit(ctx, "uploadFile", { key: userId, throws: true });
+
+        // Storage quota: block new uploads once the org is over its plan cap.
+        const orgId = await getCurrentOrgId(ctx);
+        if (orgId) {
+            const org = await ctx.db.get(orgId);
+            if (org) {
+                const maxMB = await getMaxStorageMB(ctx, org.plan);
+                if (!isUnlimited(maxMB) && (org.storageBytesUsed ?? 0) >= maxMB * 1024 * 1024) {
+                    throw new Error(
+                        `Quota de stockage média atteint (${maxMB} Mo). Supprimez des médias ou passez à un plan supérieur.`,
+                    );
+                }
+            }
+        }
 
         return await ctx.storage.generateUploadUrl();
     },

@@ -30,6 +30,8 @@ export interface UsageCounts {
     conversations: number
     seats: number
     channels: number
+    /** Media storage, in MB (used vs plan cap; max = -1 → unlimited). */
+    storageMB?: { used: number; max: number }
 }
 
 /** "149000" → "149 000" (deterministic, locale-independent). */
@@ -85,9 +87,21 @@ function meter(label: string, value: number, limit: number, cost: string): Usage
 }
 
 export function mapUsage(plan: BillingPlanInput, counts: UsageCounts): UsageMeter[] {
-    return [
+    const meters = [
         meter("Conversations Meta", counts.conversations, plan.maxConversationsPerMonth, "inclus"),
         meter("Sièges", counts.seats, plan.maxAgents, "inclus"),
         meter("Numéros WhatsApp", counts.channels, plan.maxWhatsappChannels, "inclus"),
     ]
+    if (counts.storageMB) {
+        const { used, max } = counts.storageMB
+        const unlimited = isUnlimited(max)
+        meters.push({
+            label: "Stockage média",
+            value: `${group(used)} Mo`,
+            total: unlimited ? "∞" : `${group(max)} Mo`,
+            fraction: unlimited || max <= 0 ? 0 : Math.min(1, used / max),
+            cost: "inclus",
+        })
+    }
+    return meters
 }
