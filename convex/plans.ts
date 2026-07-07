@@ -88,9 +88,11 @@ const SEED_PLANS = [
         description: "Pour les solopreneurs qui se lancent.",
         maxAgents: 1,
         maxWhatsappChannels: 1,
-        maxConversationsPerMonth: 1_000,
-        maxTemplates: 5,
-        historyDays: 30,
+        // Clear step up from FREE (1000 / 5 / 30j) so the paid tier isn't
+        // identical to the free one: more volume, more modèles, plus d'historique.
+        maxConversationsPerMonth: 3_000,
+        maxTemplates: 15,
+        historyDays: 90,
         monthlyPriceFCFA: 10_000,
         yearlyPriceFCFA: 96_000,
         yearlyMonthlyPriceFCFA: 8_000,
