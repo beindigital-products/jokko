@@ -14,10 +14,14 @@ import {
     ShieldCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 
+/**
+ * Payment status screen (after a credit recharge redirect). v3 tokens with
+ * semantic status colours: success → --status-good, failure → --status-danger,
+ * expiry → --status-warn, brand/loading → --accent.
+ */
 export function RechargeContent() {
     const searchParams = useSearchParams();
     const sessionId = searchParams.get("session") as Id<"paymentSessions"> | null;
@@ -31,32 +35,44 @@ export function RechargeContent() {
     const formatCurrency = (amount: number) =>
         new Intl.NumberFormat("fr-SN", { style: "currency", currency: "XOF" }).format(amount);
 
-    // No session ID in URL
-    if (!sessionId) {
+    const cardCls =
+        "w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--paper-white)] shadow-sm";
+    const iconWrap = (tone: string) =>
+        `flex h-14 w-14 items-center justify-center rounded-full text-white shadow-sm ${tone}`;
+    const backButton = (
+        <Button
+            asChild
+            variant="outline"
+            size="sm"
+            className="mt-2 h-8 gap-1.5 rounded-full text-xs"
+        >
+            <Link href="/dashboard/billing">
+                <ArrowLeft className="h-3.5 w-3.5" />
+                Retour à la facturation
+            </Link>
+        </Button>
+    );
+
+    // No session ID in URL / not found
+    if (!sessionId || paymentStatus === null) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Card className="w-full max-w-md bg-white border-gray-100 shadow-sm">
-                    <CardContent className="pt-8 pb-8 flex flex-col items-center text-center space-y-4">
-                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-900/20">
-                            <XCircle className="h-7 w-7 text-white" />
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <div className={cardCls}>
+                    <div className="flex flex-col items-center space-y-4 px-8 pb-8 pt-8 text-center">
+                        <div className={iconWrap("bg-[var(--status-danger)]")}>
+                            <XCircle className="h-7 w-7" />
                         </div>
                         <div className="space-y-1">
-                            <h2 className="text-base font-semibold text-gray-900">Session introuvable</h2>
-                            <p className="text-sm text-gray-500">La session de paiement est introuvable.</p>
+                            <h2 className="text-base font-semibold text-[var(--ink-900)]">Session introuvable</h2>
+                            <p className="text-sm text-[var(--ink-soft)]">
+                                {sessionId
+                                    ? "Session de paiement introuvable ou non autorisée."
+                                    : "La session de paiement est introuvable."}
+                            </p>
                         </div>
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5 text-xs rounded-full cursor-pointer mt-2"
-                        >
-                            <Link href="/dashboard/billing">
-                                <ArrowLeft className="h-3.5 w-3.5" />
-                                Retour &agrave; la facturation
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
+                        {backButton}
+                    </div>
+                </div>
             </div>
         );
     }
@@ -64,65 +80,35 @@ export function RechargeContent() {
     // Loading state
     if (paymentStatus === undefined) {
         return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Card className="w-full max-w-md bg-white border-gray-100 shadow-sm">
-                    <CardContent className="pt-8 pb-8 flex flex-col items-center text-center space-y-4">
-                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] flex items-center justify-center shadow-lg shadow-green-900/20">
-                            <Loader2 className="h-7 w-7 text-white animate-spin" />
+            <div className="flex min-h-[60vh] items-center justify-center">
+                <div className={cardCls}>
+                    <div className="flex flex-col items-center space-y-4 px-8 pb-8 pt-8 text-center">
+                        <div className={iconWrap("bg-[var(--accent)]")}>
+                            <Loader2 className="h-7 w-7 animate-spin" />
                         </div>
                         <div className="space-y-1">
-                            <h2 className="text-base font-semibold text-gray-900">Chargement</h2>
-                            <p className="text-sm text-gray-500">V&eacute;rification de votre paiement...</p>
+                            <h2 className="text-base font-semibold text-[var(--ink-900)]">Chargement</h2>
+                            <p className="text-sm text-[var(--ink-soft)]">Vérification de votre paiement…</p>
                         </div>
-                    </CardContent>
-                </Card>
-            </div>
-        );
-    }
-
-    // Session not found or unauthorized
-    if (paymentStatus === null) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <Card className="w-full max-w-md bg-white border-gray-100 shadow-sm">
-                    <CardContent className="pt-8 pb-8 flex flex-col items-center text-center space-y-4">
-                        <div className="h-14 w-14 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-900/20">
-                            <XCircle className="h-7 w-7 text-white" />
-                        </div>
-                        <div className="space-y-1">
-                            <h2 className="text-base font-semibold text-gray-900">Session introuvable</h2>
-                            <p className="text-sm text-gray-500">Session de paiement introuvable ou non autoris&eacute;e.</p>
-                        </div>
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1.5 text-xs rounded-full cursor-pointer mt-2"
-                        >
-                            <Link href="/dashboard/billing">
-                                <ArrowLeft className="h-3.5 w-3.5" />
-                                Retour &agrave; la facturation
-                            </Link>
-                        </Button>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="flex items-center justify-center min-h-[60vh]">
-            <Card className="w-full max-w-md bg-white border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex min-h-[60vh] items-center justify-center">
+            <div className={`${cardCls} overflow-hidden`}>
                 {/* PENDING */}
                 {paymentStatus.status === "PENDING" && (
-                    <CardContent className="pt-8 pb-8 space-y-5">
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] flex items-center justify-center shadow-lg shadow-green-900/20">
-                                <Loader2 className="h-7 w-7 text-white animate-spin" />
+                    <div className="space-y-5 px-8 pb-8 pt-8">
+                        <div className="flex flex-col items-center space-y-3 text-center">
+                            <div className={iconWrap("bg-[var(--accent)]")}>
+                                <Loader2 className="h-7 w-7 animate-spin" />
                             </div>
                             <div className="space-y-1">
-                                <h2 className="text-base font-semibold text-gray-900">Paiement en cours</h2>
-                                <p className="text-sm text-gray-500 max-w-xs">
+                                <h2 className="text-base font-semibold text-[var(--ink-900)]">Paiement en cours</h2>
+                                <p className="max-w-xs text-sm text-[var(--ink-soft)]">
                                     {urlStatus === "cancel"
                                         ? "Le paiement a été annulé. Si vous avez finalisé le paiement, attendez la confirmation."
                                         : "Votre paiement est en cours de traitement. Cette page se mettra à jour automatiquement."}
@@ -130,142 +116,134 @@ export function RechargeContent() {
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-gray-100 bg-gray-50/30 p-4 text-center space-y-1">
-                            <p className="text-xs font-medium text-gray-500">Montant</p>
-                            <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                        <div className="space-y-1 rounded-xl border border-[var(--border)] bg-[var(--paper-warm)]/40 p-4 text-center">
+                            <p className="text-xs font-medium text-[var(--ink-soft)]">Montant</p>
+                            <p className="text-2xl font-bold tracking-tight text-[var(--ink-900)]">
                                 {formatCurrency(paymentStatus.amount)}
                             </p>
                         </div>
 
-                        <p className="text-[11px] text-gray-400 text-center">
-                            R&eacute;f: {paymentStatus.publicReference}
+                        <p className="text-center text-[11px] text-[var(--ink-soft)]">
+                            Réf : {paymentStatus.publicReference}
                         </p>
-                    </CardContent>
+                    </div>
                 )}
 
                 {/* COMPLETED */}
                 {paymentStatus.status === "COMPLETED" && (
-                    <CardContent className="pt-8 pb-8 space-y-5">
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] flex items-center justify-center shadow-lg shadow-green-900/20">
-                                <CheckCircle2 className="h-7 w-7 text-white" />
+                    <div className="space-y-5 px-8 pb-8 pt-8">
+                        <div className="flex flex-col items-center space-y-3 text-center">
+                            <div className={iconWrap("bg-[var(--status-good)]")}>
+                                <CheckCircle2 className="h-7 w-7" />
                             </div>
                             <div className="space-y-1">
-                                <h2 className="text-base font-semibold text-gray-900">Paiement confirm&eacute; !</h2>
-                                <p className="text-sm text-gray-500">Vos cr&eacute;dits ont &eacute;t&eacute; ajout&eacute;s &agrave; votre compte.</p>
+                                <h2 className="text-base font-semibold text-[var(--ink-900)]">Paiement confirmé !</h2>
+                                <p className="text-sm text-[var(--ink-soft)]">
+                                    Vos crédits ont été ajoutés à votre compte.
+                                </p>
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-green-100 bg-green-50/30 overflow-hidden">
-                            <div className="p-4 space-y-3">
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-medium text-gray-500">Montant pay&eacute;</span>
-                                    <span className="text-sm font-bold text-gray-900">
+                        <div className="overflow-hidden rounded-xl border border-[var(--status-good)]/25 bg-[var(--status-good)]/10">
+                            <div className="space-y-3 p-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-[var(--ink-soft)]">Montant payé</span>
+                                    <span className="text-sm font-bold text-[var(--ink-900)]">
                                         {formatCurrency(paymentStatus.amount)}
                                     </span>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span className="text-xs font-medium text-gray-500">Cr&eacute;dits ajout&eacute;s</span>
-                                    <span className="text-sm font-semibold text-green-600">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-medium text-[var(--ink-soft)]">Crédits ajoutés</span>
+                                    <span className="text-sm font-semibold text-[var(--status-good)]">
                                         +{new Intl.NumberFormat("fr-FR").format(paymentStatus.credits)}
                                     </span>
                                 </div>
                             </div>
-                            <Separator className="bg-green-100" />
-                            <div className="p-4 flex justify-between items-center">
-                                <span className="text-xs font-medium text-gray-500">Via</span>
+                            <Separator className="bg-[var(--status-good)]/20" />
+                            <div className="flex items-center justify-between p-4">
+                                <span className="text-xs font-medium text-[var(--ink-soft)]">Via</span>
                                 <div className="flex items-center gap-2">
-                                    <div className="h-6 w-6 rounded-full bg-gradient-to-br from-[#14532d] to-[#059669] flex items-center justify-center">
+                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)]">
                                         <Wallet className="h-3 w-3 text-white" />
                                     </div>
-                                    <span className="text-sm font-semibold text-gray-900">{paymentStatus.provider}</span>
+                                    <span className="text-sm font-semibold text-[var(--ink-900)]">
+                                        {paymentStatus.provider}
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
                         <div className="space-y-3">
-                            <div className="flex items-center gap-2 text-[11px] text-gray-400 justify-center">
+                            <div className="flex items-center justify-center gap-2 text-[11px] text-[var(--ink-soft)]">
                                 <ShieldCheck className="h-3.5 w-3.5" />
-                                <span>R&eacute;f: {paymentStatus.publicReference}</span>
+                                <span>Réf : {paymentStatus.publicReference}</span>
                             </div>
                             <Button
                                 asChild
                                 size="sm"
-                                className="w-full h-9 text-xs font-medium bg-gradient-to-r from-[#14532d] to-[#059669] hover:from-[#14532d]/90 hover:to-[#059669]/90 cursor-pointer rounded-full"
+                                className="h-9 w-full rounded-full bg-[var(--accent)] text-xs font-medium text-white hover:opacity-90"
                             >
-                                <Link href="/dashboard/billing">
-                                    Retour &agrave; la facturation
-                                </Link>
+                                <Link href="/dashboard/billing">Retour à la facturation</Link>
                             </Button>
                         </div>
-                    </CardContent>
+                    </div>
                 )}
 
                 {/* FAILED */}
                 {paymentStatus.status === "FAILED" && (
-                    <CardContent className="pt-8 pb-8 space-y-5">
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className="h-14 w-14 rounded-full bg-gradient-to-br from-red-500 to-red-600 flex items-center justify-center shadow-lg shadow-red-900/20">
-                                <XCircle className="h-7 w-7 text-white" />
+                    <div className="space-y-5 px-8 pb-8 pt-8">
+                        <div className="flex flex-col items-center space-y-3 text-center">
+                            <div className={iconWrap("bg-[var(--status-danger)]")}>
+                                <XCircle className="h-7 w-7" />
                             </div>
                             <div className="space-y-1">
-                                <h2 className="text-base font-semibold text-gray-900">Paiement &eacute;chou&eacute;</h2>
-                                <p className="text-sm text-gray-500 max-w-xs">
+                                <h2 className="text-base font-semibold text-[var(--ink-900)]">Paiement échoué</h2>
+                                <p className="max-w-xs text-sm text-[var(--ink-soft)]">
                                     {paymentStatus.failureReason || "Le paiement n'a pas pu être traité."}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="rounded-xl border border-red-100 bg-red-50/30 p-4 text-center space-y-1">
-                            <p className="text-xs font-medium text-gray-500">Montant</p>
-                            <p className="text-2xl font-bold text-gray-900 tracking-tight">
+                        <div className="space-y-1 rounded-xl border border-[var(--status-danger)]/25 bg-[var(--status-danger)]/10 p-4 text-center">
+                            <p className="text-xs font-medium text-[var(--ink-soft)]">Montant</p>
+                            <p className="text-2xl font-bold tracking-tight text-[var(--ink-900)]">
                                 {formatCurrency(paymentStatus.amount)}
                             </p>
                         </div>
 
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-9 text-xs rounded-full cursor-pointer"
-                        >
+                        <Button asChild variant="outline" size="sm" className="h-9 w-full rounded-full text-xs">
                             <Link href="/dashboard/billing">
-                                <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-                                Retour et r&eacute;essayer
+                                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                                Retour et réessayer
                             </Link>
                         </Button>
-                    </CardContent>
+                    </div>
                 )}
 
                 {/* EXPIRED */}
                 {paymentStatus.status === "EXPIRED" && (
-                    <CardContent className="pt-8 pb-8 space-y-5">
-                        <div className="flex flex-col items-center text-center space-y-3">
-                            <div className="h-14 w-14 rounded-full bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-900/20">
-                                <Clock className="h-7 w-7 text-white" />
+                    <div className="space-y-5 px-8 pb-8 pt-8">
+                        <div className="flex flex-col items-center space-y-3 text-center">
+                            <div className={iconWrap("bg-[var(--status-warn)]")}>
+                                <Clock className="h-7 w-7" />
                             </div>
                             <div className="space-y-1">
-                                <h2 className="text-base font-semibold text-gray-900">Session expir&eacute;e</h2>
-                                <p className="text-sm text-gray-500 max-w-xs">
-                                    La session de paiement a expir&eacute; (30 minutes). Aucun montant n&apos;a &eacute;t&eacute; d&eacute;bit&eacute;.
+                                <h2 className="text-base font-semibold text-[var(--ink-900)]">Session expirée</h2>
+                                <p className="max-w-xs text-sm text-[var(--ink-soft)]">
+                                    La session de paiement a expiré (30 minutes). Aucun montant n&apos;a été débité.
                                 </p>
                             </div>
                         </div>
 
-                        <Button
-                            asChild
-                            variant="outline"
-                            size="sm"
-                            className="w-full h-9 text-xs rounded-full cursor-pointer"
-                        >
+                        <Button asChild variant="outline" size="sm" className="h-9 w-full rounded-full text-xs">
                             <Link href="/dashboard/billing">
-                                <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-                                Retour et r&eacute;essayer
+                                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                                Retour et réessayer
                             </Link>
                         </Button>
-                    </CardContent>
+                    </div>
                 )}
-            </Card>
+            </div>
         </div>
     );
 }
