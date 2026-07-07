@@ -11,21 +11,23 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { MagicCard } from "@/components/landing/ui/magic-card";
+import { useLocale } from "@/lib/i18n/locale-context";
 import { cn } from "@/lib/utils";
 
 export function BentoSection() {
+  const { m } = useLocale();
   return (
     <section className="relative py-28 md:py-36">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--accent)]">
-            Tout ce qu&apos;il vous faut
+            {m.bento.eyebrow}
           </p>
           <h2 className="mt-4 font-display text-4xl font-bold tracking-tight md:text-6xl">
-            Une plateforme. Tout pour WhatsApp.
+            {m.bento.title}
           </h2>
           <p className="mt-5 text-lg text-muted-foreground">
-            De la première connexion au reporting, Jokko remplace 5 outils.
+            {m.bento.subtitle}
           </p>
         </div>
 
@@ -112,13 +114,14 @@ function BentoHeader({
 }
 
 function InboxFeature() {
+  const { m } = useLocale();
   return (
     <>
       <BentoHeader
         icon={Inbox}
-        eyebrow="Inbox unifiée"
-        title="Une seule inbox pour tous vos numéros."
-        description="Plus besoin de jongler entre 3 téléphones. Toutes vos conversations WhatsApp Business dans une vue centralisée, avec filtres, tags et recherche full-text."
+        eyebrow={m.bento.inbox.eyebrow}
+        title={m.bento.inbox.title}
+        description={m.bento.inbox.description}
       />
       <div className="relative mt-2 px-8 pb-8">
         <div className="flex gap-2">
@@ -138,10 +141,10 @@ function InboxFeature() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[10px] font-semibold">
-                  {["Aïssatou", "Moussa", "Coumba"][i]}
+                  {m.bento.inbox.previewNames[i]}
                 </p>
                 <p className="truncate text-[9px] text-muted-foreground">
-                  {["Ma commande…", "Merci pour le…", "Changer de taille…"][i]}
+                  {m.bento.inbox.previewSnippets[i]}
                 </p>
               </div>
               <div className="flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-[var(--accent)] px-1 text-[8px] font-bold text-white">
@@ -156,13 +159,14 @@ function InboxFeature() {
 }
 
 function AssignFeature() {
+  const { m } = useLocale();
   return (
     <>
       <BentoHeader
         icon={UserPlus}
-        eyebrow="Assignation"
-        title="Chacun sa conversation."
-        description="Règles d'attribution automatiques, round-robin, ou manuel. Les agents voient uniquement ce qui leur est attribué."
+        eyebrow={m.bento.assign.eyebrow}
+        title={m.bento.assign.title}
+        description={m.bento.assign.description}
       />
       <div className="mt-2 px-8 pb-8">
         <div className="flex -space-x-2">
@@ -192,24 +196,25 @@ function AssignFeature() {
 }
 
 function AiFeature() {
+  const { m } = useLocale();
   return (
     <>
       <BentoHeader
         icon={Sparkles}
-        eyebrow="IA Copilot"
-        title="Jo rédige, vous validez."
-        description="L'IA comprend le ton de votre marque et l'historique du client. Vous gagnez 10× en vitesse sans perdre en qualité."
+        eyebrow={m.bento.ai.eyebrow}
+        title={m.bento.ai.title}
+        description={m.bento.ai.description}
       />
       <div className="mt-2 px-8 pb-8">
         <div className="rounded-xl border border-[var(--accent)]/30 bg-background/80 p-3 backdrop-blur">
           <div className="mb-1 flex items-center gap-1.5">
             <Sparkles className="h-3 w-3 text-[var(--accent)]" />
             <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-              Suggéré · 92%
+              {m.bento.ai.suggestedLabel}
             </span>
           </div>
           <p className="text-[11px] leading-relaxed">
-            Bonjour Aïssatou 👋 votre commande est partie hier soir…
+            {m.bento.ai.suggestedText}
           </p>
         </div>
       </div>
@@ -218,20 +223,21 @@ function AiFeature() {
 }
 
 function FlowsFeature() {
+  const { m } = useLocale();
   return (
     <>
       <BentoHeader
         icon={Zap}
-        eyebrow="Flows"
-        title="Automatisez l'avant-vente."
-        description="Qualifiez, redirigez, prenez RDV. Drag & drop visuel."
+        eyebrow={m.bento.flows.eyebrow}
+        title={m.bento.flows.title}
+        description={m.bento.flows.description}
       />
       <div className="mt-2 flex items-center gap-1.5 px-8 pb-8">
-        <FlowNode label="Déclencheur" />
+        <FlowNode label={m.bento.flows.nodes.trigger} />
         <ArrowRight className="h-3 w-3 text-muted-foreground" />
-        <FlowNode label="Condition" />
+        <FlowNode label={m.bento.flows.nodes.condition} />
         <ArrowRight className="h-3 w-3 text-muted-foreground" />
-        <FlowNode label="Action" active />
+        <FlowNode label={m.bento.flows.nodes.action} active />
       </div>
     </>
   );
@@ -253,16 +259,17 @@ function FlowNode({ label, active }: { label: string; active?: boolean }) {
 }
 
 function TemplatesFeature() {
+  const { m } = useLocale();
   return (
     <>
       <BentoHeader
         icon={FileText}
-        eyebrow="Templates Meta"
-        title="Templates approuvés."
-        description="Créez, soumettez, utilisez — tout depuis Jokko. Synchro Meta en temps réel."
+        eyebrow={m.bento.templates.eyebrow}
+        title={m.bento.templates.title}
+        description={m.bento.templates.description}
       />
       <div className="mt-2 flex flex-wrap gap-1.5 px-8 pb-8">
-        {["Bienvenue", "Commande", "Livraison", "Promo", "Relance"].map((t) => (
+        {m.bento.templates.chips.map((t) => (
           <div
             key={t}
             className="rounded-full border border-border/60 bg-background/80 px-2 py-0.5 text-[10px] font-medium backdrop-blur"
@@ -271,7 +278,7 @@ function TemplatesFeature() {
           </div>
         ))}
         <div className="rounded-full border border-emerald-500/30 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
-          +23 approuvés
+          {m.bento.templates.chipMore}
         </div>
       </div>
     </>
@@ -279,6 +286,7 @@ function TemplatesFeature() {
 }
 
 function RealtimeFeature() {
+  const { m } = useLocale();
   return (
     <div className="flex flex-col items-center gap-8 p-8 md:flex-row md:gap-12 md:p-12">
       <div className="flex-1">
@@ -286,15 +294,13 @@ function RealtimeFeature() {
           <Radio className="h-4 w-4" />
         </div>
         <p className="mt-4 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          Temps réel
+          {m.bento.realtime.eyebrow}
         </p>
         <h3 className="mt-2 font-display text-3xl font-bold tracking-tight md:text-4xl">
-          Synchronisation instantanée. Zéro refresh.
+          {m.bento.realtime.title}
         </h3>
         <p className="mt-4 max-w-xl text-[14px] leading-relaxed text-muted-foreground">
-          Convex propulse Jokko : chaque message, chaque assignation, chaque
-          changement se propage à toute l&apos;équipe en moins de 100ms. Pas de
-          polling, pas de doublons.
+          {m.bento.realtime.description}
         </p>
       </div>
       <div className="relative flex flex-1 items-center justify-center">

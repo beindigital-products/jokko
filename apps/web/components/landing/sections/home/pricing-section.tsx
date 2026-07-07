@@ -8,14 +8,16 @@ import { usePlans } from "@/hooks/usePlans";
 import { formatLimit } from "@/lib/plan-utils";
 import { cn } from "@/lib/utils";
 import { ShimmerButton } from "@/components/landing/ui/shimmer-button";
+import { useLocale } from "@/lib/i18n/locale-context";
+import type { LandingMessages } from "@/lib/i18n/landing-messages";
 
 const PLAN_UI: Record<
   string,
-  { icon: typeof Zap; accent: string; cta: string }
+  { icon: typeof Zap; accent: string }
 > = {
-  STARTER: { icon: Zap, accent: "slate", cta: "Démarrer" },
-  BUSINESS: { icon: Store, accent: "accent", cta: "Choisir Business" },
-  PRO: { icon: Building2, accent: "dark", cta: "Passer Pro" },
+  STARTER: { icon: Zap, accent: "slate" },
+  BUSINESS: { icon: Store, accent: "accent" },
+  PRO: { icon: Building2, accent: "dark" },
 };
 
 type Plan = {
@@ -31,11 +33,17 @@ type Plan = {
   popular?: boolean;
 };
 
-function buildPlans(planDefs: Plan[]) {
+function buildPlans(planDefs: Plan[], t: LandingMessages["pricing"]) {
+  const ft = t.featureTemplates;
   return planDefs
     .filter((p) => PLAN_UI[p.key])
     .map((p) => {
       const ui = PLAN_UI[p.key];
+      const agentWord = p.maxAgents > 1 ? ft.agentsPlural : ft.agents;
+      const numberWord =
+        p.maxWhatsappChannels > 1
+          ? ft.whatsappNumbersPlural
+          : ft.whatsappNumbers;
       return {
         key: p.key,
         name: p.name,
@@ -43,36 +51,37 @@ function buildPlans(planDefs: Plan[]) {
         description: p.description,
         icon: ui.icon,
         accent: ui.accent,
-        cta: ui.cta,
+        cta: t.planCta[p.key as keyof typeof t.planCta] ?? p.name,
         popular: p.popular || false,
         features: [
-          `${formatLimit(p.maxAgents)} agent${p.maxAgents > 1 ? "s" : ""}`,
-          `${formatLimit(p.maxWhatsappChannels)} numéro${p.maxWhatsappChannels > 1 ? "s" : ""} WhatsApp`,
-          `${formatLimit(p.maxConversationsPerMonth)} conversations / mois`,
+          `${formatLimit(p.maxAgents)} ${agentWord}`,
+          `${formatLimit(p.maxWhatsappChannels)} ${numberWord}`,
+          `${formatLimit(p.maxConversationsPerMonth)} ${ft.conversationsPerMonth}`,
           ...p.features.filter((f) => f.included).map((f) => f.label),
-          `Support ${p.supportLevel}`,
+          `${ft.supportPrefix} ${p.supportLevel}`,
         ],
       };
     });
 }
 
 export function PricingSection() {
+  const { m } = useLocale();
   const { plans: planDefs, isLoading } = usePlans();
   const [cycle, setCycle] = useState<"monthly" | "yearly">("monthly");
-  const plans = buildPlans(planDefs as Plan[]);
+  const plans = buildPlans(planDefs as Plan[], m.pricing);
 
   return (
     <section id="pricing" className="relative py-28 md:py-36">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--accent)]">
-            Tarifs
+            {m.pricing.eyebrow}
           </p>
           <h2 className="mt-4 font-display text-4xl font-bold tracking-tight md:text-6xl">
-            Un prix simple. Aucune surprise.
+            {m.pricing.title}
           </h2>
           <p className="mt-5 text-lg text-muted-foreground">
-            7 jours d&apos;essai gratuit sur tous les plans. Sans carte. Sans engagement.
+            {m.pricing.subtitle}
           </p>
 
           <div className="mt-8 inline-flex rounded-full border border-border/70 bg-card p-1">
@@ -93,10 +102,10 @@ export function PricingSection() {
                   />
                 )}
                 <span className="relative">
-                  {c === "monthly" ? "Mensuel" : "Annuel"}
+                  {c === "monthly" ? m.pricing.cycleMonthly : m.pricing.cycleYearly}
                   {c === "yearly" && (
                     <span className="ml-1.5 rounded-full bg-[var(--accent-muted)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--accent)]">
-                      -20%
+                      {m.pricing.yearlyDiscount}
                     </span>
                   )}
                 </span>
@@ -117,18 +126,18 @@ export function PricingSection() {
           <div className="flex flex-col items-start gap-6 md:flex-row md:items-center md:justify-between md:gap-8">
             <div className="max-w-xl">
               <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-white/50">
-                Enterprise
+                {m.pricing.enterprise.eyebrow}
               </p>
               <h3 className="mt-2 font-display text-2xl font-bold md:text-3xl">
-                Besoin de plus ? On construit sur-mesure.
+                {m.pricing.enterprise.title}
               </h3>
               <p className="mt-3 text-[14px] text-white/70">
-                SSO, SLA garanti, onboarding dédié, account manager, audit sécurité, multi-organisations.
+                {m.pricing.enterprise.description}
               </p>
             </div>
             <ShimmerButton asChild size="lg" variant="light">
               <Link href="/contact?subject=enterprise">
-                Parler à un expert
+                {m.pricing.enterprise.cta}
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </ShimmerButton>
@@ -148,6 +157,7 @@ function PricingCard({
   cycle: "monthly" | "yearly";
   index: number;
 }) {
+  const { m } = useLocale();
   const Icon = plan.icon;
   const displayPrice =
     cycle === "yearly"
@@ -199,7 +209,7 @@ function PricingCard({
           {plan.popular && (
             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--accent)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
               <Sparkles className="h-2.5 w-2.5" />
-              Recommandé
+              {m.pricing.recommendedBadge}
             </span>
           )}
         </div>
@@ -220,7 +230,7 @@ function PricingCard({
               {displayPrice}
             </motion.span>
           </AnimatePresence>
-          <span className="text-sm text-muted-foreground">F CFA / mois</span>
+          <span className="text-sm text-muted-foreground">{m.pricing.priceSuffix}</span>
         </div>
 
         <ul className="mt-8 space-y-3">

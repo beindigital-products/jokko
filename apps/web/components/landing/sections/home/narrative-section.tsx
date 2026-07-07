@@ -4,39 +4,13 @@ import { motion, useScroll, useTransform } from "framer-motion";
 import { useRef } from "react";
 import { Plug, Users, MessageSquareReply, BarChart3 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/lib/i18n/locale-context";
 
-const steps = [
-  {
-    num: "01",
-    icon: Plug,
-    title: "Connectez vos numéros",
-    body:
-      "Reliez en 2 minutes vos comptes WhatsApp Business via Meta. Multi-numéros, multi-équipes, sans jamais changer d'outil.",
-  },
-  {
-    num: "02",
-    icon: Users,
-    title: "Routez chaque conversation",
-    body:
-      "Assignation automatique selon règles, langue, ou charge. Les agents voient uniquement ce qui leur appartient. Les managers, tout.",
-  },
-  {
-    num: "03",
-    icon: MessageSquareReply,
-    title: "Répondez 10× plus vite",
-    body:
-      "L'IA Jo propose un brouillon adapté au ton de votre marque, à l'historique du client, et à vos FAQ. Vous validez, vous envoyez.",
-  },
-  {
-    num: "04",
-    icon: BarChart3,
-    title: "Mesurez ce qui compte",
-    body:
-      "Temps de première réponse, taux de résolution, CSAT WhatsApp. Transformez les conversations en revenus.",
-  },
-];
+// Non-translatable icon components, aligned by index with m.narrative.steps.
+const stepIcons = [Plug, Users, MessageSquareReply, BarChart3];
 
 export function NarrativeSection() {
+  const { m } = useLocale();
   const sectionRef = useRef<HTMLDivElement>(null);
   const { scrollYProgress } = useScroll({
     target: sectionRef,
@@ -52,13 +26,13 @@ export function NarrativeSection() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--accent)]">
-            Comment ça marche
+            {m.narrative.eyebrow}
           </p>
           <h2 className="mt-4 font-display text-4xl font-bold tracking-tight md:text-6xl">
-            De WhatsApp chaos à WhatsApp calme.
+            {m.narrative.title}
           </h2>
           <p className="mt-5 text-lg text-muted-foreground">
-            Quatre étapes pour reprendre le contrôle de vos conversations client.
+            {m.narrative.subtitle}
           </p>
         </div>
 
@@ -70,8 +44,13 @@ export function NarrativeSection() {
           </div>
 
           <div className="space-y-20 lg:space-y-36">
-            {steps.map((step, i) => (
-              <NarrativeStep key={step.num} step={step} index={i} />
+            {m.narrative.steps.map((step, i) => (
+              <NarrativeStep
+                key={step.num}
+                step={step}
+                index={i}
+                stepLabel={m.narrative.stepLabel}
+              />
             ))}
           </div>
         </div>
@@ -83,11 +62,13 @@ export function NarrativeSection() {
 function NarrativeStep({
   step,
   index,
+  stepLabel,
 }: {
-  step: (typeof steps)[number];
+  step: { num: string; title: string; body: string };
   index: number;
+  stepLabel: string;
 }) {
-  const Icon = step.icon;
+  const Icon = stepIcons[index];
   return (
     <motion.div
       initial={{ opacity: 0, y: 40 }}
@@ -99,7 +80,7 @@ function NarrativeStep({
       <div className="flex items-center gap-3 font-mono text-[12px] uppercase tracking-[0.2em] text-muted-foreground">
         <span className="text-[var(--accent)]">{step.num}</span>
         <span className="h-px w-12 bg-border" />
-        <span>étape</span>
+        <span>{stepLabel}</span>
       </div>
       <h3 className="mt-4 font-display text-3xl font-bold tracking-tight md:text-4xl">
         {step.title}
@@ -133,7 +114,7 @@ function StickyVisual({
 
   return (
     <div className="relative aspect-[4/5] w-full overflow-hidden rounded-3xl border border-border/60 bg-gradient-to-br from-muted/40 to-background shadow-xl">
-      {steps.map((_, i) => (
+      {stepIcons.map((_, i) => (
         <motion.div
           key={i}
           className="absolute inset-0 flex items-center justify-center"
@@ -147,6 +128,8 @@ function StickyVisual({
 }
 
 function StepVisual({ index }: { index: number }) {
+  const { m } = useLocale();
+  const v = m.narrative.visuals;
   const commonClass =
     "relative flex h-full w-full flex-col items-center justify-center gap-4 p-8";
 
@@ -166,7 +149,9 @@ function StepVisual({ index }: { index: number }) {
               </div>
               <div className="text-xs">
                 <p className="font-semibold">+221 {77 + n}0 000 00</p>
-                <p className="text-muted-foreground">Connecté · {n * 3} agents</p>
+                <p className="text-muted-foreground">
+                  {v.connectedStatus} · {n * 3} {v.agentsSuffix}
+                </p>
               </div>
               <div className="ml-6 h-2 w-2 rounded-full bg-emerald-500" />
             </div>
@@ -182,7 +167,7 @@ function StepVisual({ index }: { index: number }) {
         <svg className="h-full w-full max-h-[300px]" viewBox="0 0 320 300" fill="none">
           <circle cx="160" cy="60" r="32" fill="var(--accent-muted)" />
           <text x="160" y="66" textAnchor="middle" fontSize="12" fill="var(--accent)" fontWeight="600">
-            Nouveau msg
+            {v.newMessage}
           </text>
           {[80, 160, 240].map((x, i) => (
             <g key={i}>
@@ -212,14 +197,14 @@ function StepVisual({ index }: { index: number }) {
       <div className={commonClass}>
         <div className="w-full max-w-sm space-y-2">
           <div className="self-start rounded-2xl rounded-bl-sm bg-muted px-3 py-2 text-xs">
-            Bonjour, où en est ma commande ?
+            {v.customerMessage}
           </div>
           <div className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-muted)] p-3">
             <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)]">
-              Brouillon IA
+              {v.aiDraftLabel}
             </p>
             <p className="text-xs">
-              Bonjour 👋 votre commande #4821 a été expédiée hier. Suivi AB123456…
+              {v.aiDraftText}
             </p>
           </div>
         </div>
@@ -230,10 +215,10 @@ function StepVisual({ index }: { index: number }) {
   return (
     <div className={commonClass}>
       <div className="grid w-full max-w-sm grid-cols-2 gap-3">
-        <MetricCard label="Temps 1ère réponse" value="47s" trend="-82%" />
-        <MetricCard label="Taux résolution" value="94%" trend="+31%" />
-        <MetricCard label="CSAT WhatsApp" value="4.9/5" trend="+0.8" />
-        <MetricCard label="Revenu WhatsApp" value="+12M F" trend="+48%" />
+        <MetricCard label={v.metrics.firstResponse} value="47s" trend="-82%" />
+        <MetricCard label={v.metrics.resolutionRate} value="94%" trend="+31%" />
+        <MetricCard label={v.metrics.csat} value="4.9/5" trend="+0.8" />
+        <MetricCard label={v.metrics.revenue} value="+12M F" trend="+48%" />
       </div>
     </div>
   );

@@ -4,8 +4,10 @@ import { motion } from "framer-motion";
 import { BigNumber } from "@/components/landing/ui/big-number";
 import { cn } from "@/lib/utils";
 import { X, Check } from "lucide-react";
+import { useLocale } from "@/lib/i18n/locale-context";
 
 export function BeforeAfterSection() {
+  const { m } = useLocale();
   return (
     <section className="relative overflow-hidden bg-[var(--surface-dark)] py-28 text-[var(--surface-dark-foreground)] md:py-36">
       <div
@@ -26,13 +28,13 @@ export function BeforeAfterSection() {
       <div className="relative mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--accent)]">
-            Avant / Après
+            {m.beforeAfter.eyebrow}
           </p>
           <h2 className="mt-4 font-display text-4xl font-bold tracking-tight text-white md:text-6xl">
-            De 3 téléphones au chaos à 1 inbox calme.
+            {m.beforeAfter.title}
           </h2>
           <p className="mt-5 text-lg text-[var(--surface-dark-muted-foreground)]">
-            Ce que change Jokko pour une équipe de 5 agents qui gère 3 numéros WhatsApp.
+            {m.beforeAfter.subtitle}
           </p>
         </div>
 
@@ -42,10 +44,15 @@ export function BeforeAfterSection() {
         </div>
 
         <div className="mt-16 grid grid-cols-2 gap-8 border-t border-white/10 pt-12 md:grid-cols-4">
-          <DarkBigNumber value={82} suffix="%" label="Temps économisé" />
-          <DarkBigNumber value={10} suffix="×" label="Plus de volume traité" accent />
-          <DarkBigNumber value={47} suffix="s" label="Temps 1ère réponse" />
-          <DarkBigNumber value={94} suffix="%" label="Taux de résolution" />
+          {m.beforeAfter.stats.map((stat, i) => (
+            <DarkBigNumber
+              key={i}
+              value={stat.value}
+              suffix={stat.suffix}
+              label={stat.label}
+              accent={i === 1}
+            />
+          ))}
         </div>
       </div>
     </section>
@@ -53,7 +60,9 @@ export function BeforeAfterSection() {
 }
 
 function Panel({ variant }: { variant: "before" | "after" }) {
+  const { m } = useLocale();
   const isBefore = variant === "before";
+  const content = isBefore ? m.beforeAfter.before : m.beforeAfter.after;
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -77,15 +86,15 @@ function Panel({ variant }: { variant: "before" | "after" }) {
           {isBefore ? <X className="h-3 w-3" /> : <Check className="h-3 w-3" />}
         </span>
         <span className={isBefore ? "text-rose-300" : "text-emerald-300"}>
-          {isBefore ? "Sans Jokko" : "Avec Jokko"}
+          {content.badge}
         </span>
       </div>
       <h3 className="mt-4 font-display text-2xl font-bold text-white md:text-3xl">
-        {isBefore ? "3 téléphones, 5 tabs, 0 visibilité." : "1 inbox. Toute votre équipe. Tout le contexte."}
+        {content.title}
       </h3>
 
       <ul className="mt-8 space-y-3">
-        {(isBefore ? beforeItems : afterItems).map((item, i) => (
+        {content.items.map((item, i) => (
           <li
             key={i}
             className={cn(
@@ -134,19 +143,3 @@ function DarkBigNumber({
     </div>
   );
 }
-
-const beforeItems = [
-  "Un téléphone par numéro, chacun avec son mot de passe",
-  "Les agents se marchent dessus et répondent 2 fois",
-  "Aucune trace des conversations passées",
-  "Pas de métriques : qui a répondu ? en combien de temps ?",
-  "Les nouveaux agents mettent des semaines à être opérationnels",
-];
-
-const afterItems = [
-  "Tous les numéros dans une seule inbox unifiée",
-  "Assignation automatique : chacun sa zone",
-  "Historique, tags, CRM embarqué sur chaque contact",
-  "Reporting natif : TTR, résolution, CSAT, revenu",
-  "Onboarding agent en 30 min grâce à l'IA copilot",
-];
