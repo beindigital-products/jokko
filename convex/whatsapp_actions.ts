@@ -477,7 +477,8 @@ export const sendMessage = internalAction({
 
                 await ctx.runMutation(internal.utils.updateMessageStatus, {
                     messageId: args.messageId,
-                    status: "FAILED"
+                    status: "FAILED",
+                    errorReason: data?.error?.message ?? `Erreur WhatsApp (${response.status})`,
                 });
             } else {
                 console.log(`[OUTBOUND] Message sent. WhatsApp ID: ${data.messages?.[0]?.id}`);
@@ -491,7 +492,8 @@ export const sendMessage = internalAction({
             console.error(`[OUTBOUND] Network Error:`, error);
             await ctx.runMutation(internal.utils.updateMessageStatus, {
                 messageId: args.messageId,
-                status: "FAILED"
+                status: "FAILED",
+                errorReason: "Erreur réseau lors de l'envoi (Meta injoignable).",
             });
         }
     },

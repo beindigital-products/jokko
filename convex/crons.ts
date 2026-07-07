@@ -42,4 +42,7 @@ crons.daily(
 // Expire ringing calls that were never answered (60s timeout) -> MISSED
 crons.interval("expire-missed-calls", { minutes: 1 }, internal.calls.expireMissedCalls);
 
+// Fail broadcasts stuck in SENDING with no progress for >15 min (broken chunk chain)
+crons.interval("cleanup-stale-broadcasts", { minutes: 5 }, internal.broadcasts.cleanupStale);
+
 export default crons;

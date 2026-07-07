@@ -105,11 +105,13 @@ export const updateMessageStatus = internalMutation({
         messageId: v.id("messages"),
         status: v.string(),
         externalId: v.optional(v.string()),
+        errorReason: v.optional(v.string()),
     },
     handler: async (ctx, args) => {
         await ctx.db.patch(args.messageId, {
             status: args.status,
             externalId: args.externalId,
+            errorReason: args.errorReason,
             updatedAt: Date.now(),
         });
     },

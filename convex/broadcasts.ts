@@ -747,6 +747,34 @@ export const markFailed = internalMutation({
     },
 });
 
+/**
+ * Cron safety net: if the chunked-sender chain breaks (a crash between chunks),
+ * a broadcast would otherwise sit in SENDING forever. Mark as FAILED any
+ * broadcast stuck in SENDING with no progress for over 15 minutes. Healthy
+ * sends update every ~1s per chunk, so this never touches a running one.
+ */
+export const cleanupStale = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const cutoff = Date.now() - 15 * 60 * 1000;
+        const stuck = (await ctx.db
+            .query("broadcasts")
+            .withIndex("by_status", (q) => q.eq("status", "SENDING"))
+            .collect())
+            .filter((b) => (b.updatedAt ?? 0) < cutoff);
+        for (const b of stuck) {
+            await ctx.db.patch(b._id, { status: "FAILED", updatedAt: Date.now() });
+            await ctx.db.insert("broadcastActivities", {
+                broadcastId: b._id,
+                type: "failures",
+                message: "Campagne interrompue (aucune progression depuis 15 min) — marquée en échec automatiquement.",
+                createdAt: Date.now(),
+            });
+            console.log(`[BROADCASTS] Stale SENDING broadcast ${b._id} marked FAILED`);
+        }
+    },
+});
+
 export const markCompleted = internalMutation({
     args: { id: v.id("broadcasts") },
     handler: async (ctx, args) => {

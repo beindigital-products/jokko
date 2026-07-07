@@ -71,3 +71,48 @@ describe("deductBroadcastCredits — idempotence", () => {
         expect((await usageTxns()).length).toBe(0);
     });
 });
+
+/**
+ * A crash between chunks would leave a broadcast in SENDING forever. The
+ * cleanupStale cron fails only broadcasts with no progress for >15 min, never a
+ * currently-running one.
+ */
+describe("broadcasts.cleanupStale — campagnes bloquées", () => {
+    let t: any;
+
+    beforeEach(() => {
+        t = convexTest(schema, modules);
+    });
+
+    async function seedBroadcast(updatedAt: number) {
+        return t.run(async (ctx: any) => {
+            const owner = await ctx.db.insert("users", { email: "o@t.com", name: "O" });
+            const org = await ctx.db.insert("organizations", {
+                name: "O", ownerId: owner, plan: "BUSINESS", createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            const templateId = await ctx.db.insert("templates", {
+                organizationId: org, name: "T", slug: "t", type: "MARKETING", category: "MARKETING",
+                language: "fr", status: "APPROVED", body: "Hi",
+                sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0,
+                clickedCount: 0, convertedCount: 0, failedCount: 0, blockedCount: 0,
+                createdAt: Date.now(), updatedAt: Date.now(),
+            });
+            return ctx.db.insert("broadcasts", {
+                organizationId: org, name: "C", templateId, audienceConfig: { type: "ALL" },
+                status: "SENDING", sentCount: 0, deliveredCount: 0, readCount: 0, repliedCount: 0,
+                failedCount: 0, createdAt: Date.now(), updatedAt,
+            });
+        });
+    }
+
+    it("fails a stalled SENDING broadcast but spares a recently-updated one", async () => {
+        const stuck = await seedBroadcast(Date.now() - 20 * 60 * 1000); // 20 min idle
+        const active = await seedBroadcast(Date.now() - 30 * 1000);       // 30s ago
+
+        await t.mutation(internal.broadcasts.cleanupStale, {});
+
+        const statusOf = (id: any) => t.run(async (ctx: any) => (await ctx.db.get(id)).status);
+        expect(await statusOf(stuck)).toBe("FAILED");
+        expect(await statusOf(active)).toBe("SENDING");
+    });
+});

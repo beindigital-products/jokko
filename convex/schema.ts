@@ -1108,6 +1108,11 @@ export default defineSchema({
         // External ID (WhatsApp Message ID)
         externalId: v.optional(v.string()),
 
+        // Human-readable reason for a FAILED send (Meta's error message, e.g.
+        // "re-engagement message" / 131047). Surfaced to agents instead of a
+        // bare FAILED so they know why and what to do.
+        errorReason: v.optional(v.string()),
+
         // Broadcast Link (Campaigns)
         broadcastId: v.optional(v.id("broadcasts")),
 
