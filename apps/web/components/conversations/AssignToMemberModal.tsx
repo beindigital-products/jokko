@@ -297,7 +297,7 @@ export function AssignToMemberModal({
                     <Button
                         onClick={handleSubmit}
                         disabled={!selectedMemberId || isSubmitting}
-                        className="bg-green-500 hover:bg-green-600"
+                        className="bg-[var(--accent)] hover:opacity-90"
                     >
                         {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Assigner
@@ -328,7 +328,7 @@ function AgentButton({ agent, isSelected, isCurrent, onSelect }: AgentButtonProp
             disabled={isCurrent}
             className={cn(
                 'w-full flex items-center gap-3 p-2 rounded-md text-left transition-colors',
-                isSelected && 'bg-green-50 border border-green-500',
+                isSelected && 'bg-[var(--accent-muted)] border border-[var(--accent)]',
                 !isSelected && !isCurrent && 'hover:bg-muted',
                 isCurrent && 'opacity-50 cursor-not-allowed'
             )}
@@ -338,7 +338,7 @@ function AgentButton({ agent, isSelected, isCurrent, onSelect }: AgentButtonProp
                 className={cn(
                     'w-5 h-5 rounded-full border-2 flex items-center justify-center',
                     isSelected
-                        ? 'border-green-500 bg-green-500 text-white'
+                        ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
                         : 'border-muted-foreground/30'
                 )}
             >

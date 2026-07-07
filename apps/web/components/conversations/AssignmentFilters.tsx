@@ -80,7 +80,7 @@ export function AssignmentFilters({
                         onClick={() => onChange(tab.value)}
                         className={cn(
                             'flex-1 gap-1.5 text-xs',
-                            isActive && 'bg-green-500 hover:bg-green-600 border-green-500'
+                            isActive && 'bg-[var(--accent)] hover:opacity-90 border-[var(--accent)]'
                         )}
                     >
                         <Icon className="h-3.5 w-3.5" />
