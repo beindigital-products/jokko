@@ -1128,7 +1128,13 @@ export default defineSchema({
         .index("by_organization", ["organizationId"])
         .index("by_external_id", ["externalId"])
         // Date-bounded org scans (analytics windows) without reading all history.
-        .index("by_org_created", ["organizationId", "createdAt"]),
+        .index("by_org_created", ["organizationId", "createdAt"])
+        // Full-text search over message bodies for the ⌘K palette, scoped to
+        // the caller's org via the filter field (no cross-tenant leakage).
+        .searchIndex("search_messages", {
+            searchField: "content",
+            filterFields: ["organizationId"],
+        }),
 
     // ============================================
     // TYPING INDICATORS

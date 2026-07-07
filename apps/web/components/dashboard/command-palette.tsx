@@ -3,13 +3,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from 'convex/react'
-import { ArrowRight, Search, User } from 'lucide-react'
+import { ArrowRight, MessageSquare, Search, User } from 'lucide-react'
 
 import { api } from '@/convex/_generated/api'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { useCommandPalette } from '@/lib/stores/command-palette-store'
 
-type Row = { id: string; label: string; href: string; kind: 'page' | 'contact' }
+type Row = { id: string; label: string; href: string; kind: 'page' | 'contact' | 'message'; sub?: string }
 
 /**
  * Global ⌘K command palette. Replaces the old fake search badge (which merely
@@ -55,8 +55,9 @@ export function CommandPalette() {
 
     const results = useQuery(api.search.searchGlobal, debounced ? { query: debounced } : 'skip')
     const rows: Row[] = [
-        ...(results?.pages ?? []).map((p) => ({ id: p.id, label: p.name, href: p.link, kind: 'page' as const })),
         ...(results?.contacts ?? []).map((c) => ({ id: c.id, label: c.name, href: c.link, kind: 'contact' as const })),
+        ...(results?.messages ?? []).map((m) => ({ id: m.id, label: m.name, href: m.link, kind: 'message' as const, sub: m.snippet })),
+        ...(results?.pages ?? []).map((p) => ({ id: p.id, label: p.name, href: p.link, kind: 'page' as const })),
     ]
 
     useEffect(() => setHighlight(0), [debounced])
@@ -114,7 +115,8 @@ export function CommandPalette() {
                         </p>
                     )}
                     {rows.map((r, i) => {
-                        const Icon = r.kind === 'contact' ? User : ArrowRight
+                        const Icon = r.kind === 'contact' ? User : r.kind === 'message' ? MessageSquare : ArrowRight
+                        const tag = r.kind === 'contact' ? 'Contact' : r.kind === 'message' ? 'Message' : 'Page'
                         return (
                             <button
                                 key={`${r.kind}-${r.id}`}
@@ -127,9 +129,14 @@ export function CommandPalette() {
                                 }`}
                             >
                                 <Icon className="h-4 w-4 shrink-0 text-[var(--ink-soft)]" aria-hidden />
-                                <span className="flex-1 truncate">{r.label}</span>
-                                <span className="font-mono text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">
-                                    {r.kind === 'contact' ? 'Contact' : 'Page'}
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                    <span className="truncate">{r.label}</span>
+                                    {r.sub && (
+                                        <span className="truncate text-xs text-[var(--ink-soft)]">{r.sub}</span>
+                                    )}
+                                </span>
+                                <span className="shrink-0 font-mono text-[10px] uppercase tracking-wide text-[var(--ink-soft)]">
+                                    {tag}
                                 </span>
                             </button>
                         )
