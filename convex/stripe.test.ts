@@ -60,4 +60,36 @@ describe("Stripe subscription — out-of-order event guard", () => {
         await update("canceled", 2000);
         expect((await stripe()).status).toBe("canceled");
     });
+
+    it("invoice.payment_failed flips the org to past_due and notifies the owner", async () => {
+        await update("active", 1000);
+        await t.mutation(internal.stripe.markInvoicePaymentFailed, {
+            stripeCustomerId: customerId, eventCreated: 2000,
+        });
+        expect((await stripe()).status).toBe("past_due");
+
+        const notifs = await t.run(async (ctx: any) =>
+            ctx.db.query("notifications").filter((q: any) => q.eq(q.field("type"), "SYSTEM")).collect());
+        expect(notifs.length).toBe(1);
+        expect(notifs[0].link).toBe("/dashboard/billing");
+    });
+
+    it("invoice.paid recovers a past_due org back to active", async () => {
+        await t.mutation(internal.stripe.markInvoicePaymentFailed, {
+            stripeCustomerId: customerId, eventCreated: 1000,
+        });
+        expect((await stripe()).status).toBe("past_due");
+        await t.mutation(internal.stripe.markInvoicePaid, {
+            stripeCustomerId: customerId, eventCreated: 2000,
+        });
+        expect((await stripe()).status).toBe("active");
+    });
+
+    it("ignores a stale invoice.payment_failed", async () => {
+        await update("active", 2000);
+        await t.mutation(internal.stripe.markInvoicePaymentFailed, {
+            stripeCustomerId: customerId, eventCreated: 1000, // older than the active event
+        });
+        expect((await stripe()).status).toBe("active"); // not flipped
+    });
 });

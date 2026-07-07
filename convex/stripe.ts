@@ -3,6 +3,7 @@ import { internalMutation } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { planFromPriceId } from "./lib/stripePlans";
 import { enforceChannelDowngrade } from "./lib/planEnforcement";
+import { createNotification } from "./notifications";
 
 /**
  * True when a Stripe webhook event is older than the last one already applied
@@ -193,6 +194,73 @@ export const cancelSubscription = internalMutation({
         });
 
         await enforceChannelDowngrade(ctx, org._id, "FREE");
+    },
+});
+
+/**
+ * A subscription renewal payment failed (invoice.payment_failed). Flip the org
+ * to `past_due` and alert the owner. Previously this produced NO signal at all —
+ * an expired card silently degraded the account until the subscription was
+ * eventually canceled downstream.
+ */
+export const markInvoicePaymentFailed = internalMutation({
+    args: { stripeCustomerId: v.string(), eventCreated: v.optional(v.number()) },
+    handler: async (ctx, args) => {
+        const org = await ctx.db
+            .query("organizations")
+            .withIndex("by_stripe_customer", (q) => q.eq("stripe.customerId", args.stripeCustomerId))
+            .first();
+        if (!org) {
+            console.error(`[Stripe] No org found for customer ${args.stripeCustomerId}`);
+            return;
+        }
+        if (isStaleStripeEvent(org, args.eventCreated)) return;
+
+        await ctx.db.patch(org._id, {
+            stripe: {
+                ...(org.stripe ?? {}),
+                customerId: args.stripeCustomerId,
+                status: "past_due",
+                lastEventAt: args.eventCreated ?? org.stripe?.lastEventAt,
+            },
+            updatedAt: Date.now(),
+        });
+
+        await createNotification(ctx, {
+            organizationId: org._id,
+            userId: org.ownerId,
+            type: "SYSTEM",
+            title: "Échec de paiement",
+            message:
+                "Le renouvellement de votre abonnement a échoué. Mettez à jour votre moyen de paiement pour éviter l'interruption du service.",
+            link: "/dashboard/billing",
+            metadata: {},
+        });
+    },
+});
+
+/**
+ * A subscription invoice was paid (invoice.paid). If the org was `past_due`,
+ * clear it back to `active` — the payment recovered.
+ */
+export const markInvoicePaid = internalMutation({
+    args: { stripeCustomerId: v.string(), eventCreated: v.optional(v.number()) },
+    handler: async (ctx, args) => {
+        const org = await ctx.db
+            .query("organizations")
+            .withIndex("by_stripe_customer", (q) => q.eq("stripe.customerId", args.stripeCustomerId))
+            .first();
+        if (!org || !org.stripe) return;
+        if (isStaleStripeEvent(org, args.eventCreated)) return;
+
+        await ctx.db.patch(org._id, {
+            stripe: {
+                ...org.stripe,
+                status: org.stripe.status === "past_due" ? "active" : org.stripe.status,
+                lastEventAt: args.eventCreated ?? org.stripe.lastEventAt,
+            },
+            updatedAt: Date.now(),
+        });
     },
 });
 

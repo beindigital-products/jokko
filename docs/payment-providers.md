@@ -149,6 +149,8 @@ Events a ecouter :
 - `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
+- `invoice.payment_failed` (renouvellement echoue → org passe `past_due` + notif owner)
+- `invoice.paid` (paiement recupere → repasse `active` si `past_due`)
 
 ### Flux technique (recharge credits)
 

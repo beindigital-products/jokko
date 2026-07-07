@@ -464,6 +464,30 @@ http.route({
                     break;
                 }
 
+                case "invoice.payment_failed": {
+                    const invoice = event.data.object;
+                    const customer = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+                    if (customer) {
+                        await ctx.runMutation(internal.stripe.markInvoicePaymentFailed, {
+                            stripeCustomerId: customer,
+                            eventCreated: event.created,
+                        });
+                    }
+                    break;
+                }
+
+                case "invoice.paid": {
+                    const invoice = event.data.object;
+                    const customer = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+                    if (customer) {
+                        await ctx.runMutation(internal.stripe.markInvoicePaid, {
+                            stripeCustomerId: customer,
+                            eventCreated: event.created,
+                        });
+                    }
+                    break;
+                }
+
                 default:
                     console.log(`[Stripe Webhook] Unhandled event type: ${event.type}`);
             }
