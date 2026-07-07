@@ -61,3 +61,21 @@ export const recompute = internalMutation({
         await ctx.db.patch(args.organizationId, { storageBytesUsed: total });
     },
 });
+
+/**
+ * Backfill helper: schedule a recompute for every org. Run once after deploy so
+ * existing orgs' storage counters reflect their historical media (they start at
+ * 0 otherwise): `pnpm exec convex run storage_usage:recomputeAll`.
+ */
+export const recomputeAll = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const orgs = await ctx.db.query("organizations").collect();
+        for (const org of orgs) {
+            await ctx.scheduler.runAfter(0, internal.storage_usage.recompute, {
+                organizationId: org._id,
+            });
+        }
+        return { scheduled: orgs.length };
+    },
+});
