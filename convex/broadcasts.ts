@@ -542,6 +542,9 @@ export const sendBroadcast = internalAction({
         // preserving the cursor (sentCount) for resume. Also keeps each action
         // invocation well within Convex's time budget on large audiences.
         const CHUNK = 50;
+        // Throttle between chunks so a large audience doesn't burst past Meta's
+        // per-second messaging limits (429s → permanent FAILED on the overflow).
+        const CHUNK_DELAY_MS = 1000;
 
         // 1. Fetch Broadcast & Template
         const broadcast = await ctx.runQuery(internal.broadcasts.getBroadcastInternal, { id: args.broadcastId });
@@ -619,7 +622,7 @@ export const sendBroadcast = internalAction({
         if ((fresh.sentCount ?? 0) >= total) {
             await ctx.runMutation(internal.broadcasts.markCompleted, { id: args.broadcastId });
         } else if (fresh.status === "SENDING") {
-            await ctx.scheduler.runAfter(0, internal.broadcasts.sendBroadcast, {
+            await ctx.scheduler.runAfter(CHUNK_DELAY_MS, internal.broadcasts.sendBroadcast, {
                 broadcastId: args.broadcastId,
                 organizationId: args.organizationId,
             });

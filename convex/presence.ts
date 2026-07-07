@@ -121,18 +121,19 @@ export const checkTimeouts = internalMutation({
     handler: async (ctx) => {
         const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
 
-        const stale = await ctx.db
-            .query("memberships")
-            .filter((q) =>
-                q.and(
-                    q.neq(q.field("status"), "OFFLINE"),
-                    q.lt(q.field("lastSeenAt"), fiveMinutesAgo)
-                )
-            )
-            .collect();
-
-        for (const m of stale) {
-            await ctx.db.patch(m._id, { status: "OFFLINE" });
+        // Only the currently-active members can time out — scan them via the
+        // by_status index instead of full-scanning the whole memberships table
+        // every minute (which degraded all tenants as the table grew).
+        for (const status of ["ONLINE", "BUSY"] as const) {
+            const active = await ctx.db
+                .query("memberships")
+                .withIndex("by_status", (q) => q.eq("status", status))
+                .collect();
+            for (const m of active) {
+                if ((m.lastSeenAt ?? 0) < fiveMinutesAgo) {
+                    await ctx.db.patch(m._id, { status: "OFFLINE" });
+                }
+            }
         }
     },
 });

@@ -343,7 +343,8 @@ export default defineSchema({
         .index("by_user", ["userId"])
         .index("by_organization", ["organizationId"])
         .index("by_user_org", ["userId", "organizationId"])
-        .index("by_org_status", ["organizationId", "status"]), // Optimized for assignment logic
+        .index("by_org_status", ["organizationId", "status"]) // Optimized for assignment logic
+        .index("by_status", ["status"]), // Global presence-timeout cron (only scans ONLINE/BUSY)
 
     // ============================================
     // Invitations
@@ -2092,5 +2093,6 @@ export default defineSchema({
         .index("by_org_status", ["organizationId", "status"])
         .index("by_conversation", ["conversationId"])
         .index("by_agent", ["agentId"])
-        .index("by_channel_status", ["whatsappChannelId", "status"]),
+        .index("by_channel_status", ["whatsappChannelId", "status"])
+        .index("by_status", ["status"]), // Global missed-call expiry cron (only scans RINGING)
 });

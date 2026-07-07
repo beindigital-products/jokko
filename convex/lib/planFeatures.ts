@@ -125,3 +125,19 @@ export async function requirePlanFeatureInAction(
     const state: TrialState = typeof org === "string" ? { plan: org } : org;
     assertFeature(state, feature, now);
 }
+
+/**
+ * Variante booléenne (même règle que `assertFeature`) pour les appelants qui
+ * doivent dégrader gracieusement au lieu de throw — ex. une action de fond qui
+ * saute simplement une étape IA quand l'org n'y a pas droit (évite de brûler le
+ * budget OpenAI partagé pour un plan non éligible).
+ */
+export function planFeatureAllowed(
+    org: TrialState,
+    feature: PlanFeature,
+    now: number = Date.now(),
+): boolean {
+    if (orgIsTrialing(org, now)) return true;
+    if (!orgHasPaidAccess(org)) return false;
+    return planIncludesFeature((org.plan ?? "FREE") as PlanKey, feature);
+}

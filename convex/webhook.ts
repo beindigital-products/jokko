@@ -7,6 +7,11 @@ import { enqueueConversationEvent } from "./crm/enqueue";
 import { formatConversationPreview } from "./lib/messagePreview";
 import { createNotification } from "./notifications";
 
+// WhatsApp customer-service window: 24h from the last inbound customer message.
+// Free-form (non-template) replies are only accepted by Meta while it's open;
+// messages.send enforces it. Reset on every inbound message below.
+const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Create NEW_MESSAGE notifications (which drive the push) for an inbound message.
  * The assigned agent always gets it; an unassigned conversation pings the whole
@@ -190,6 +195,7 @@ export const handleIncomingMessage = internalMutation({
                 whatsappChannelId: whatsappChannelId,
                 assignedTeamId: channelTeamId,
                 poleId: channelPoleId,
+                windowExpiresAt: Date.now() + SERVICE_WINDOW_MS,
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
             });
@@ -324,6 +330,7 @@ export const handleIncomingMessage = internalMutation({
             lastMessageDirection: "INBOUND",
             preview,
             unreadCount: (conversation.unreadCount || 0) + 1,
+            windowExpiresAt: Date.now() + SERVICE_WINDOW_MS,
             updatedAt: Date.now(),
         });
 

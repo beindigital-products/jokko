@@ -943,16 +943,13 @@ export const expireMissedCalls = internalMutation({
     handler: async (ctx) => {
         const cutoff = Date.now() - 60_000; // 60 seconds timeout
 
-        // Get all organizations that have ringing calls
-        const ringingCalls = await ctx.db
+        // Only RINGING calls can expire — scan them via the by_status index
+        // instead of full-scanning the whole calls table every minute.
+        const ringingCalls = (await ctx.db
             .query("calls")
-            .filter((q) =>
-                q.and(
-                    q.eq(q.field("status"), "RINGING"),
-                    q.lt(q.field("startedAt"), cutoff)
-                )
-            )
-            .collect();
+            .withIndex("by_status", (q) => q.eq("status", "RINGING"))
+            .collect())
+            .filter((c) => c.startedAt < cutoff);
 
         for (const call of ringingCalls) {
             const now = Date.now();
