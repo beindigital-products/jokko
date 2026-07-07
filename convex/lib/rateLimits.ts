@@ -1,11 +1,14 @@
 import { RateLimiter, MINUTE, HOUR } from "@convex-dev/rate-limiter";
 import { components } from "../_generated/api";
 
+// NOTE — outbound WhatsApp message throttling is NOT done with a per-message
+// token bucket here: that would fight the broadcast sender (chunks of 50).
+// Real outbound throttling lives in the send path itself — broadcasts use an
+// inter-chunk delay (CHUNK_DELAY_MS) and the automation engine is bounded by
+// MAX_STEPS per inbound message. This limiter only guards discrete user-driven
+// endpoints below.
 export const rateLimiter = new RateLimiter(components.rateLimiter, {
-    // Auth: brute-force protection
-    sendMessage: { kind: "token bucket", rate: 30, period: MINUTE, capacity: 5 },
-
-    // WhatsApp test messages
+    // WhatsApp "send test message" button (per channel/org) — anti-abuse.
     sendTestMessage: { kind: "token bucket", rate: 5, period: MINUTE, capacity: 2 },
 
     // Checkout sessions

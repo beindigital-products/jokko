@@ -6,8 +6,12 @@ import { motion } from "framer-motion";
 import { SplitText } from "@/components/animations/split-text";
 import { InboxMockup } from "@/components/landing/ui/inbox-mockup";
 import { ShimmerButton } from "@/components/landing/ui/shimmer-button";
+import { useLocale } from "@/lib/i18n/locale-context";
+import { useDemoModal } from "@/lib/stores/demo-modal-store";
 
 export function HeroSection() {
+  const { m } = useLocale();
+  const openDemo = useDemoModal((s) => s.openModal);
   return (
     <section className="relative overflow-hidden pt-28 pb-16 md:pt-36 md:pb-24">
       {/* Dot grid background */}
@@ -45,19 +49,19 @@ export function HeroSection() {
             className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/70 px-3 py-1 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground backdrop-blur"
           >
             <span className="flex h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
-            For teams · 2026
+            {m.hero.eyebrow}
           </motion.div>
 
           <h1 className="mt-8 font-display text-[clamp(2.5rem,7vw,6rem)] font-bold leading-[0.98] tracking-[-0.025em]">
             <SplitText as="span" className="block">
-              L&apos;inbox WhatsApp
+              {m.hero.titleLine1}
             </SplitText>
             <SplitText
               as="span"
               delay={0.15}
               className="block bg-gradient-to-br from-foreground via-foreground to-[var(--accent)] bg-clip-text text-transparent"
             >
-              partagée pour les équipes.
+              {m.hero.titleLine2}
             </SplitText>
           </h1>
 
@@ -67,9 +71,7 @@ export function HeroSection() {
             transition={{ duration: 0.6, delay: 0.5, ease: [0.22, 1, 0.36, 1] }}
             className="mt-8 max-w-2xl text-lg leading-relaxed text-muted-foreground md:text-xl"
           >
-            Centralisez vos numéros WhatsApp Business dans une seule inbox.
-            Assignez les conversations à votre équipe, laissez l&apos;IA rédiger
-            le premier brouillon, mesurez les résultats.
+            {m.hero.subtitle}
           </motion.p>
 
           <motion.div
@@ -80,15 +82,18 @@ export function HeroSection() {
           >
             <ShimmerButton asChild size="lg">
               <Link href="/auth/sign-up">
-                Démarrer gratuitement
+                {m.hero.ctaPrimary}
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </ShimmerButton>
-            <ShimmerButton asChild variant="ghost" size="lg">
-              <Link href="/fonctionnalites">
-                <Play className="h-3.5 w-3.5 fill-current" />
-                Voir la démo (2 min)
-              </Link>
+            <ShimmerButton
+              type="button"
+              variant="ghost"
+              size="lg"
+              onClick={openDemo}
+            >
+              <Play className="h-3.5 w-3.5 fill-current" />
+              {m.hero.ctaSecondary}
             </ShimmerButton>
           </motion.div>
 
@@ -100,22 +105,68 @@ export function HeroSection() {
           >
             <div className="flex -space-x-2">
               {[
-                "from-rose-400 to-rose-600",
-                "from-amber-400 to-amber-600",
-                "from-sky-400 to-sky-600",
-                "from-emerald-400 to-emerald-600",
-                "from-violet-400 to-violet-600",
-              ].map((g, i) => (
+                {
+                  g: "from-rose-400 to-rose-600",
+                  mark: (
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                      <circle cx="12" cy="6" r="3.2" />
+                      <circle cx="12" cy="18" r="3.2" />
+                      <circle cx="6" cy="12" r="3.2" />
+                      <circle cx="18" cy="12" r="3.2" />
+                    </svg>
+                  ),
+                },
+                {
+                  g: "from-amber-400 to-amber-600",
+                  mark: (
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round" aria-hidden>
+                      <path d="M6 8h12l-1.2 11.2A1 1 0 0 1 15.8 20H8.2a1 1 0 0 1-1-.8L6 8Z" />
+                      <path d="M9 8a3 3 0 0 1 6 0" />
+                    </svg>
+                  ),
+                },
+                {
+                  g: "from-sky-400 to-sky-600",
+                  mark: (
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinejoin="round" aria-hidden>
+                      <path d="M12 2.5 3.5 7v10L12 21.5 20.5 17V7L12 2.5Z" />
+                      <path d="M3.5 7 12 11.5 20.5 7" />
+                      <path d="M12 11.5v10" />
+                    </svg>
+                  ),
+                },
+                {
+                  g: "from-emerald-400 to-emerald-600",
+                  mark: (
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="currentColor" aria-hidden>
+                      <path d="M12 2.5C7.4 7.2 5.5 10.8 5.5 14a6.5 6.5 0 0 0 13 0c0-3.2-1.9-6.8-6.5-11.5Z" />
+                    </svg>
+                  ),
+                },
+                {
+                  g: "from-violet-400 to-violet-600",
+                  mark: (
+                    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2} aria-hidden>
+                      <circle cx="12" cy="12" r="9" />
+                      <circle cx="12" cy="12" r="3.4" fill="currentColor" stroke="none" />
+                    </svg>
+                  ),
+                },
+              ].map(({ g, mark }, i) => (
                 <div
                   key={i}
-                  className={`h-7 w-7 rounded-full bg-gradient-to-br ${g} ring-2 ring-background`}
-                />
+                  className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br ${g} text-white ring-2 ring-background`}
+                >
+                  {mark}
+                </div>
               ))}
             </div>
             <div className="flex flex-col text-left text-xs">
-              <span className="font-semibold text-foreground">+140 équipes</span>
+              <span className="font-semibold text-foreground">
+                {m.hero.socialProofCount}
+              </span>
               <span className="text-muted-foreground">
-                Sans CB · RGPD · Hébergement UE
+                {m.hero.socialProofNote}
               </span>
             </div>
           </motion.div>

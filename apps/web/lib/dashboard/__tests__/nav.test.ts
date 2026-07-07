@@ -26,8 +26,8 @@ describe("navKeyFromPathname", () => {
         expect(navKeyFromPathname("/dashboard/mentions")).toBe("mentions")
     })
 
-    it("keeps the notifications history under the mentions key", () => {
-        expect(navKeyFromPathname("/dashboard/notifications")).toBe("mentions")
+    it("maps the notifications history to its own dedicated key", () => {
+        expect(navKeyFromPathname("/dashboard/notifications")).toBe("notifications")
     })
 
     it("does not confuse contacts with conversations", () => {

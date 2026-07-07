@@ -27,6 +27,7 @@ import type { ChipTone } from "../primitives/Chip"
 import {
     AtSign,
     BarChart3,
+    Bell,
     BookUser,
     FileText,
     Globe,
@@ -44,6 +45,7 @@ export type DashboardNavKey =
     | "tableau-de-bord"
     | "conversations"
     | "mentions"
+    | "notifications"
     | "assignations"
     | "contacts"
     | "modeles"
@@ -109,6 +111,7 @@ const SECTIONS: { label: string; items: NavEntry[] }[] = [
         items: [
             { key: "conversations", icon: MessageSquare, label: "Conversations", path: "/conversations" },
             { key: "mentions", icon: AtSign, label: "Mentions", path: "/mentions" },
+            { key: "notifications", icon: Bell, label: "Notifications", path: "/notifications" },
             { key: "assignations", icon: Repeat, label: "Assignations", path: "/assignments" },
         ],
     },

@@ -126,7 +126,7 @@ export function AudioPlayer({ src, isOutbound = false }: AudioPlayerProps) {
             <div className="flex items-center gap-3 min-w-[200px] p-2">
                 <div className={cn(
                     'h-10 w-10 rounded-full flex items-center justify-center shrink-0',
-                    isOutbound ? 'bg-green-200' : 'bg-gray-200'
+                    isOutbound ? 'bg-[var(--accent)]/25' : 'bg-[var(--border)]'
                 )}>
                     <Mic className="h-5 w-5 text-gray-500" />
                 </div>
@@ -147,7 +147,7 @@ export function AudioPlayer({ src, isOutbound = false }: AudioPlayerProps) {
                 className={cn(
                     'h-11 w-11 rounded-full flex items-center justify-center shrink-0 transition-all',
                     isOutbound
-                        ? 'bg-green-500 hover:bg-green-600 text-white disabled:bg-green-300'
+                        ? 'bg-[var(--accent)] hover:opacity-90 text-white disabled:opacity-50'
                         : 'bg-gray-200 hover:bg-gray-300 text-gray-700 disabled:bg-gray-100'
                 )}
             >
@@ -178,10 +178,10 @@ export function AudioPlayer({ src, isOutbound = false }: AudioPlayerProps) {
                                     'w-[3px] rounded-full transition-colors',
                                     isActive
                                         ? isOutbound
-                                            ? 'bg-green-600'
+                                            ? 'bg-[var(--accent)]'
                                             : 'bg-gray-600'
                                         : isOutbound
-                                            ? 'bg-green-300'
+                                            ? 'bg-[var(--accent)]/40'
                                             : 'bg-gray-300'
                                 )}
                                 style={{ height: `${height * 100}%` }}

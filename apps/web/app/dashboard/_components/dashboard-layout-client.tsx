@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 
 import { AppSidebar } from '@/components/dashboard/app-sidebar'
+import { CommandPalette } from '@/components/dashboard/command-palette'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { BrowserNotifications } from '@/components/browser-notifications'
 import { NotificationBanner } from '@/components/dashboard/notification-banner'
@@ -72,6 +73,18 @@ export function DashboardLayoutClient({ children }: DashboardLayoutClientProps) 
 
     return (
         <SidebarProvider className="h-screen bg-gray-50/50">
+            {/* A11y: skip straight to the page content, past the sidebar/header.
+                Visually hidden until focused (keyboard/screen-reader users). */}
+            <a
+                href="#main-content"
+                className="sr-only z-50 rounded-md bg-[var(--ink-900)] px-4 py-2 text-sm font-medium text-white focus:not-sr-only focus:absolute focus:left-4 focus:top-4"
+            >
+                Aller au contenu
+            </a>
+
+            {/* Global ⌘K command palette (real search — replaces the old fake badge). */}
+            <CommandPalette />
+
             {/* Desktop sidebar (v3 on shadcn) + mobile off-canvas sheet */}
             <AppSidebar basePath={basePath} />
 

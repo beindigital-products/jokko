@@ -15,6 +15,36 @@ import ffmpegPath from "ffmpeg-static";
 const execFileAsync = promisify(execFile);
 
 /**
+ * POST to the WhatsApp Graph API with a bounded retry on TRANSIENT failures
+ * (HTTP 408/429/5xx or a network error). Non-transient responses — 400 invalid
+ * recipient, 401/190 bad token, etc. — return immediately so the caller's
+ * existing error handling still runs. Without this, a momentary Meta blip during
+ * a broadcast turned dozens of messages into permanent FAILED. Backoff: 0.5s, 1s.
+ */
+const TRANSIENT_HTTP = new Set([408, 429, 500, 502, 503, 504]);
+
+async function metaFetchWithRetry(
+    url: string,
+    init: Parameters<typeof fetch>[1],
+    maxAttempts = 3,
+): Promise<Response> {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            const res = await fetch(url, init);
+            if (res.ok || !TRANSIENT_HTTP.has(res.status) || attempt === maxAttempts) {
+                return res;
+            }
+        } catch (err) {
+            lastError = err;
+            if (attempt === maxAttempts) throw err;
+        }
+        await new Promise((r) => setTimeout(r, 500 * 2 ** (attempt - 1)));
+    }
+    throw lastError ?? new Error("metaFetchWithRetry: retries exhausted");
+}
+
+/**
  * SSRF guard: server-side media fetches must only target Convex Storage.
  *
  * `messages.send` accepts a client-supplied `mediaUrl` that is relayed here and
@@ -387,7 +417,7 @@ export const sendMessage = internalAction({
         // PII: do not log the full WhatsApp payload (message body / caption / link).
 
         try {
-            const response = await fetch(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
+            const response = await metaFetchWithRetry(`https://graph.facebook.com/v20.0/${phoneNumberId}/messages`, {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${accessToken}`,
@@ -447,7 +477,8 @@ export const sendMessage = internalAction({
 
                 await ctx.runMutation(internal.utils.updateMessageStatus, {
                     messageId: args.messageId,
-                    status: "FAILED"
+                    status: "FAILED",
+                    errorReason: data?.error?.message ?? `Erreur WhatsApp (${response.status})`,
                 });
             } else {
                 console.log(`[OUTBOUND] Message sent. WhatsApp ID: ${data.messages?.[0]?.id}`);
@@ -461,7 +492,8 @@ export const sendMessage = internalAction({
             console.error(`[OUTBOUND] Network Error:`, error);
             await ctx.runMutation(internal.utils.updateMessageStatus, {
                 messageId: args.messageId,
-                status: "FAILED"
+                status: "FAILED",
+                errorReason: "Erreur réseau lors de l'envoi (Meta injoignable).",
             });
         }
     },

@@ -37,6 +37,10 @@ export default defineSchema({
         maxConversationsPerMonth: v.number(),
         maxTemplates: v.number(),
         historyDays: v.number(),
+        // Media storage cap in MB (-1 = illimité). Optionnel pour compat avec
+        // les plans seedés avant l'ajout — getMaxStorageMB traite l'absence
+        // comme illimité.
+        maxStorageMB: v.optional(v.number()),
         monthlyPriceFCFA: v.number(),
         yearlyPriceFCFA: v.number(),
         yearlyMonthlyPriceFCFA: v.number(),
@@ -62,6 +66,8 @@ export default defineSchema({
         locale: v.optional(v.string()),
         timezone: v.optional(v.string()),
         onboardingCompleted: v.optional(v.boolean()),
+        // Timestamp of the one-off welcome email (sent once onboarding completes).
+        welcomeEmailSentAt: v.optional(v.number()),
         // RGPD : timestamp (ms epoch) auquel l'utilisateur a accepté les CGU
         // et la politique de confidentialité au moment du sign-up.
         // Persistance gérée par le callback Password.profile() dans convex/auth.ts.
@@ -131,11 +137,17 @@ export default defineSchema({
             v.literal("ENTERPRISE")
         ),
         creditBalance: v.optional(v.number()), // Solde de crédits (FCFA ou Unités)
+        // Octets de média stockés (inbound + sortant) — maintenu au store/suppression,
+        // réconciliable via storage_usage.recompute. Borné par plan.maxStorageMB.
+        storageBytesUsed: v.optional(v.number()),
 
         // App-level trial (14 jours à partir de la création de l'org)
         // Toutes les fonctionnalités sont déverrouillées pendant cette période, peu importe le plan choisi.
         trialStartedAt: v.optional(v.number()),
         trialEndsAt: v.optional(v.number()),
+        // Timestamp of the one-off "your trial is ending" reminder email, so the
+        // daily cron sends it at most once per org.
+        trialReminderSentAt: v.optional(v.number()),
 
         // Indique si l'utilisateur a explicitement sélectionné un plan payant.
         // FREE est un sentinel "pas de plan choisi". Après expiration du trial et
@@ -166,6 +178,10 @@ export default defineSchema({
             status: v.optional(v.string()), // active, canceled, past_due, trialing
             currentPeriodEnd: v.optional(v.number()),
             trialUsed: v.optional(v.boolean()),
+            // Unix seconds of the last Stripe event applied to this org.
+            // Guards against out-of-order webhook replays overwriting a newer
+            // subscription state with a stale one.
+            lastEventAt: v.optional(v.number()),
         })),
 
         // Fair Usage Policy (Limits)
@@ -335,11 +351,17 @@ export default defineSchema({
         joinedAt: v.number(),
         lastAssignedAt: v.optional(v.number()),
         invitedById: v.optional(v.id("users")),
+        // Suspended seat (e.g. freed by a plan downgrade). The row + history are
+        // kept, but the member loses access until reactivated by an owner/admin.
+        // Enforced centrally in requireMembership.
+        suspended: v.optional(v.boolean()),
+        suspendedReason: v.optional(v.string()),
     })
         .index("by_user", ["userId"])
         .index("by_organization", ["organizationId"])
         .index("by_user_org", ["userId", "organizationId"])
-        .index("by_org_status", ["organizationId", "status"]), // Optimized for assignment logic
+        .index("by_org_status", ["organizationId", "status"]) // Optimized for assignment logic
+        .index("by_status", ["status"]), // Global presence-timeout cron (only scans ONLINE/BUSY)
 
     // ============================================
     // Invitations
@@ -790,6 +812,11 @@ export default defineSchema({
         // the cursor).
         audienceTotal: v.optional(v.number()),
 
+        // True once the audience cost has been debited from the org's credit
+        // balance. Makes the upfront debit exactly-once per campaign even if
+        // the chunked sender is re-run at cursor 0 after a crash.
+        creditsDeducted: v.optional(v.boolean()),
+
         // Per-template variable mapping ({{N}} → contact field or fixed value),
         // resolved per-recipient at send-time into WhatsApp template components.
         // `token` is the placeholder ("{{1}}"), `src` a contact field
@@ -1098,6 +1125,11 @@ export default defineSchema({
         // External ID (WhatsApp Message ID)
         externalId: v.optional(v.string()),
 
+        // Human-readable reason for a FAILED send (Meta's error message, e.g.
+        // "re-engagement message" / 131047). Surfaced to agents instead of a
+        // bare FAILED so they know why and what to do.
+        errorReason: v.optional(v.string()),
+
         // Broadcast Link (Campaigns)
         broadcastId: v.optional(v.id("broadcasts")),
 
@@ -1108,7 +1140,13 @@ export default defineSchema({
         .index("by_organization", ["organizationId"])
         .index("by_external_id", ["externalId"])
         // Date-bounded org scans (analytics windows) without reading all history.
-        .index("by_org_created", ["organizationId", "createdAt"]),
+        .index("by_org_created", ["organizationId", "createdAt"])
+        // Full-text search over message bodies for the ⌘K palette, scoped to
+        // the caller's org via the filter field (no cross-tenant leakage).
+        .searchIndex("search_messages", {
+            searchField: "content",
+            filterFields: ["organizationId"],
+        }),
 
     // ============================================
     // TYPING INDICATORS
@@ -2083,5 +2121,6 @@ export default defineSchema({
         .index("by_org_status", ["organizationId", "status"])
         .index("by_conversation", ["conversationId"])
         .index("by_agent", ["agentId"])
-        .index("by_channel_status", ["whatsappChannelId", "status"]),
+        .index("by_channel_status", ["whatsappChannelId", "status"])
+        .index("by_status", ["status"]), // Global missed-call expiry cron (only scans RINGING)
 });

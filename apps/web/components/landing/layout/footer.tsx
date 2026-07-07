@@ -10,58 +10,7 @@ import { ArrowRight, Check, Shield, Twitter, Linkedin, Github, Loader2 } from "l
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-
-const columns = [
-  {
-    title: "Produit",
-    links: [
-      { name: "Fonctionnalités", href: "/fonctionnalites" },
-      { name: "Tarifs", href: "/tarifs" },
-      { name: "Changelog", href: "/changelog" },
-      { name: "Feuille de route", href: "/roadmap" },
-      { name: "Statut", href: "https://status.jokko.co" },
-    ],
-  },
-  {
-    title: "Solutions",
-    links: [
-      { name: "Service client", href: "/solutions/service-client" },
-      { name: "E-commerce", href: "/solutions/e-commerce" },
-      { name: "Agences", href: "/solutions/agences" },
-      { name: "TPE & PME", href: "/solutions/tpe-pme" },
-    ],
-  },
-  {
-    title: "Ressources",
-    links: [
-      { name: "Blog", href: "/blog" },
-      { name: "Cas d'usage", href: "/solutions/service-client" },
-      { name: "Centre d'aide", href: "/contact" },
-      // Masqués temporairement — à réactiver quand les pages seront finalisées
-      // { name: "Guides", href: "/guides" },
-      // { name: "Documentation", href: "/docs" },
-      // { name: "API", href: "/docs/api" },
-    ],
-  },
-  {
-    title: "Entreprise",
-    links: [
-      { name: "À propos", href: "/about" },
-      { name: "Contact", href: "/contact" },
-      { name: "Carrières", href: "/careers" },
-      { name: "Presse", href: "/press" },
-    ],
-  },
-  {
-    title: "Légal",
-    links: [
-      { name: "Confidentialité", href: "/privacy" },
-      { name: "Conditions", href: "/terms" },
-      { name: "Mentions légales", href: "/legal" },
-      { name: "DPA", href: "/dpa" },
-    ],
-  },
-];
+import { useLocale } from "@/lib/i18n/locale-context";
 
 const socialLinks = [
   { name: "Twitter", href: "https://twitter.com/jokko_co", icon: Twitter },
@@ -70,6 +19,8 @@ const socialLinks = [
 ];
 
 export function Footer() {
+  const { m } = useLocale();
+  const columns = m.footer.columns;
   const subscribeNewsletter = useMutation(api.waitingList.subscribeNewsletter);
   const [email, setEmail] = useState("");
   const [subscribed, setSubscribed] = useState(false);
@@ -86,7 +37,7 @@ export function Footer() {
       setSubscribed(true);
       setEmail("");
     } catch {
-      setNewsletterError("Erreur, veuillez réessayer.");
+      setNewsletterError(m.footer.newsletterError);
     } finally {
       setIsLoading(false);
     }
@@ -125,19 +76,18 @@ export function Footer() {
               </span>
             </Link>
             <p className="mt-5 max-w-sm text-[15px] leading-relaxed text-[var(--surface-dark-muted-foreground)]">
-              L&apos;inbox WhatsApp partagée pour les équipes. Centralisez vos numéros
-              Business, assignez les conversations, laissez l&apos;IA rédiger le premier brouillon.
+              {m.footer.tagline}
             </p>
 
             <form onSubmit={handleSubmit} className="mt-8">
               <label htmlFor="newsletter-email" className="mb-2 block text-xs font-medium uppercase tracking-wider text-white/60">
-                Newsletter produit
+                {m.footer.newsletterLabel}
               </label>
               <div className="flex gap-2">
                 <Input
                   id="newsletter-email"
                   type="email"
-                  placeholder="votre@email.com"
+                  placeholder={m.footer.newsletterPlaceholder}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -160,11 +110,11 @@ export function Footer() {
                   ) : subscribed ? (
                     <>
                       <Check className="h-4 w-4" />
-                      Inscrit
+                      {m.footer.newsletterSubscribed}
                     </>
                   ) : (
                     <>
-                      S&apos;abonner
+                      {m.footer.newsletterSubmit}
                       <ArrowRight className="h-4 w-4" />
                     </>
                   )}
@@ -174,7 +124,7 @@ export function Footer() {
                 <p className="mt-1 text-xs text-red-400">{newsletterError}</p>
               )}
               <p className="mt-2 text-xs text-white/40">
-                Une fois par mois. Pas de spam, désinscription en 1 clic.
+                {m.footer.newsletterNote}
               </p>
             </form>
 
@@ -221,24 +171,23 @@ export function Footer() {
         </div>
 
         <div className="mt-16 flex flex-wrap items-center gap-3 border-t border-white/10 pt-8">
-          <TrustBadge icon={Shield} label="RGPD conforme" />
-          <TrustBadge icon={Shield} label="Hébergement UE" />
-          <TrustBadge icon={Shield} label="SOC 2 · en cours" />
-          <TrustBadge icon={Shield} label="Chiffrement TLS 1.3" />
+          {m.footer.trustBadges.map((label) => (
+            <TrustBadge key={label} icon={Shield} label={label} />
+          ))}
           <div className="ml-auto flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span className="text-xs font-medium text-white/80">
-              API officielle WhatsApp Business
+              {m.footer.apiBadge}
             </span>
           </div>
         </div>
 
         <div className="mt-10 flex flex-col items-start justify-between gap-4 border-t border-white/10 pt-6 md:flex-row md:items-center">
           <p className="text-sm text-white/50">
-            © {new Date().getFullYear()} Jokko. Tous droits réservés.
+            © {new Date().getFullYear()} Jokko. {m.footer.copyright}
           </p>
           <div className="flex items-center gap-4 text-xs text-white/40">
-            <span>Fabriqué avec soin entre Paris &amp; Dakar</span>
+            <span>{m.footer.madeWith}</span>
             <span aria-hidden>·</span>
             <LanguageSwitch />
           </div>
@@ -280,12 +229,31 @@ function TrustBadge({ icon: Icon, label }: { icon: typeof Shield; label: string 
 }
 
 function LanguageSwitch() {
+  const { locale, setLocale } = useLocale();
   return (
     <div className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 p-0.5">
-      <button className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-medium text-white">
+      <button
+        type="button"
+        onClick={() => setLocale("fr")}
+        className={cn(
+          "rounded-full px-2.5 py-1 text-xs font-medium",
+          locale === "fr"
+            ? "bg-white/10 text-white"
+            : "text-white/50 hover:text-white/80"
+        )}
+      >
         FR
       </button>
-      <button className="rounded-full px-2.5 py-1 text-xs font-medium text-white/50 hover:text-white/80">
+      <button
+        type="button"
+        onClick={() => setLocale("en")}
+        className={cn(
+          "rounded-full px-2.5 py-1 text-xs font-medium",
+          locale === "en"
+            ? "bg-white/10 text-white"
+            : "text-white/50 hover:text-white/80"
+        )}
+      >
         EN
       </button>
     </div>

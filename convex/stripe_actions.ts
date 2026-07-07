@@ -238,8 +238,10 @@ export const createCreditsCheckoutSession = action({
             });
         }
 
-        // Create one-time payment checkout session
-        // XOF in Stripe: 2-decimal currency → multiply by 100
+        // Create one-time payment checkout session.
+        // XOF is a ZERO-decimal currency in Stripe (like JPY/XAF): unit_amount
+        // is the amount in the major unit, sent as-is — NOT multiplied by 100.
+        // Multiplying would charge the customer 100× the displayed FCFA price.
         const checkoutSession = await stripe.checkout.sessions.create({
             customer: customerId,
             mode: "payment",
@@ -247,7 +249,7 @@ export const createCreditsCheckoutSession = action({
                 {
                     price_data: {
                         currency: "xof",
-                        unit_amount: args.amount * 100,
+                        unit_amount: args.amount,
                         product_data: {
                             name: `Recharge Jokko - ${new Intl.NumberFormat("fr-FR").format(args.amount)} FCFA`,
                         },

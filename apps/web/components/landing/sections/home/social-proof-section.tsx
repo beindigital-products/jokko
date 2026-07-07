@@ -4,99 +4,58 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowUpRight, Quote, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/lib/i18n/locale-context";
 
-const featured = [
-  {
-    quote: "Jokko a divisé par 4 notre temps de première réponse. Nos clients remarquent, notre CSAT est passé de 3.8 à 4.7.",
-    metric: "-75%",
-    metricLabel: "Temps 1ère réponse",
-    author: "Fatou Ndiaye",
-    role: "Head of CX",
-    company: "Sama Mode",
-    color: "from-rose-400 to-rose-600",
-  },
-  {
-    quote: "Avant on avait 3 Nokia sur un bureau. Aujourd'hui, 6 agents gèrent tous nos numéros depuis leurs postes. Le chaos a disparu.",
-    metric: "6",
-    metricLabel: "Agents simultanés",
-    author: "Mamadou Bah",
-    role: "CEO",
-    company: "Teranga Livraison",
-    color: "from-sky-400 to-sky-600",
-  },
-  {
-    quote: "L'IA Jo écrit mieux que mes stagiaires. C'est presque vexant. Surtout, elle le fait en wolof et en français.",
-    metric: "10×",
-    metricLabel: "Productivité agent",
-    author: "Awa Sarr",
-    role: "Head of Ops",
-    company: "Kaïcedra",
-    color: "from-violet-400 to-violet-600",
-  },
+// Témoignages illustratifs — personnes et marques FICTIVES, à remplacer par de
+// vrais retours clients (avec accord) une fois disponibles. Ton volontairement
+// mesuré et concret pour rester crédible.
+// Champs traduisibles (quote/metric/author/role/company…) dans le dictionnaire
+// i18n ; seul le dégradé d'avatar (non textuel) reste ici, zippé par index.
+const featuredColors = [
+  "from-rose-400 to-rose-600",
+  "from-sky-400 to-sky-600",
+  "from-violet-400 to-violet-600",
 ];
 
-const tweets = [
-  {
-    author: "Ibrahim M.",
-    handle: "@ibra_tech",
-    text: "Migration de Respond.io vers Jokko terminée en 1 soirée. L'équipe adore. La fin des tabs WhatsApp.",
-    color: "from-emerald-400 to-emerald-600",
-  },
-  {
-    author: "Sophie L.",
-    handle: "@sophiepicks",
-    text: "Le copilot IA de Jokko est le seul qui comprend vraiment mon ton de marque. J'ai testé 6 concurrents.",
-    color: "from-amber-400 to-amber-600",
-  },
-  {
-    author: "Kabs Diouf",
-    handle: "@kabsdiouf",
-    text: "On vient de faire 2.3M F de vente via WhatsApp en une semaine, 100% routées par les flows Jokko. Absurd.",
-    color: "from-rose-400 to-rose-600",
-  },
-  {
-    author: "Nadia R.",
-    handle: "@nadia_cx",
-    text: "L'onboarding a pris 12min. J'étais préparée pour 2h. Mes agents sont en prod depuis hier matin.",
-    color: "from-sky-400 to-sky-600",
-  },
-  {
-    author: "Thomas V.",
-    handle: "@tvincendon",
-    text: "Le plus impressionnant : le real-time. Aucun refresh, aucun lag. Comme si Linear faisait du WhatsApp.",
-    color: "from-violet-400 to-violet-600",
-  },
-  {
-    author: "Aminata B.",
-    handle: "@aminata_biz",
-    text: "J'ai gardé Jokko 2 semaines en essai puis basculé toute ma boutique. Ma TTR moyenne est tombée sous 1min.",
-    color: "from-emerald-400 to-emerald-600",
-  },
-  {
-    author: "Xavier D.",
-    handle: "@xdlv",
-    text: "Les équipes ops m'appellent encore pour me remercier d'avoir migré. Je ne reverrai plus jamais HubSpot.",
-    color: "from-amber-400 to-amber-600",
-  },
-  {
-    author: "Lamine F.",
-    handle: "@laminedev",
-    text: "Le build quality de Jokko est insane. Du React qui ne lag jamais, des mutations optimistes partout.",
-    color: "from-sky-400 to-sky-600",
-  },
+// Retours illustratifs (fictifs) — à remplacer par de vrais avis avec accord.
+// Texte dans le dictionnaire i18n ; le dégradé d'avatar reste ici (par index).
+const tweetColors = [
+  "from-emerald-400 to-emerald-600",
+  "from-amber-400 to-amber-600",
+  "from-rose-400 to-rose-600",
+  "from-sky-400 to-sky-600",
+  "from-violet-400 to-violet-600",
+  "from-emerald-400 to-emerald-600",
+  "from-amber-400 to-amber-600",
+  "from-sky-400 to-sky-600",
 ];
 
 export function SocialProofSection() {
+  const { m } = useLocale();
+  const featured = m.socialProof.featured.map((t, i) => ({
+    ...t,
+    color: featuredColors[i],
+  }));
+  const tweets = m.socialProof.tweets.map((t, i) => ({
+    ...t,
+    color: tweetColors[i],
+  }));
+
   return (
     <section className="relative overflow-hidden py-28 md:py-36">
       <div className="mx-auto max-w-7xl px-6">
         <div className="mx-auto max-w-2xl text-center">
           <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-[var(--accent)]">
-            Ils en parlent
+            {m.socialProof.eyebrow}
           </p>
           <h2 className="mt-4 font-display text-4xl font-bold tracking-tight md:text-6xl">
-            140 équipes. Une seule inbox.
+            {m.socialProof.title}
           </h2>
+          {m.socialProof.disclaimer && (
+            <p className="mt-3 text-xs text-muted-foreground/70">
+              {m.socialProof.disclaimer}
+            </p>
+          )}
         </div>
 
         <div className="mt-16 grid gap-6 md:grid-cols-3">
@@ -124,7 +83,16 @@ function FeaturedTestimonial({
   company,
   color,
   index,
-}: (typeof featured)[number] & { index: number }) {
+}: {
+  quote: string;
+  metric: string;
+  metricLabel: string;
+  author: string;
+  role: string;
+  company: string;
+  color: string;
+  index: number;
+}) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 30 }}
@@ -247,13 +215,10 @@ function TweetCard({
 }
 
 export function CaseStudyRow() {
+  const { m } = useLocale();
   return (
     <div className="mx-auto mt-20 grid max-w-7xl gap-6 px-6 md:grid-cols-3">
-      {[
-        { company: "Sama Mode", slug: "e-commerce", metric: "CSAT 4.8/5" },
-        { company: "Teranga Livraison", slug: "service-client", metric: "TTR -82%" },
-        { company: "Kaïcedra", slug: "agences", metric: "12 clients gérés" },
-      ].map((cs) => (
+      {m.socialProof.caseStudy.items.map((cs) => (
         <Link
           key={cs.slug}
           href={`/solutions/${cs.slug}`}
@@ -261,7 +226,7 @@ export function CaseStudyRow() {
         >
           <div>
             <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-              Étude de cas
+              {m.socialProof.caseStudy.eyebrow}
             </p>
             <p className="mt-1 font-display text-xl font-bold">{cs.company}</p>
             <p className="text-sm text-[var(--accent)]">{cs.metric}</p>

@@ -69,6 +69,7 @@ export default function BillingPage() {
         api.billing.getUsageStats,
         currentOrg?._id ? { organizationId: currentOrg._id } : "skip",
     )
+    const storageUsage = useQuery(api.storage_usage.getUsage)
     const membersData = useQuery(api.team.listMembers, {})
     const { channels } = useChannels()
     const { plans: planDefs } = usePlans()
@@ -126,6 +127,9 @@ export default function BillingPage() {
         conversations: usageStats?.serviceConversationsCount ?? 0,
         seats: membersData?.nonOwnerCount ?? 0,
         channels: activeChannels,
+        storageMB: storageUsage
+            ? { used: Math.round(storageUsage.usedBytes / (1024 * 1024)), max: storageUsage.maxMB }
+            : undefined,
     })
 
     const eyebrow = `Compte · ${currentPlan === "FREE" ? "Gratuit" : planInput.name} · facturation`

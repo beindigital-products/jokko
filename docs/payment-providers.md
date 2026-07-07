@@ -149,6 +149,8 @@ Events a ecouter :
 - `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
+- `invoice.payment_failed` (renouvellement echoue → org passe `past_due` + notif owner)
+- `invoice.paid` (paiement recupere → repasse `active` si `past_due`)
 
 ### Flux technique (recharge credits)
 
@@ -178,21 +180,37 @@ sequenceDiagram
 
 ### Particularite devise XOF
 
-XOF est une devise a 2 decimales dans Stripe. Le montant doit etre multiplie par 100 :
+XOF est une devise **zero-decimale** dans Stripe (comme JPY, XAF, VND...). Le
+montant doit etre envoye **tel quel**, sans multiplication par 100 :
 
 ```typescript
-unit_amount: args.amount * 100  // 5000 FCFA = 500000
+unit_amount: args.amount  // 5000 FCFA = 5000
 ```
 
-La fonction `toProviderAmount()` dans `lib/credit-packs.ts` gere cette conversion.
+> ⚠️ Multiplier par 100 facturerait le client **100× le prix affiche** (une
+> recharge « 5 000 FCFA » preleverait 500 000 FCFA). Voir la liste officielle
+> des devises zero-decimales : https://docs.stripe.com/currencies#zero-decimal
+
+La fonction `toProviderAmount()` dans `lib/credit-packs.ts` renvoie le montant
+FCFA brut pour tous les providers.
 
 ---
 
 ## 3. Orange Money
 
-**Statut : A implementer**
+**Statut : Code implemente, desactive en attente de credentials marchand**
 
-L'action `initiateOrangeMoneyPayment` dans `convex/payment_actions.ts` est un stub qui lance une erreur. Le dialog affiche le provider mais il est desactive avec le label "Bientot disponible".
+L'action `initiateOrangeMoneyPayment` (`convex/payment_actions.ts`) et le webhook
+`/api/orange-money/webhook` (`convex/http.ts`) sont wires de bout en bout selon la
+spec Orange Web Payment (OAuth client-credentials → webpayment → notif). Le
+provider reste **desactive dans l'UI** (`PAYMENT_PROVIDERS.available = false` dans
+`lib/credit-packs.ts`) jusqu'a validation d'un compte marchand reel.
+
+**Pour activer** : renseigner les env vars ci-dessous (+ `ORANGE_MONEY_ENV=dev`
+pour le sandbox), tester un paiement en sandbox, puis passer `available` a `true`.
+Sans credentials, l'action renvoie une erreur "non configure" propre (pas de flow
+casse). L'authentification du callback se fait via le `notif_token` par transaction
+(Orange n'a pas de signature HMAC) ; l'ajout de credits reste idempotent.
 
 ### Prerequis
 

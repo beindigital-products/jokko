@@ -67,6 +67,14 @@ export async function requireMembership(
         throw new Error("Non membre de cette organisation");
     }
 
+    // A suspended seat (e.g. freed by a plan downgrade) keeps its row + history
+    // but has no access until an owner/admin reactivates it.
+    if (membership.suspended) {
+        throw new Error(
+            "Votre accès à cette organisation est suspendu (siège désactivé suite à un changement de plan). Un administrateur peut le réactiver.",
+        );
+    }
+
     return { userId, membership };
 }
 

@@ -542,6 +542,9 @@ export const sendBroadcast = internalAction({
         // preserving the cursor (sentCount) for resume. Also keeps each action
         // invocation well within Convex's time budget on large audiences.
         const CHUNK = 50;
+        // Throttle between chunks so a large audience doesn't burst past Meta's
+        // per-second messaging limits (429s → permanent FAILED on the overflow).
+        const CHUNK_DELAY_MS = 1000;
 
         // 1. Fetch Broadcast & Template
         const broadcast = await ctx.runQuery(internal.broadcasts.getBroadcastInternal, { id: args.broadcastId });
@@ -571,28 +574,25 @@ export const sendBroadcast = internalAction({
         const cursor = broadcast.sentCount ?? 0;
 
         // 3. First chunk only: deduct credits for the full audience + lock total.
+        //    Idempotent via the broadcast's `creditsDeducted` flag so a crash-
+        //    and-rerun at cursor 0 never double-charges the org.
         if (cursor === 0) {
             const { totalCostFCFA } = calculateBroadcastCost(targetContacts.map((c: any) => c.phone));
-            if (totalCostFCFA > 0) {
-                try {
-                    await ctx.runMutation(internal.credits.internalDeductCredits, {
-                        organizationId: args.organizationId,
-                        amount: totalCostFCFA,
-                        description: `Campagne "${broadcast.name}" — ${targetContacts.length} messages, ${totalCostFCFA.toLocaleString()} FCFA`,
-                        referenceId: args.broadcastId,
-                    });
-                } catch (e: any) {
-                    await ctx.runMutation(internal.broadcasts.markFailed, {
-                        id: args.broadcastId,
-                        reason: "Crédits insuffisants pour envoyer cette campagne",
-                    });
-                    return;
-                }
-            }
-            await ctx.runMutation(internal.broadcasts.setAudienceTotal, {
-                id: args.broadcastId,
-                total: targetContacts.length,
+            const debit = await ctx.runMutation(internal.broadcasts.deductBroadcastCredits, {
+                broadcastId: args.broadcastId,
+                organizationId: args.organizationId,
+                amount: totalCostFCFA,
+                audienceTotal: targetContacts.length,
             });
+            if (!debit.ok) {
+                await ctx.runMutation(internal.broadcasts.markFailed, {
+                    id: args.broadcastId,
+                    reason: debit.reason === "insufficient_credits"
+                        ? "Crédits insuffisants pour envoyer cette campagne"
+                        : "Impossible de débiter les crédits de la campagne",
+                });
+                return;
+            }
         }
 
         const total = broadcast.audienceTotal ?? targetContacts.length;
@@ -622,7 +622,7 @@ export const sendBroadcast = internalAction({
         if ((fresh.sentCount ?? 0) >= total) {
             await ctx.runMutation(internal.broadcasts.markCompleted, { id: args.broadcastId });
         } else if (fresh.status === "SENDING") {
-            await ctx.scheduler.runAfter(0, internal.broadcasts.sendBroadcast, {
+            await ctx.scheduler.runAfter(CHUNK_DELAY_MS, internal.broadcasts.sendBroadcast, {
                 broadcastId: args.broadcastId,
                 organizationId: args.organizationId,
             });
@@ -631,13 +631,64 @@ export const sendBroadcast = internalAction({
     }
 });
 
-/** Lock the audience size at send-start (cursor 0) for the chunked sender. */
-export const setAudienceTotal = internalMutation({
-    args: { id: v.id("broadcasts"), total: v.number() },
+/**
+ * Debit the campaign's full audience cost EXACTLY ONCE and lock the audience
+ * total, in a single atomic mutation. Idempotent via the broadcast's
+ * `creditsDeducted` flag: if the chunked sender is re-run at cursor 0 after a
+ * crash, the second call sees the flag and does not re-charge. Returns a
+ * `reason` on failure so the caller can mark the broadcast FAILED.
+ */
+export const deductBroadcastCredits = internalMutation({
+    args: {
+        broadcastId: v.id("broadcasts"),
+        organizationId: v.id("organizations"),
+        amount: v.number(),
+        audienceTotal: v.number(),
+    },
     handler: async (ctx, args) => {
-        await ctx.db.patch(args.id, { audienceTotal: args.total, updatedAt: Date.now() });
+        const broadcast = await ctx.db.get(args.broadcastId);
+        if (!broadcast) return { ok: false as const, reason: "not_found" };
+
+        // Already charged (idempotent replay) — just ensure the total is locked.
+        if (broadcast.creditsDeducted) {
+            if (broadcast.audienceTotal == null) {
+                await ctx.db.patch(args.broadcastId, {
+                    audienceTotal: args.audienceTotal,
+                    updatedAt: Date.now(),
+                });
+            }
+            return { ok: true as const, alreadyCharged: true };
+        }
+
+        if (args.amount > 0) {
+            const org = await ctx.db.get(args.organizationId);
+            if (!org) return { ok: false as const, reason: "org_not_found" };
+            const balance = org.creditBalance ?? 0;
+            if (balance < args.amount) {
+                return { ok: false as const, reason: "insufficient_credits" };
+            }
+            const newBalance = balance - args.amount;
+            await ctx.db.patch(args.organizationId, { creditBalance: newBalance });
+            await ctx.db.insert("creditTransactions", {
+                organizationId: args.organizationId,
+                amount: -args.amount,
+                type: "USAGE",
+                description: `Campagne "${broadcast.name}" — ${args.audienceTotal} messages, ${args.amount.toLocaleString()} FCFA`,
+                referenceId: args.broadcastId,
+                balanceAfter: newBalance,
+                createdAt: Date.now(),
+            });
+        }
+
+        await ctx.db.patch(args.broadcastId, {
+            creditsDeducted: true,
+            audienceTotal: args.audienceTotal,
+            updatedAt: Date.now(),
+        });
+        return { ok: true as const };
     },
 });
+
 
 /**
  * Pause an in-flight send. The currently-running chunk finishes; the next
@@ -693,6 +744,34 @@ export const markFailed = internalMutation({
             message: args.reason,
             createdAt: Date.now(),
         });
+    },
+});
+
+/**
+ * Cron safety net: if the chunked-sender chain breaks (a crash between chunks),
+ * a broadcast would otherwise sit in SENDING forever. Mark as FAILED any
+ * broadcast stuck in SENDING with no progress for over 15 minutes. Healthy
+ * sends update every ~1s per chunk, so this never touches a running one.
+ */
+export const cleanupStale = internalMutation({
+    args: {},
+    handler: async (ctx) => {
+        const cutoff = Date.now() - 15 * 60 * 1000;
+        const stuck = (await ctx.db
+            .query("broadcasts")
+            .withIndex("by_status", (q) => q.eq("status", "SENDING"))
+            .collect())
+            .filter((b) => (b.updatedAt ?? 0) < cutoff);
+        for (const b of stuck) {
+            await ctx.db.patch(b._id, { status: "FAILED", updatedAt: Date.now() });
+            await ctx.db.insert("broadcastActivities", {
+                broadcastId: b._id,
+                type: "failures",
+                message: "Campagne interrompue (aucune progression depuis 15 min) — marquée en échec automatiquement.",
+                createdAt: Date.now(),
+            });
+            console.log(`[BROADCASTS] Stale SENDING broadcast ${b._id} marked FAILED`);
+        }
     },
 });
 

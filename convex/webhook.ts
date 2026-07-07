@@ -7,6 +7,11 @@ import { enqueueConversationEvent } from "./crm/enqueue";
 import { formatConversationPreview } from "./lib/messagePreview";
 import { createNotification } from "./notifications";
 
+// WhatsApp customer-service window: 24h from the last inbound customer message.
+// Free-form (non-template) replies are only accepted by Meta while it's open;
+// messages.send enforces it. Reset on every inbound message below.
+const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+
 /**
  * Create NEW_MESSAGE notifications (which drive the push) for an inbound message.
  * The assigned agent always gets it; an unassigned conversation pings the whole
@@ -65,6 +70,23 @@ export const handleIncomingMessage = internalMutation({
         const { message, phoneNumberId } = args;
         const from = message.from; // Numéro de téléphone
         const name = args.contact?.profile?.name || from;
+
+        // 0. IDEMPOTENCE — Meta delivers webhooks at-least-once and replays an
+        //    event whenever our ack times out. Skip if we've already recorded
+        //    this exact inbound message (wamid). Without this guard a replay
+        //    duplicates the thread message, double-counts unread, re-pings the
+        //    team, AND re-runs the automation engine (double outbound = double
+        //    cost). The `by_external_id` index already exists for this.
+        if (message.id) {
+            const alreadyProcessed = await ctx.db
+                .query("messages")
+                .withIndex("by_external_id", (q) => q.eq("externalId", message.id))
+                .first();
+            if (alreadyProcessed) {
+                console.log(`[WHATSAPP] Duplicate inbound message ${message.id} ignored (replay)`);
+                return;
+            }
+        }
 
         // 1. Trouver l'organisation via whatsappChannels (nouveau modèle) puis fallback legacy
         if (!phoneNumberId) {
@@ -173,6 +195,7 @@ export const handleIncomingMessage = internalMutation({
                 whatsappChannelId: whatsappChannelId,
                 assignedTeamId: channelTeamId,
                 poleId: channelPoleId,
+                windowExpiresAt: Date.now() + SERVICE_WINDOW_MS,
                 createdAt: Date.now(),
                 updatedAt: Date.now(),
             });
@@ -307,6 +330,7 @@ export const handleIncomingMessage = internalMutation({
             lastMessageDirection: "INBOUND",
             preview,
             unreadCount: (conversation.unreadCount || 0) + 1,
+            windowExpiresAt: Date.now() + SERVICE_WINDOW_MS,
             updatedAt: Date.now(),
         });
 
@@ -432,6 +456,19 @@ export const handleStatusUpdate = internalMutation({
         if (args.status === "delivered") internalStatus = "DELIVERED";
         if (args.status === "read") internalStatus = "READ";
         if (args.status === "failed") internalStatus = "FAILED";
+
+        // ORDERING GUARD — Meta status webhooks can arrive out of order (a
+        // delayed "delivered" after "read"). Only ever move the status forward
+        // along sent → delivered → read; FAILED is terminal. Prevents the
+        // agent-visible status from regressing. Equal status is a no-op skip.
+        const STATUS_RANK: Record<string, number> = {
+            PENDING: 0, SENT: 1, DELIVERED: 2, READ: 3, FAILED: 4,
+        };
+        const currentRank = STATUS_RANK[message.status ?? "PENDING"] ?? 0;
+        const nextRank = STATUS_RANK[internalStatus] ?? 0;
+        if (nextRank <= currentRank) {
+            return; // out-of-order or duplicate status — ignore
+        }
 
         await ctx.db.patch(message._id, {
             status: internalStatus,

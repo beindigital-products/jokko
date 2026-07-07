@@ -5,6 +5,7 @@ import { generateRegistrationPin } from "./lib/registration";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { encrypt, decrypt } from "./lib/encryption";
 import { hasPermission } from "./lib/permissions";
+import { rateLimiter } from "./lib/rateLimits";
 
 /**
  * Helper to get active organization ID for current user
@@ -192,6 +193,9 @@ export const sendTestMessageByChannel = action({
         // SECURITY: enforce org membership + role before sending a WhatsApp via
         // this channel's credentials (was a cross-tenant IDOR send).
         await ctx.runQuery(internal.whatsapp.assertChannelManager, { channelId: args.channelId });
+
+        // Anti-abuse: cap how often the "send test message" button can fire.
+        await rateLimiter.limit(ctx, "sendTestMessage", { key: args.channelId, throws: true });
 
         const channel: any = await ctx.runQuery(internal.channels.getChannelWithWaba, { channelId: args.channelId });
 
@@ -477,6 +481,9 @@ export const sendTestMessage = action({
         // Auth check
         const orgId = await ctx.runQuery(internal.whatsapp.getActiveOrgId);
         if (!orgId) throw new Error("Not authenticated or no active organization");
+
+        // Anti-abuse: cap how often the "send test message" button can fire.
+        await rateLimiter.limit(ctx, "sendTestMessage", { key: orgId, throws: true });
 
         let phoneNumberId: string = "";
         let accessToken: string = "";

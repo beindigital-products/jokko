@@ -9,6 +9,7 @@ import { Id } from "./_generated/dataModel";
 import { QueryCtx, MutationCtx } from "./_generated/server";
 import { createNotification } from "./notifications";
 import { enqueueConversationEvent } from "./crm/enqueue";
+import { planFeatureAllowed } from "./lib/planFeatures";
 
 // Helper to resolve context
 async function getContext(ctx: QueryCtx | MutationCtx): Promise<VisibilityContext> {
@@ -743,6 +744,21 @@ export const getRoutingContext = internalQuery({
         const settings = org.settings?.assignment;
         if (!settings?.autoAssignEnabled) return { enabled: false };
 
+        // AI-based routing (calls OpenAI) is a paid-plan feature. Compute the
+        // entitlement here so the background action can skip the model call for
+        // non-eligible orgs instead of burning the shared OpenAI budget on every
+        // inbound message. Round-robin fallback assignment still runs regardless.
+        const aiRoutingAllowed = planFeatureAllowed(
+            {
+                plan: org.plan,
+                trialEndsAt: org.trialEndsAt,
+                hasSelectedPlan: org.hasSelectedPlan,
+                createdAt: org.createdAt,
+                stripeStatus: org.stripe?.status,
+            },
+            "ai",
+        );
+
         // Fetch agents
         const agents = await ctx.db
             .query("memberships")
@@ -771,6 +787,7 @@ export const getRoutingContext = internalQuery({
 
         return {
             enabled: true,
+            aiRoutingAllowed,
             settings,
             agents: agentList,
             poles: poles.map(p => ({ id: p._id, name: p.name }))
@@ -952,12 +969,15 @@ export const analyzeAndRoute = internalAction({
 
         const { agents, settings, poles } = context;
 
-        // 2. AI Analysis
+        // 2. AI Analysis — only for orgs entitled to the AI feature (see
+        //    getRoutingContext.aiRoutingAllowed). Caps the shared OpenAI spend:
+        //    without this, gpt-4o ran on EVERY inbound message of EVERY org with
+        //    auto-assign on, uncapped and unbilled.
         const apiKey = process.env.OPENAI_API_KEY;
         let specificAgentId = null;
         let specificPoleId = null;
 
-        if (apiKey) {
+        if (apiKey && context.aiRoutingAllowed) {
             try {
                 const openai = new OpenAI({ apiKey });
                 // SECURITY (prompt injection): the customer message is untrusted.

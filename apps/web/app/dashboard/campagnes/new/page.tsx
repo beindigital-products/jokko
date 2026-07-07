@@ -198,15 +198,15 @@ export default function NewBroadcastPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => router.back()}
-                        className="h-9 w-9 text-gray-400 hover:text-gray-600 hover:bg-gray-100 cursor-pointer"
+                        className="h-9 w-9 cursor-pointer text-[var(--ink-soft)] hover:bg-[var(--paper-warm)] hover:text-[var(--ink-700)]"
                     >
                         <ArrowLeft className="h-4 w-4" />
                     </Button>
                     <div>
-                        <h1 className="font-display text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">
+                        <h1 className="font-display text-xl font-bold tracking-tight text-[var(--ink-900)] sm:text-2xl">
                             Nouvelle Campagne
                         </h1>
-                        <p className="text-sm text-gray-500 mt-0.5">
+                        <p className="mt-0.5 text-sm text-[var(--ink-soft)]">
                             Configurez votre diffusion de messages en masse
                         </p>
                     </div>
@@ -217,10 +217,10 @@ export default function NewBroadcastPage() {
                         <Skeleton className="h-8 w-32" />
                     ) : (
                         <div className={cn(
-                            "flex items-center gap-2 rounded-full px-3 py-1.5 border text-sm font-medium",
+                            "flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm font-medium",
                             hasInsufficientCredits
-                                ? "bg-red-50 border-red-200 text-red-700"
-                                : "bg-green-50 border-green-200 text-green-700"
+                                ? "border-[var(--status-danger)]/30 bg-[var(--status-danger)]/10 text-[var(--status-danger)]"
+                                : "border-[var(--status-good)]/30 bg-[var(--status-good)]/10 text-[var(--status-good)]"
                         )}>
                             <Wallet className="h-4 w-4" />
                             <span>{audienceEstimate.creditBalance.toLocaleString()} FCFA</span>
@@ -231,7 +231,7 @@ export default function NewBroadcastPage() {
                         variant="outline"
                         size="sm"
                         onClick={() => router.push('/dashboard/billing')}
-                        className="h-8 text-xs rounded-full cursor-pointer gap-1.5"
+                        className="h-8 cursor-pointer gap-1.5 rounded-full text-xs"
                     >
                         <Plus className="h-3.5 w-3.5" />
                         Recharger
@@ -239,10 +239,10 @@ export default function NewBroadcastPage() {
                 </div>
             </div>
 
-            <Card className="bg-white border-gray-100 shadow-sm">
+            <Card className="border-[var(--border)] bg-[var(--paper-white)] shadow-sm">
                 <CardHeader className="pb-4">
-                    <CardTitle className="text-sm sm:text-base font-semibold text-gray-900">Configuration</CardTitle>
-                    <CardDescription className="text-[11px] text-gray-400">
+                    <CardTitle className="text-sm font-semibold text-[var(--ink-900)] sm:text-base">Configuration</CardTitle>
+                    <CardDescription className="text-[11px] text-[var(--ink-soft)]">
                         Définissez les paramètres de votre campagne
                     </CardDescription>
                 </CardHeader>
@@ -250,23 +250,23 @@ export default function NewBroadcastPage() {
                     <form onSubmit={handleSubmit} className="space-y-6">
                         {/* Campaign Name */}
                         <div className="space-y-2">
-                            <Label htmlFor="name" className="text-sm font-medium text-gray-700">Nom de la campagne</Label>
+                            <Label htmlFor="name" className="text-sm font-medium text-[var(--ink-700)]">Nom de la campagne</Label>
                             <Input
                                 id="name"
                                 placeholder="ex: Newsletter Juin 2025"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 required
-                                className="h-10 border-gray-200 focus:border-green-500 focus:ring-green-500/20"
+                                className="h-10 border-[var(--border)] focus:border-[var(--accent)] focus:ring-[var(--accent)]/20"
                             />
                         </div>
 
                         {/* Audience */}
                         <div className="space-y-4">
                             <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">Audience</Label>
+                                <Label className="text-sm font-medium text-[var(--ink-700)]">Audience</Label>
                                 <Select value={audienceType} onValueChange={(v) => setAudienceType(v as 'ALL' | 'TAGS' | 'COUNTRIES')}>
-                                    <SelectTrigger className="h-10 border-gray-200">
+                                    <SelectTrigger className="h-10 border-[var(--border)]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -278,10 +278,10 @@ export default function NewBroadcastPage() {
                             </div>
 
                             {audienceType === 'TAGS' && (
-                                <div className="space-y-2 rounded-lg border border-gray-100 p-4 bg-gray-50/50">
-                                    <Label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Sélectionnez les tags à cibler</Label>
+                                <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--paper-warm)]/50 p-4">
+                                    <Label className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-soft)]">Sélectionnez les tags à cibler</Label>
                                     {tags.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2 mt-2">
+                                        <div className="mt-2 flex flex-wrap gap-2">
                                             {tags.map(tag => {
                                                 const isSelected = selectedTags.includes(tag._id);
                                                 return (
@@ -289,10 +289,10 @@ export default function NewBroadcastPage() {
                                                         key={tag._id}
                                                         variant="outline"
                                                         className={cn(
-                                                            "cursor-pointer transition-all select-none text-xs",
+                                                            "cursor-pointer select-none text-xs transition-all",
                                                             isSelected
-                                                                ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                                                                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                                                                ? "border-[var(--accent)]/30 bg-[var(--accent-muted)] text-[var(--accent)] hover:bg-[var(--accent-muted)]"
+                                                                : "border-[var(--border)] bg-[var(--paper-white)] text-[var(--ink-700)] hover:border-[var(--ink-soft)]/40"
                                                         )}
                                                         onClick={() => toggleTag(tag._id)}
                                                     >
@@ -302,10 +302,10 @@ export default function NewBroadcastPage() {
                                             })}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-gray-400">Aucun tag disponible. Créez des tags dans la section Contacts.</p>
+                                        <p className="text-sm text-[var(--ink-soft)]">Aucun tag disponible. Créez des tags dans la section Contacts.</p>
                                     )}
                                     {selectedTags.length > 0 && (
-                                        <p className="text-[11px] text-gray-400 mt-2">
+                                        <p className="mt-2 text-[11px] text-[var(--ink-soft)]">
                                             {selectedTags.length} tag(s) sélectionné(s)
                                         </p>
                                     )}
@@ -313,10 +313,10 @@ export default function NewBroadcastPage() {
                             )}
 
                             {audienceType === 'COUNTRIES' && (
-                                <div className="space-y-2 rounded-lg border border-gray-100 p-4 bg-gray-50/50">
-                                    <Label className="text-[11px] text-gray-400 font-medium uppercase tracking-wider">Sélectionnez les pays à cibler</Label>
+                                <div className="space-y-2 rounded-lg border border-[var(--border)] bg-[var(--paper-warm)]/50 p-4">
+                                    <Label className="text-[11px] font-medium uppercase tracking-wider text-[var(--ink-soft)]">Sélectionnez les pays à cibler</Label>
                                     {availableCountries.length > 0 ? (
-                                        <div className="flex flex-wrap gap-2 mt-2">
+                                        <div className="mt-2 flex flex-wrap gap-2">
                                             {availableCountries.map(country => {
                                                 const isSelected = selectedCountries.includes(country);
                                                 let label = country;
@@ -336,10 +336,10 @@ export default function NewBroadcastPage() {
                                                         key={country}
                                                         variant="outline"
                                                         className={cn(
-                                                            "cursor-pointer transition-all select-none text-xs",
+                                                            "cursor-pointer select-none text-xs transition-all",
                                                             isSelected
-                                                                ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
-                                                                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                                                                ? "border-[var(--accent)]/30 bg-[var(--accent-muted)] text-[var(--accent)] hover:bg-[var(--accent-muted)]"
+                                                                : "border-[var(--border)] bg-[var(--paper-white)] text-[var(--ink-700)] hover:border-[var(--ink-soft)]/40"
                                                         )}
                                                         onClick={() => toggleCountry(country)}
                                                     >
@@ -349,10 +349,10 @@ export default function NewBroadcastPage() {
                                             })}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-gray-400">Aucun indicatif de pays détecté.</p>
+                                        <p className="text-sm text-[var(--ink-soft)]">Aucun indicatif de pays détecté.</p>
                                     )}
                                     {selectedCountries.length > 0 && (
-                                        <p className="text-[11px] text-gray-400 mt-2">
+                                        <p className="mt-2 text-[11px] text-[var(--ink-soft)]">
                                             {selectedCountries.length} pays sélectionné(s)
                                         </p>
                                     )}
@@ -361,23 +361,23 @@ export default function NewBroadcastPage() {
 
                             {/* Audience Estimation + Cost */}
                             {audienceEstimate === undefined ? (
-                                <div className="rounded-lg bg-green-50 border border-green-100 px-3 py-2.5 space-y-1">
+                                <div className="space-y-1 rounded-lg border border-[var(--border)] bg-[var(--paper-warm)]/50 px-3 py-2.5">
                                     <Skeleton className="h-4 w-40" />
                                     <Skeleton className="h-3 w-28" />
                                 </div>
                             ) : (
                                 <div className={cn(
-                                    "rounded-lg border px-3 py-2.5 space-y-1",
+                                    "space-y-1 rounded-lg border px-3 py-2.5",
                                     hasInsufficientCredits
-                                        ? "bg-red-50 border-red-200"
-                                        : "bg-green-50 border-green-100"
+                                        ? "border-[var(--status-danger)]/30 bg-[var(--status-danger)]/10"
+                                        : "border-[var(--status-good)]/25 bg-[var(--status-good)]/10"
                                 )}>
                                     <div className="flex items-center gap-2">
-                                        <Users className={cn("h-4 w-4", hasInsufficientCredits ? "text-red-600" : "text-green-600")} />
-                                        <span className={cn("text-sm", hasInsufficientCredits ? "text-red-700" : "text-green-700")}>
+                                        <Users className={cn("h-4 w-4", hasInsufficientCredits ? "text-[var(--status-danger)]" : "text-[var(--status-good)]")} />
+                                        <span className={cn("text-sm", hasInsufficientCredits ? "text-[var(--status-danger)]" : "text-[var(--status-good)]")}>
                                             ~<span className="font-bold">{audienceEstimate.count}</span> contacts ciblés
                                             {audienceEstimate.costPerMessage > 0 && (
-                                                <span className="text-xs ml-2 opacity-75">
+                                                <span className="ml-2 text-xs opacity-75">
                                                     (~{audienceEstimate.costPerMessage} FCFA/msg en moyenne)
                                                 </span>
                                             )}
@@ -385,13 +385,13 @@ export default function NewBroadcastPage() {
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <span className={cn("text-xs font-medium", hasInsufficientCredits ? "text-red-600" : "text-green-600")}>
+                                            <span className={cn("text-xs font-medium", hasInsufficientCredits ? "text-[var(--status-danger)]" : "text-[var(--status-good)]")}>
                                                 Coût estimé : {audienceEstimate.estimatedCost.toLocaleString()} FCFA
                                             </span>
                                             <PricingDialog />
                                         </div>
                                         {hasInsufficientCredits && (
-                                            <span className="text-xs text-red-600 flex items-center gap-1 font-medium">
+                                            <span className="flex items-center gap-1 text-xs font-medium text-[var(--status-danger)]">
                                                 <AlertTriangle className="h-3 w-3" />
                                                 Crédits insuffisants
                                             </span>
@@ -404,10 +404,10 @@ export default function NewBroadcastPage() {
                         {/* Channel selector */}
                         {hasMultipleChannels && (
                             <div className="space-y-2">
-                                <Label className="text-sm font-medium text-gray-700">Canal d&apos;envoi</Label>
+                                <Label className="text-sm font-medium text-[var(--ink-700)]">Canal d&apos;envoi</Label>
                                 <Select value={channelId} onValueChange={setChannelId}>
-                                    <SelectTrigger className="h-10 border-gray-200">
-                                        <Phone className="h-4 w-4 mr-2 text-green-600" />
+                                    <SelectTrigger className="h-10 border-[var(--border)]">
+                                        <Phone className="mr-2 h-4 w-4 text-[var(--accent)]" />
                                         <SelectValue placeholder="Canal par défaut" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -416,14 +416,14 @@ export default function NewBroadcastPage() {
                                             .map((ch) => (
                                                 <SelectItem key={ch._id} value={ch._id}>
                                                     <div className="flex items-center gap-2">
-                                                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                                                        <div className="h-2 w-2 rounded-full bg-[var(--status-good)]" />
                                                         {ch.label} — {ch.displayPhoneNumber}
                                                     </div>
                                                 </SelectItem>
                                             ))}
                                     </SelectContent>
                                 </Select>
-                                <p className="text-[11px] text-gray-400">
+                                <p className="text-[11px] text-[var(--ink-soft)]">
                                     Choisissez depuis quel numéro WhatsApp envoyer la campagne.
                                 </p>
                             </div>
@@ -431,29 +431,29 @@ export default function NewBroadcastPage() {
 
                         {/* Template */}
                         <div className="space-y-2">
-                            <Label htmlFor="template" className="text-sm font-medium text-gray-700">Template WhatsApp</Label>
-                            <div className="flex gap-3 items-start">
+                            <Label htmlFor="template" className="text-sm font-medium text-[var(--ink-700)]">Template WhatsApp</Label>
+                            <div className="flex items-start gap-3">
                                 <div className="flex-1">
                                     <Select value={templateId} onValueChange={setTemplateId} required disabled={!hasTemplates}>
-                                        <SelectTrigger className="h-10 border-gray-200">
+                                        <SelectTrigger className="h-10 border-[var(--border)]">
                                             <SelectValue placeholder={hasTemplates ? "Choisir un modèle..." : "Aucun modèle disponible"} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {hasTemplates ? templates?.map((t) => (
                                                 <SelectItem key={t._id} value={t._id}>
-                                                    {t.name} <span className="text-gray-400 text-xs ml-2">({t.language})</span>
+                                                    {t.name} <span className="ml-2 text-xs text-[var(--ink-soft)]">({t.language})</span>
                                                 </SelectItem>
                                             )) : (
-                                                <div className="p-2 text-sm text-gray-400">Aucun template approuvé</div>
+                                                <div className="p-2 text-sm text-[var(--ink-soft)]">Aucun template approuvé</div>
                                             )}
                                         </SelectContent>
                                     </Select>
                                     {!hasTemplates && templates !== undefined && (
-                                        <p className="text-red-500 text-[11px] mt-1.5">
+                                        <p className="mt-1.5 text-[11px] text-[var(--status-danger)]">
                                             Vous n&apos;avez aucun template approuvé pour le moment.
                                         </p>
                                     )}
-                                    <p className="text-[11px] text-gray-400 mt-1.5">
+                                    <p className="mt-1.5 text-[11px] text-[var(--ink-soft)]">
                                         Seuls les templates approuvés apparaissent ici.
                                     </p>
                                 </div>
@@ -461,7 +461,7 @@ export default function NewBroadcastPage() {
                                     type="button"
                                     variant="outline"
                                     onClick={() => router.push('/dashboard/modeles')}
-                                    className="h-10 gap-1.5 text-xs rounded-full cursor-pointer shrink-0"
+                                    className="h-10 shrink-0 cursor-pointer gap-1.5 rounded-full text-xs"
                                 >
                                     <Plus className="h-3.5 w-3.5" />
                                     <span className="hidden sm:inline">Créer un modèle</span>
@@ -471,52 +471,52 @@ export default function NewBroadcastPage() {
 
                         {/* Template Preview */}
                         {selectedTemplate && (
-                            <Card className="border-gray-100 bg-gray-50/50 shadow-none">
+                            <Card className="border-[var(--border)] bg-[var(--paper-warm)]/50 shadow-none">
                                 <CardHeader className="pb-3">
-                                    <CardTitle className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                                        <Eye className="h-4 w-4 text-green-600" />
+                                    <CardTitle className="flex items-center gap-2 text-sm font-semibold text-[var(--ink-900)]">
+                                        <Eye className="h-4 w-4 text-[var(--accent)]" />
                                         Aperçu du message
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex justify-start">
-                                        <div className="relative max-w-sm w-full">
-                                            {/* WhatsApp bubble tail */}
-                                            <div className="absolute -left-2 top-0 w-0 h-0 border-b-[8px] border-b-transparent border-r-[8px] border-r-[#dcf8c6]" />
+                                        <div className="relative w-full max-w-sm">
+                                            {/* WhatsApp bubble tail (authentic WA green — do not tokenise) */}
+                                            <div className="absolute -left-2 top-0 h-0 w-0 border-b-[8px] border-r-[8px] border-b-transparent border-r-[#dcf8c6]" />
                                             {/* Message bubble */}
-                                            <div className="rounded-lg rounded-tl-none bg-[#dcf8c6] p-3 space-y-2 shadow-sm">
+                                            <div className="space-y-2 rounded-lg rounded-tl-none bg-[#dcf8c6] p-3 shadow-sm">
                                                 {/* Header */}
                                                 {selectedTemplate.header?.type && selectedTemplate.header?.text && (
-                                                    <div className="font-semibold text-sm text-gray-900">
+                                                    <div className="text-sm font-semibold text-gray-900">
                                                         {selectedTemplate.header.text}
                                                     </div>
                                                 )}
                                                 {selectedTemplate.header?.type && selectedTemplate.header?.mediaUrl && (
-                                                    <div className="rounded bg-gray-200/60 p-4 text-center text-xs text-gray-500">
-                                                        <MessageSquare className="h-6 w-6 mx-auto mb-1 text-gray-400" />
+                                                    <div className="rounded bg-black/5 p-4 text-center text-xs text-gray-500">
+                                                        <MessageSquare className="mx-auto mb-1 h-6 w-6 text-gray-400" />
                                                         {selectedTemplate.header.type === 'IMAGE' ? 'Image' : selectedTemplate.header.type === 'VIDEO' ? 'Vidéo' : 'Document'}
                                                     </div>
                                                 )}
                                                 {/* Body */}
                                                 {selectedTemplate.body && (
-                                                    <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">
+                                                    <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-800">
                                                         {selectedTemplate.body}
                                                     </p>
                                                 )}
                                                 {/* Footer */}
                                                 {selectedTemplate.footer && (
-                                                    <p className="text-[11px] text-gray-500 italic">
+                                                    <p className="text-[11px] italic text-gray-500">
                                                         {selectedTemplate.footer}
                                                     </p>
                                                 )}
                                             </div>
-                                            {/* Buttons */}
+                                            {/* Buttons (authentic WA action blue) */}
                                             {selectedTemplate.buttons && selectedTemplate.buttons.length > 0 && (
                                                 <div className="mt-1 space-y-1">
                                                     {selectedTemplate.buttons.map((btn: { type: string; text: string }, idx: number) => (
                                                         <div
                                                             key={idx}
-                                                            className="w-full text-center py-1.5 text-sm font-medium text-blue-500 bg-white rounded-lg border border-gray-100 shadow-sm"
+                                                            className="w-full rounded-lg border border-[var(--border)] bg-white py-1.5 text-center text-sm font-medium text-[#0091ff] shadow-sm"
                                                         >
                                                             {btn.text}
                                                         </div>
@@ -530,11 +530,11 @@ export default function NewBroadcastPage() {
                         )}
 
                         {/* Scheduling */}
-                        <div className="space-y-4 rounded-lg border border-gray-100 p-4 bg-gray-50/50">
+                        <div className="space-y-4 rounded-lg border border-[var(--border)] bg-[var(--paper-warm)]/50 p-4">
                             <div className="flex items-center justify-between">
                                 <div className="space-y-0.5">
-                                    <Label className="text-sm font-medium text-gray-700">Programmer l&apos;envoi</Label>
-                                    <p className="text-[11px] text-gray-400">Activez pour planifier l&apos;envoi à une date ultérieure.</p>
+                                    <Label className="text-sm font-medium text-[var(--ink-700)]">Programmer l&apos;envoi</Label>
+                                    <p className="text-[11px] text-[var(--ink-soft)]">Activez pour planifier l&apos;envoi à une date ultérieure.</p>
                                 </div>
                                 <Switch
                                     checked={isScheduled}
@@ -544,16 +544,16 @@ export default function NewBroadcastPage() {
 
                             {isScheduled && (
                                 <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-4 items-start">
+                                <div className="grid grid-cols-1 items-start gap-4 sm:grid-cols-[1fr_160px]">
                                     <div className="space-y-2">
-                                        <Label className="text-sm font-medium text-gray-700">Date</Label>
+                                        <Label className="text-sm font-medium text-[var(--ink-700)]">Date</Label>
                                         <Popover>
                                             <PopoverTrigger asChild>
                                                 <Button
                                                     variant="outline"
                                                     className={cn(
-                                                        "w-full justify-start text-left font-normal h-10 border-gray-200",
-                                                        !date && "text-gray-400"
+                                                        "h-10 w-full justify-start border-[var(--border)] text-left font-normal",
+                                                        !date && "text-[var(--ink-soft)]"
                                                     )}
                                                 >
                                                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -572,26 +572,26 @@ export default function NewBroadcastPage() {
                                         </Popover>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-sm font-medium text-gray-700">Heure</Label>
+                                        <Label className="text-sm font-medium text-[var(--ink-700)]">Heure</Label>
                                         <Input
                                             type="time"
                                             value={time}
                                             min={minTime}
                                             onChange={(e) => setTime(e.target.value)}
                                             className={cn(
-                                                "h-10 border-gray-200",
-                                                isTimePast && "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                                                "h-10 border-[var(--border)]",
+                                                isTimePast && "border-[var(--status-danger)]/40 focus:border-[var(--status-danger)] focus:ring-[var(--status-danger)]/20"
                                             )}
                                         />
                                         {isTimePast && (
-                                            <p className="text-[11px] text-red-500">
+                                            <p className="text-[11px] text-[var(--status-danger)]">
                                                 Min. {minTime} (dans 5 min)
                                             </p>
                                         )}
                                     </div>
                                 </div>
                                 {date && !isTimePast && (
-                                    <p className="text-[11px] text-green-600">
+                                    <p className="text-[11px] text-[var(--accent)]">
                                         Envoi prévu le {format(date, "PPP", { locale: fr })} à {time}
                                     </p>
                                 )}
@@ -600,15 +600,15 @@ export default function NewBroadcastPage() {
                         </div>
 
                         {/* Actions */}
-                        <div className="pt-4 flex items-center justify-end gap-2 border-t border-gray-100">
-                            <Button type="button" variant="outline" size="sm" onClick={() => router.back()} className="h-8 gap-1.5 text-xs rounded-full cursor-pointer">
+                        <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-4">
+                            <Button type="button" variant="outline" size="sm" onClick={() => router.back()} className="h-8 cursor-pointer gap-1.5 rounded-full text-xs">
                                 Annuler
                             </Button>
                             <Button
                                 type="submit"
                                 size="sm"
                                 disabled={isLoading || !hasTemplates || (isScheduled && isTimePast) || (isScheduled && !date) || hasInsufficientCredits}
-                                className="h-8 gap-1.5 text-xs rounded-full cursor-pointer"
+                                className="h-8 cursor-pointer gap-1.5 rounded-full bg-[var(--accent)] text-xs text-white hover:opacity-90"
                             >
                                 {isLoading ? (
                                     <><Loader2 className="h-3.5 w-3.5 animate-spin" /> {isScheduled ? "Planification..." : "Envoi..."}</>

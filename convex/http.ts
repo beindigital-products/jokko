@@ -406,6 +406,7 @@ http.route({
                             priceId,
                             currentPeriodEnd: 0,
                             status,
+                            eventCreated: event.created,
                         });
                     }
                     break;
@@ -449,6 +450,7 @@ http.route({
                         status: sub.status,
                         currentPeriodEnd: sub.current_period_end,
                         organizationId: sub.metadata?.organizationId || undefined,
+                        eventCreated: event.created,
                     });
                     break;
                 }
@@ -457,7 +459,32 @@ http.route({
                     const sub = event.data.object;
                     await ctx.runMutation(internal.stripe.cancelSubscription, {
                         stripeCustomerId: sub.customer,
+                        eventCreated: event.created,
                     });
+                    break;
+                }
+
+                case "invoice.payment_failed": {
+                    const invoice = event.data.object;
+                    const customer = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+                    if (customer) {
+                        await ctx.runMutation(internal.stripe.markInvoicePaymentFailed, {
+                            stripeCustomerId: customer,
+                            eventCreated: event.created,
+                        });
+                    }
+                    break;
+                }
+
+                case "invoice.paid": {
+                    const invoice = event.data.object;
+                    const customer = typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+                    if (customer) {
+                        await ctx.runMutation(internal.stripe.markInvoicePaid, {
+                            stripeCustomerId: customer,
+                            eventCreated: event.created,
+                        });
+                    }
                     break;
                 }
 
@@ -592,6 +619,72 @@ http.route({
             }
         } catch (error) {
             console.error("[Wave Webhook] Error processing event:", String(error));
+            return new Response("Processing error", { status: 500 });
+        }
+
+        return new Response("OK", { status: 200 });
+    }),
+});
+
+// ============================================================
+// Orange Money Web Payment notification
+// ============================================================
+// Orange has no HMAC signature: the per-transaction notif_token (returned at
+// init and stored on the session) authenticates the callback. Credit granting
+// is idempotent via completePayment. DISABLED in the UI until sandbox-validated.
+http.route({
+    path: "/api/orange-money/webhook",
+    method: "POST",
+    handler: httpAction(async (ctx, request) => {
+        const rawBody = await request.text();
+        let data: any;
+        try {
+            data = JSON.parse(rawBody);
+        } catch {
+            return new Response("Bad request", { status: 400 });
+        }
+
+        const orderId = data.order_id ?? data.orderId;
+        const notifToken = data.notif_token ?? data.notifToken;
+        const status = String(data.status ?? "").toUpperCase();
+        console.log("[Orange Webhook]", JSON.stringify({ orderId, status }));
+
+        if (!orderId) return new Response("OK", { status: 200 });
+
+        const paymentSession = await ctx.runQuery(
+            internal.payments.getPaymentSessionByProviderSessionId,
+            { providerSessionId: orderId },
+        );
+        if (!paymentSession) {
+            console.error("[Orange Webhook] No matching session for order:", orderId);
+            return new Response("OK", { status: 200 });
+        }
+
+        // Authenticate: the callback token must match the one stored at init.
+        const expectedToken = (paymentSession.providerMetadata as { notif_token?: string } | undefined)?.notif_token;
+        if (!expectedToken || notifToken !== expectedToken) {
+            console.error("[Orange Webhook] notif_token mismatch for order:", orderId);
+            return new Response("Invalid token", { status: 401 });
+        }
+
+        try {
+            if (status === "SUCCESS" || status === "SUCCESSFUL") {
+                await ctx.runMutation(internal.payments.completePayment, {
+                    sessionId: paymentSession._id,
+                    providerTransactionId: data.txnid ?? data.txnId ?? orderId,
+                    webhookEventId: `orange:${orderId}:${status}`,
+                    providerMetadata: data,
+                });
+            } else if (status === "FAILED" || status === "CANCELLED" || status === "EXPIRED") {
+                await ctx.runMutation(internal.payments.failPayment, {
+                    sessionId: paymentSession._id,
+                    failureReason: `Orange Money ${status}`,
+                    webhookEventId: `orange:${orderId}:${status}`,
+                    providerMetadata: data,
+                });
+            }
+        } catch (error) {
+            console.error("[Orange Webhook] Error processing:", String(error));
             return new Response("Processing error", { status: 500 });
         }
 

@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { requireMembership, requirePermission } from "./lib/auth";
 import { createNotification } from "./notifications";
 import { formatConversationPreview } from "./lib/messagePreview";
+import { recordStorageAdd } from "./lib/storageUsage";
 import { paginationOptsValidator } from "convex/server";
 
 // ============================================
@@ -214,6 +215,25 @@ export const send = mutation({
 
         const { userId } = await requirePermission(ctx, conversation.organizationId, "messages:send");
 
+        const org = await ctx.db.get(conversation.organizationId);
+
+        // WhatsApp 24h customer-service window: this `send` path is free-form
+        // (non-template), which Meta only accepts while the window is open — it
+        // opens/resets on each inbound customer message. Past it, Meta rejects
+        // (error 131047) and the agent only saw a generic FAILED. Block early
+        // with an actionable message instead. Skipped in demo local_only (never
+        // hits Meta); allowed when windowExpiresAt is unset (no inbound yet /
+        // conversation predating this tracking) to avoid over-blocking.
+        if (
+            org?.demo?.outboundMode !== "local_only" &&
+            conversation.windowExpiresAt != null &&
+            conversation.windowExpiresAt < Date.now()
+        ) {
+            throw new Error(
+                "La fenêtre de 24h est fermée : le client doit vous réécrire, ou utilisez un modèle (template) pour le recontacter.",
+            );
+        }
+
         // Create message
         const messageId = await ctx.db.insert("messages", {
             organizationId: conversation.organizationId,
@@ -239,6 +259,11 @@ export const send = mutation({
             updatedAt: Date.now(),
         });
 
+        // Count outbound media (uploaded via generateUploadUrl) against the org.
+        if (args.mediaStorageId) {
+            await recordStorageAdd(ctx, conversation.organizationId, args.mediaStorageId);
+        }
+
         // Update conversation (last message, update time)
         await ctx.db.patch(args.conversationId, {
             lastMessageAt: Date.now(),
@@ -247,7 +272,6 @@ export const send = mutation({
             updatedAt: Date.now(),
         });
 
-        const org = await ctx.db.get(conversation.organizationId);
         if (org?.demo?.outboundMode === "local_only") {
             await ctx.db.patch(messageId, {
                 status: "SENT",

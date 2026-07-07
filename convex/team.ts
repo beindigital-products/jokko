@@ -7,7 +7,7 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { getAuthUserId } from "@convex-dev/auth/server";
-import { getMaxAgents } from "./lib/planHelpers";
+import { getMaxAgents, isUnlimited } from "./lib/planHelpers";
 
 export const listMembers = query({
     args: { organizationId: v.optional(v.id("organizations")) },
@@ -71,6 +71,7 @@ export const listMembers = query({
                 activeConversations: m.activeConversations,
                 maxConversations: m.maxConversations,
                 lastSeenAt: m.lastSeenAt,
+                suspended: m.suspended ?? false,
                 isCurrentUser: m.userId === userId,
                 joinedAt: new Date(m.joinedAt).toISOString(),
                 user: {
@@ -176,6 +177,49 @@ export const removeMember = mutation({
 
         await ctx.db.delete(args.membershipId);
     }
+});
+
+// ============================================
+// REACTIVATE MEMBER (seat suspended by a plan downgrade)
+// ============================================
+
+export const reactivateMember = mutation({
+    args: { membershipId: v.id("memberships") },
+    handler: async (ctx, args) => {
+        const userId = await getAuthUserId(ctx);
+        if (!userId) throw new Error("Unauthorized");
+
+        const target = await ctx.db.get(args.membershipId);
+        if (!target) throw new Error("Member not found");
+
+        const requester = await ctx.db
+            .query("memberships")
+            .withIndex("by_user_org", (q) => q.eq("userId", userId).eq("organizationId", target.organizationId))
+            .first();
+        if (!requester || (requester.role !== "OWNER" && requester.role !== "ADMIN")) {
+            throw new Error("Insufficient permissions");
+        }
+        if (!target.suspended) return; // already active
+
+        // Reactivating must not exceed the plan's seat limit.
+        const org = await ctx.db.get(target.organizationId);
+        const maxAgents = await getMaxAgents(ctx, org?.plan ?? "FREE");
+        if (!isUnlimited(maxAgents)) {
+            const active = (
+                await ctx.db
+                    .query("memberships")
+                    .withIndex("by_organization", (q) => q.eq("organizationId", target.organizationId))
+                    .collect()
+            ).filter((m) => !m.suspended).length;
+            if (active >= maxAgents) {
+                throw new Error(
+                    "Plus de sièges disponibles sur votre plan. Retirez un membre ou passez à un plan supérieur avant de réactiver.",
+                );
+            }
+        }
+
+        await ctx.db.patch(args.membershipId, { suspended: undefined, suspendedReason: undefined });
+    },
 });
 
 // ============================================

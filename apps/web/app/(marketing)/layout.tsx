@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Footer } from "@/components/landing/layout/footer";
 import { NavigationHeader } from "@/components/landing/layout/navigation-header";
 import { LenisProvider } from "@/components/landing/providers/lenis-provider";
+import { LocaleProvider } from "@/lib/i18n/locale-context";
+import { DemoVideoModal } from "@/components/landing/ui/demo-video-modal";
 
 export const metadata: Metadata = {
   title: {
@@ -86,7 +88,8 @@ interface WebsiteLayoutProps {
 
 export default function WebsiteLayout({ children }: WebsiteLayoutProps) {
   return (
-    <LenisProvider>
+    <LocaleProvider>
+      <LenisProvider>
       <div className="relative min-h-screen bg-background text-foreground">
         <a
           href="#main-content"
@@ -102,7 +105,9 @@ export default function WebsiteLayout({ children }: WebsiteLayoutProps) {
         </main>
 
         <Footer />
+        <DemoVideoModal />
       </div>
-    </LenisProvider>
+      </LenisProvider>
+    </LocaleProvider>
   );
 }

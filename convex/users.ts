@@ -1,6 +1,7 @@
 import { mutation, query, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
+import { internal } from "./_generated/api";
 
 /**
  * Get current authenticated user
@@ -53,10 +54,21 @@ export const completeOnboarding = mutation({
         const userId = await getAuthUserId(ctx);
         if (!userId) throw new Error("Not authenticated");
 
+        const user = await ctx.db.get(userId);
+
         await ctx.db.patch(userId, {
             onboardingCompleted: true,
             updatedAt: Date.now(),
         });
+
+        // One-off welcome email (best-effort; the send action no-ops without SES).
+        if (user?.email && !user.welcomeEmailSentAt) {
+            await ctx.db.patch(userId, { welcomeEmailSentAt: Date.now() });
+            await ctx.scheduler.runAfter(0, internal.lifecycle_emails.sendWelcome, {
+                to: user.email,
+                userName: user.name ?? "",
+            });
+        }
     },
 });
 

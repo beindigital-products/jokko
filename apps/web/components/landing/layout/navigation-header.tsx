@@ -9,16 +9,11 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { Menu, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
-
-const navItems = [
-  { name: "Accueil", href: "/" },
-  { name: "Produit", href: "/fonctionnalites" },
-  { name: "Solutions", href: "/solutions/service-client" },
-  { name: "Tarifs", href: "/tarifs" },
-  { name: "Contact", href: "/contact" },
-];
+import { useLocale } from "@/lib/i18n/locale-context";
 
 export function NavigationHeader() {
+  const { m } = useLocale();
+  const navItems = m.nav.items;
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
@@ -51,7 +46,7 @@ export function NavigationHeader() {
               ? "rounded-full border border-black/5 bg-white/75 px-4 py-2 shadow-[0_8px_32px_-12px_rgba(20,20,26,0.18)] backdrop-blur-xl backdrop-saturate-150"
               : "rounded-full border border-transparent bg-transparent px-2 py-2"
           )}
-          aria-label="Navigation principale"
+          aria-label={m.nav.ariaNav}
         >
           <Link href="/" className="group flex items-center gap-2 pl-2">
             <LogoMark />
@@ -89,7 +84,7 @@ export function NavigationHeader() {
 
           <div className="hidden items-center gap-2 lg:flex">
             <Button asChild variant="ghost" size="sm" className="rounded-full font-medium">
-              <Link href="/auth/sign-in">Connexion</Link>
+              <Link href="/auth/sign-in">{m.nav.signIn}</Link>
             </Button>
             <Button
               asChild
@@ -97,7 +92,7 @@ export function NavigationHeader() {
               className="rounded-full bg-foreground px-4 font-medium text-background hover:bg-foreground/90"
             >
               <Link href="/auth/sign-up" className="group">
-                Démarrer
+                {m.nav.signUp}
                 <ArrowRight className="ml-1.5 h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </Button>
@@ -110,13 +105,13 @@ export function NavigationHeader() {
                   size="icon"
                   variant="ghost"
                   className="h-9 w-9 rounded-full"
-                  aria-label="Ouvrir le menu"
+                  aria-label={m.nav.ariaOpenMenu}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
               <SheetContent side="top" className="h-auto rounded-b-3xl border-0 pt-16">
-                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <SheetTitle className="sr-only">{m.nav.mobileTitle}</SheetTitle>
                 <div className="flex flex-col gap-2 px-2 pb-6">
                   {navItems.map((item) => {
                     const active = isActive(item.href);
@@ -140,7 +135,7 @@ export function NavigationHeader() {
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <Button asChild variant="outline" className="rounded-full">
                       <Link href="/auth/sign-in" onClick={() => setIsOpen(false)}>
-                        Connexion
+                        {m.nav.signIn}
                       </Link>
                     </Button>
                     <Button
@@ -148,7 +143,7 @@ export function NavigationHeader() {
                       className="rounded-full bg-foreground text-background hover:bg-foreground/90"
                     >
                       <Link href="/auth/sign-up" onClick={() => setIsOpen(false)}>
-                        Démarrer
+                        {m.nav.signUp}
                       </Link>
                     </Button>
                   </div>
