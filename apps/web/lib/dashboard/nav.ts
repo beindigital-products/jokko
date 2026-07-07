@@ -13,7 +13,7 @@ export function navKeyFromPathname(
     const rel = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : pathname
 
     if (rel.startsWith("/mentions")) return "mentions"
-    if (rel.startsWith("/notifications")) return "mentions"
+    if (rel.startsWith("/notifications")) return "notifications"
     if (rel.startsWith("/conversations")) return "conversations"
     if (rel.startsWith("/assignments")) return "assignations"
     if (rel.startsWith("/contacts")) return "contacts"

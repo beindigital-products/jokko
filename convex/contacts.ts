@@ -1,6 +1,7 @@
 
 import { v } from "convex/values";
-import { query, mutation, QueryCtx, internalQuery } from "./_generated/server";
+import { query, mutation, QueryCtx, internalQuery, internalMutation } from "./_generated/server";
+import { internal } from "./_generated/api";
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { paginationOptsValidator } from "convex/server";
 import { Id } from "./_generated/dataModel";
@@ -442,7 +443,54 @@ export const remove = mutation({
         }
 
         await ctx.db.delete(args.id);
+
+        // Cascade the contact's footprint (conversations → messages → calls) in a
+        // scheduled, batched job so a heavy history doesn't blow the mutation
+        // limits and no dead references linger.
+        await ctx.scheduler.runAfter(0, internal.contacts.cascadeDeleteContactData, {
+            organizationId: contact.organizationId,
+            contactId: args.id,
+        });
     }
+});
+
+/**
+ * Batched cascade delete of a removed contact's data. Deletes messages per
+ * conversation in bounded chunks (reschedules itself if a conversation still
+ * has more), then the conversation's calls + the conversation. Idempotent: a
+ * re-run simply finds whatever is left.
+ */
+export const cascadeDeleteContactData = internalMutation({
+    args: { organizationId: v.id("organizations"), contactId: v.id("contacts") },
+    handler: async (ctx, args) => {
+        const MSG_BATCH = 200;
+        const convs = await ctx.db
+            .query("conversations")
+            .withIndex("by_org_contact", (q) =>
+                q.eq("organizationId", args.organizationId).eq("contactId", args.contactId),
+            )
+            .collect();
+
+        for (const conv of convs) {
+            const msgs = await ctx.db
+                .query("messages")
+                .withIndex("by_conversation", (q) => q.eq("conversationId", conv._id))
+                .take(MSG_BATCH);
+            for (const m of msgs) await ctx.db.delete(m._id);
+            if (msgs.length === MSG_BATCH) {
+                // More messages remain in this conversation → resume next tick.
+                await ctx.scheduler.runAfter(0, internal.contacts.cascadeDeleteContactData, args);
+                return;
+            }
+            // Conversation drained → remove its calls, then the conversation itself.
+            const calls = await ctx.db
+                .query("calls")
+                .withIndex("by_conversation", (q) => q.eq("conversationId", conv._id))
+                .collect();
+            for (const c of calls) await ctx.db.delete(c._id);
+            await ctx.db.delete(conv._id);
+        }
+    },
 });
 
 export const batchCreate = mutation({

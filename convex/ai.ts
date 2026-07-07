@@ -5,6 +5,22 @@ import { getAuthUserId } from "@convex-dev/auth/server";
 import { requirePlanFeatureInAction } from "./lib/planFeatures";
 import OpenAI from "openai";
 
+/**
+ * Map an OpenAI/network error to a safe, user-facing French message. Never leak
+ * raw provider error strings (keys, internal URLs, stack details) to the client;
+ * the raw error is still logged server-side for debugging.
+ */
+function friendlyAiError(error: unknown): string {
+    const err = error as { status?: number; response?: { status?: number }; name?: string; message?: string };
+    const status = err?.status ?? err?.response?.status;
+    if (status === 429) return "Le service IA est temporairement saturé. Réessayez dans un instant.";
+    if (status === 401 || status === 403) return "Service IA momentanément indisponible.";
+    if (err?.name === "APIConnectionTimeoutError" || /timeout|ETIMEDOUT/i.test(err?.message ?? "")) {
+        return "Le service IA a mis trop de temps à répondre. Réessayez.";
+    }
+    return "Échec de la génération. Réessayez dans un instant.";
+}
+
 export const getFlowContext = internalQuery({
     args: {},
     handler: async (ctx) => {
@@ -178,9 +194,9 @@ export const generateFlow = action({
             const json = JSON.parse(content);
             return json; // Expecting { nodes: [...], edges: [...] }
 
-        } catch (error: any) {
+        } catch (error) {
             console.error("OpenAI error:", error);
-            return { error: error.message || "Failed to generate flow" };
+            return { error: friendlyAiError(error) };
         }
     },
 });
@@ -301,9 +317,9 @@ Règles : n'invente AUCUNE information factuelle (prix, délais, stock, disponib
             const draft = response.choices[0]?.message?.content?.trim();
             if (!draft) throw new Error("Réponse vide du modèle");
             return { draft };
-        } catch (error: any) {
+        } catch (error) {
             console.error("generateReplyDraft error:", error);
-            return { error: error.message || "Échec de la génération du brouillon" };
+            return { error: friendlyAiError(error) };
         }
     },
 });
