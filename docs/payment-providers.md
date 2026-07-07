@@ -178,13 +178,19 @@ sequenceDiagram
 
 ### Particularite devise XOF
 
-XOF est une devise a 2 decimales dans Stripe. Le montant doit etre multiplie par 100 :
+XOF est une devise **zero-decimale** dans Stripe (comme JPY, XAF, VND...). Le
+montant doit etre envoye **tel quel**, sans multiplication par 100 :
 
 ```typescript
-unit_amount: args.amount * 100  // 5000 FCFA = 500000
+unit_amount: args.amount  // 5000 FCFA = 5000
 ```
 
-La fonction `toProviderAmount()` dans `lib/credit-packs.ts` gere cette conversion.
+> ⚠️ Multiplier par 100 facturerait le client **100× le prix affiche** (une
+> recharge « 5 000 FCFA » preleverait 500 000 FCFA). Voir la liste officielle
+> des devises zero-decimales : https://docs.stripe.com/currencies#zero-decimal
+
+La fonction `toProviderAmount()` dans `lib/credit-packs.ts` renvoie le montant
+FCFA brut pour tous les providers.
 
 ---
 

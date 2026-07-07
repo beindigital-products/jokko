@@ -25,11 +25,11 @@ export const PAYMENT_PROVIDERS: { id: PaymentProvider; name: string; description
 
 /**
  * Convertit un montant FCFA (unités majeures) en montant provider.
- * - Stripe : XOF est une devise à 2 décimales → multiplier par 100
- * - Wave / Orange Money : unités majeures directement
+ * XOF est une devise ZÉRO-décimale chez Stripe (comme JPY / XAF) : le montant
+ * est envoyé tel quel, sans ×100. Wave / Orange Money : unités majeures aussi.
+ * Tous les providers reçoivent donc le montant FCFA brut.
  */
-export function toProviderAmount(amountFCFA: number, provider: PaymentProvider): number {
-    if (provider === "STRIPE") return amountFCFA * 100;
+export function toProviderAmount(amountFCFA: number, _provider: PaymentProvider): number {
     return amountFCFA;
 }
 

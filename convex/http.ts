@@ -406,6 +406,7 @@ http.route({
                             priceId,
                             currentPeriodEnd: 0,
                             status,
+                            eventCreated: event.created,
                         });
                     }
                     break;
@@ -449,6 +450,7 @@ http.route({
                         status: sub.status,
                         currentPeriodEnd: sub.current_period_end,
                         organizationId: sub.metadata?.organizationId || undefined,
+                        eventCreated: event.created,
                     });
                     break;
                 }
@@ -457,6 +459,7 @@ http.route({
                     const sub = event.data.object;
                     await ctx.runMutation(internal.stripe.cancelSubscription, {
                         stripeCustomerId: sub.customer,
+                        eventCreated: event.created,
                     });
                     break;
                 }

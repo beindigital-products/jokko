@@ -5,6 +5,20 @@ import { planFromPriceId } from "./lib/stripePlans";
 import { enforceChannelDowngrade } from "./lib/planEnforcement";
 
 /**
+ * True when a Stripe webhook event is older than the last one already applied
+ * to this org (out-of-order retry). Stripe delivers events at-least-once and
+ * can replay an old event after a newer one; applying it would clobber the
+ * current subscription state. `eventCreated` is `event.created` (unix seconds).
+ */
+function isStaleStripeEvent(
+    org: { stripe?: { lastEventAt?: number } | null },
+    eventCreated: number | undefined,
+): boolean {
+    const last = org.stripe?.lastEventAt;
+    return eventCreated != null && last != null && eventCreated < last;
+}
+
+/**
  * Persist the Stripe customer ID immediately after creation.
  * Prevents duplicate customer creation on concurrent calls.
  */
@@ -40,10 +54,18 @@ export const handleCheckoutCompleted = internalMutation({
         priceId: v.string(),
         currentPeriodEnd: v.number(),
         status: v.string(),
+        eventCreated: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
-        const org = await ctx.db.get(args.organizationId as any);
+        const org = await ctx.db.get(args.organizationId as Id<"organizations">);
         if (!org) throw new Error(`Organization ${args.organizationId} not found`);
+
+        // Ordering guard: ignore a Stripe event older than the last one applied
+        // (out-of-order retry) so a stale event can't overwrite a newer state.
+        if (isStaleStripeEvent(org, args.eventCreated)) {
+            console.warn(`[Stripe] Stale checkout event for ${org._id} ignored`);
+            return;
+        }
 
         const plan = planFromPriceId(args.priceId);
 
@@ -57,6 +79,7 @@ export const handleCheckoutCompleted = internalMutation({
                 status: args.status,
                 currentPeriodEnd: args.currentPeriodEnd,
                 trialUsed: true, // Mark trial as used
+                lastEventAt: args.eventCreated ?? org.stripe?.lastEventAt,
             },
             updatedAt: Date.now(),
         });
@@ -77,6 +100,7 @@ export const updateSubscription = internalMutation({
         status: v.string(),
         currentPeriodEnd: v.number(),
         organizationId: v.optional(v.string()),
+        eventCreated: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         // Try by stripe customer index first, fallback to direct org ID
@@ -91,6 +115,13 @@ export const updateSubscription = internalMutation({
 
         if (!org) {
             console.error(`[Stripe] No org found for customer ${args.stripeCustomerId}`);
+            return;
+        }
+
+        // Ordering guard: ignore an out-of-order (stale) Stripe event so it
+        // can't clobber a newer subscription state.
+        if (isStaleStripeEvent(org, args.eventCreated)) {
+            console.warn(`[Stripe] Stale subscription event for ${org._id} ignored`);
             return;
         }
 
@@ -111,6 +142,7 @@ export const updateSubscription = internalMutation({
                 status: args.status,
                 currentPeriodEnd: args.currentPeriodEnd,
                 trialUsed,
+                lastEventAt: args.eventCreated ?? org.stripe?.lastEventAt,
             },
             updatedAt: Date.now(),
         });
@@ -125,6 +157,7 @@ export const updateSubscription = internalMutation({
 export const cancelSubscription = internalMutation({
     args: {
         stripeCustomerId: v.string(),
+        eventCreated: v.optional(v.number()),
     },
     handler: async (ctx, args) => {
         const org = await ctx.db
@@ -134,6 +167,13 @@ export const cancelSubscription = internalMutation({
 
         if (!org) {
             console.error(`[Stripe] No org found for customer ${args.stripeCustomerId}`);
+            return;
+        }
+
+        // Ordering guard: a stale cancel event must not downgrade an org that a
+        // newer event has since re-activated.
+        if (isStaleStripeEvent(org, args.eventCreated)) {
+            console.warn(`[Stripe] Stale cancel event for ${org._id} ignored`);
             return;
         }
 
@@ -147,6 +187,7 @@ export const cancelSubscription = internalMutation({
                 status: "canceled",
                 currentPeriodEnd: org.stripe?.currentPeriodEnd,
                 trialUsed: org.stripe?.trialUsed ?? true,
+                lastEventAt: args.eventCreated ?? org.stripe?.lastEventAt,
             },
             updatedAt: Date.now(),
         });

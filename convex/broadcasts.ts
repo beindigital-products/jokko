@@ -571,28 +571,25 @@ export const sendBroadcast = internalAction({
         const cursor = broadcast.sentCount ?? 0;
 
         // 3. First chunk only: deduct credits for the full audience + lock total.
+        //    Idempotent via the broadcast's `creditsDeducted` flag so a crash-
+        //    and-rerun at cursor 0 never double-charges the org.
         if (cursor === 0) {
             const { totalCostFCFA } = calculateBroadcastCost(targetContacts.map((c: any) => c.phone));
-            if (totalCostFCFA > 0) {
-                try {
-                    await ctx.runMutation(internal.credits.internalDeductCredits, {
-                        organizationId: args.organizationId,
-                        amount: totalCostFCFA,
-                        description: `Campagne "${broadcast.name}" — ${targetContacts.length} messages, ${totalCostFCFA.toLocaleString()} FCFA`,
-                        referenceId: args.broadcastId,
-                    });
-                } catch (e: any) {
-                    await ctx.runMutation(internal.broadcasts.markFailed, {
-                        id: args.broadcastId,
-                        reason: "Crédits insuffisants pour envoyer cette campagne",
-                    });
-                    return;
-                }
-            }
-            await ctx.runMutation(internal.broadcasts.setAudienceTotal, {
-                id: args.broadcastId,
-                total: targetContacts.length,
+            const debit = await ctx.runMutation(internal.broadcasts.deductBroadcastCredits, {
+                broadcastId: args.broadcastId,
+                organizationId: args.organizationId,
+                amount: totalCostFCFA,
+                audienceTotal: targetContacts.length,
             });
+            if (!debit.ok) {
+                await ctx.runMutation(internal.broadcasts.markFailed, {
+                    id: args.broadcastId,
+                    reason: debit.reason === "insufficient_credits"
+                        ? "Crédits insuffisants pour envoyer cette campagne"
+                        : "Impossible de débiter les crédits de la campagne",
+                });
+                return;
+            }
         }
 
         const total = broadcast.audienceTotal ?? targetContacts.length;
@@ -631,13 +628,64 @@ export const sendBroadcast = internalAction({
     }
 });
 
-/** Lock the audience size at send-start (cursor 0) for the chunked sender. */
-export const setAudienceTotal = internalMutation({
-    args: { id: v.id("broadcasts"), total: v.number() },
+/**
+ * Debit the campaign's full audience cost EXACTLY ONCE and lock the audience
+ * total, in a single atomic mutation. Idempotent via the broadcast's
+ * `creditsDeducted` flag: if the chunked sender is re-run at cursor 0 after a
+ * crash, the second call sees the flag and does not re-charge. Returns a
+ * `reason` on failure so the caller can mark the broadcast FAILED.
+ */
+export const deductBroadcastCredits = internalMutation({
+    args: {
+        broadcastId: v.id("broadcasts"),
+        organizationId: v.id("organizations"),
+        amount: v.number(),
+        audienceTotal: v.number(),
+    },
     handler: async (ctx, args) => {
-        await ctx.db.patch(args.id, { audienceTotal: args.total, updatedAt: Date.now() });
+        const broadcast = await ctx.db.get(args.broadcastId);
+        if (!broadcast) return { ok: false as const, reason: "not_found" };
+
+        // Already charged (idempotent replay) — just ensure the total is locked.
+        if (broadcast.creditsDeducted) {
+            if (broadcast.audienceTotal == null) {
+                await ctx.db.patch(args.broadcastId, {
+                    audienceTotal: args.audienceTotal,
+                    updatedAt: Date.now(),
+                });
+            }
+            return { ok: true as const, alreadyCharged: true };
+        }
+
+        if (args.amount > 0) {
+            const org = await ctx.db.get(args.organizationId);
+            if (!org) return { ok: false as const, reason: "org_not_found" };
+            const balance = org.creditBalance ?? 0;
+            if (balance < args.amount) {
+                return { ok: false as const, reason: "insufficient_credits" };
+            }
+            const newBalance = balance - args.amount;
+            await ctx.db.patch(args.organizationId, { creditBalance: newBalance });
+            await ctx.db.insert("creditTransactions", {
+                organizationId: args.organizationId,
+                amount: -args.amount,
+                type: "USAGE",
+                description: `Campagne "${broadcast.name}" — ${args.audienceTotal} messages, ${args.amount.toLocaleString()} FCFA`,
+                referenceId: args.broadcastId,
+                balanceAfter: newBalance,
+                createdAt: Date.now(),
+            });
+        }
+
+        await ctx.db.patch(args.broadcastId, {
+            creditsDeducted: true,
+            audienceTotal: args.audienceTotal,
+            updatedAt: Date.now(),
+        });
+        return { ok: true as const };
     },
 });
+
 
 /**
  * Pause an in-flight send. The currently-running chunk finishes; the next

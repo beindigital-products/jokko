@@ -166,6 +166,10 @@ export default defineSchema({
             status: v.optional(v.string()), // active, canceled, past_due, trialing
             currentPeriodEnd: v.optional(v.number()),
             trialUsed: v.optional(v.boolean()),
+            // Unix seconds of the last Stripe event applied to this org.
+            // Guards against out-of-order webhook replays overwriting a newer
+            // subscription state with a stale one.
+            lastEventAt: v.optional(v.number()),
         })),
 
         // Fair Usage Policy (Limits)
@@ -789,6 +793,11 @@ export default defineSchema({
         // detect completion + cap at the paid count (resume uses sentCount as
         // the cursor).
         audienceTotal: v.optional(v.number()),
+
+        // True once the audience cost has been debited from the org's credit
+        // balance. Makes the upfront debit exactly-once per campaign even if
+        // the chunked sender is re-run at cursor 0 after a crash.
+        creditsDeducted: v.optional(v.boolean()),
 
         // Per-template variable mapping ({{N}} → contact field or fixed value),
         // resolved per-recipient at send-time into WhatsApp template components.
